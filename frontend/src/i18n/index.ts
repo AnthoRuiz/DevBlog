@@ -50,6 +50,7 @@ export interface Translations {
   uploadImageBtn: string;
   uploadingImage: string;
   readingTimeLabel: string;
+  readingTimeAuto: string;
   tagsLabel: string;
   contentMarkdownLabel: string;
   contentMarkdownPlaceholder: string;
@@ -78,6 +79,11 @@ export interface Translations {
   alreadyAccountText: string;
   needAccountText: string;
   googleLoginBtn: string;
+  tableOfContents: string;
+  aiTranslateBtn: string;
+  translatingWithAi: string;
+  aiTranslateSuccess: string;
+  aiTranslatePrompt: string;
   footerText: string;
 }
 
@@ -102,19 +108,19 @@ export const translations: Record<Language, Translations> = {
     sortByRecent: '✨ Más Recientes',
     sortByTopVoted: '▲ Más Votados',
     sortByTrending: '🔥 En Tendencia',
-    minRead: 'min',
+    minRead: 'min de lectura',
     viewsCount: 'vistas',
     originalLangBadge: 'Idioma original',
     bookmarkSave: 'Guardar en marcadores',
     bookmarked: 'Guardado',
     noArticlesFound: 'No se encontraron artículos',
-    noArticlesSub: 'Prueba seleccionando otro filtro o limpiando el buscador.',
-    noBookmarksFound: 'No tienes artículos guardados todavía',
-    noBookmarksSub: 'Haz clic en el ícono de marcador en cualquier card para guardarlo aquí.',
+    noArticlesSub: 'Intenta seleccionar otro filtro o buscar un término diferente.',
+    noBookmarksFound: 'No tienes artículos guardados aún',
+    noBookmarksSub: 'Haz clic en el icono de marcador en cualquier tarjeta para guardarlo aquí.',
     readingMode: 'Modo Lectura',
     byAuthor: 'Por Ingeniero de Software',
     publishedOn: 'Publicado el',
-    summaryLabel: 'Resumen:',
+    summaryLabel: 'Resumen Ejecutivo:',
     copySnippet: 'Copiar',
     copiedSnippet: 'Copiado',
     shareBtn: 'Compartir',
@@ -132,6 +138,7 @@ export const translations: Record<Language, Translations> = {
     uploadImageBtn: 'Subir Imagen Local',
     uploadingImage: 'Subiendo imagen...',
     readingTimeLabel: 'Tiempo estimado de lectura (min)',
+    readingTimeAuto: 'Calculado automáticamente',
     tagsLabel: 'Categorías y Tags',
     contentMarkdownLabel: 'Contenido en Markdown',
     contentMarkdownPlaceholder: '# Mi Arquitectura\n\nExplica aquí los conceptos, diagramas y fragmentos de código...',
@@ -160,6 +167,11 @@ export const translations: Record<Language, Translations> = {
     alreadyAccountText: '¿Ya tienes cuenta? Inicia sesión',
     needAccountText: '¿No tienes cuenta? Regístrate aquí',
     googleLoginBtn: 'Continuar con Google Workspace',
+    tableOfContents: 'Tabla de Contenidos',
+    aiTranslateBtn: '⚡ Traducir con IA (Gemini)',
+    translatingWithAi: 'Traduciendo con Gemini...',
+    aiTranslateSuccess: '¡Artículo traducido exitosamente!',
+    aiTranslatePrompt: 'Selecciona el idioma de destino para autotraducir:',
     footerText: '© 2026 SYS.BLOG • Diseñado para Homelab • Desplegado con Docker • React + FastAPI',
   },
   en: {
@@ -180,21 +192,21 @@ export const translations: Record<Language, Translations> = {
     clearFilter: '✕ Clear filter',
     activeTagFilter: 'Filtered by',
     sortByRecent: '✨ Most Recent',
-    sortByTopVoted: '▲ Top Voted',
+    sortByTopVoted: '▲ Most Voted',
     sortByTrending: '🔥 Trending',
     minRead: 'min read',
     viewsCount: 'views',
     originalLangBadge: 'Original language',
-    bookmarkSave: 'Save bookmark',
+    bookmarkSave: 'Save to bookmarks',
     bookmarked: 'Saved',
     noArticlesFound: 'No articles found',
-    noArticlesSub: 'Try selecting a different tag or clearing your search.',
+    noArticlesSub: 'Try selecting another filter or searching for a different keyword.',
     noBookmarksFound: 'No saved articles yet',
-    noBookmarksSub: 'Click the bookmark icon on any card to save it for reading later.',
+    noBookmarksSub: 'Click the bookmark icon on any card to save it here for later reading.',
     readingMode: 'Reading Mode',
     byAuthor: 'By Software Engineer',
     publishedOn: 'Published on',
-    summaryLabel: 'Summary:',
+    summaryLabel: 'Executive Summary:',
     copySnippet: 'Copy',
     copiedSnippet: 'Copied',
     shareBtn: 'Share',
@@ -212,6 +224,7 @@ export const translations: Record<Language, Translations> = {
     uploadImageBtn: 'Upload Local Image',
     uploadingImage: 'Uploading image...',
     readingTimeLabel: 'Estimated reading time (min)',
+    readingTimeAuto: 'Calculated automatically',
     tagsLabel: 'Categories & Tags',
     contentMarkdownLabel: 'Markdown Content',
     contentMarkdownPlaceholder: '# Architecture Overview\n\nExplain concepts, system diagrams, and code snippets...',
@@ -240,6 +253,11 @@ export const translations: Record<Language, Translations> = {
     alreadyAccountText: 'Already have an account? Sign in',
     needAccountText: 'Need an account? Register here',
     googleLoginBtn: 'Continue with Google Workspace',
+    tableOfContents: 'Table of Contents',
+    aiTranslateBtn: '⚡ Translate with AI (Gemini)',
+    translatingWithAi: 'Translating with Gemini...',
+    aiTranslateSuccess: 'Article translated successfully!',
+    aiTranslatePrompt: 'Select target language to auto-translate:',
     footerText: '© 2026 SYS.BLOG • Built for Homelab • Deployed with Docker • React + FastAPI',
   },
   pt: {
@@ -292,6 +310,7 @@ export const translations: Record<Language, Translations> = {
     uploadImageBtn: 'Enviar Imagem Local',
     uploadingImage: 'Enviando imagem...',
     readingTimeLabel: 'Tempo estimado de leitura (min)',
+    readingTimeAuto: 'Calculado automaticamente',
     tagsLabel: 'Categorias e Tags',
     contentMarkdownLabel: 'Conteúdo em Markdown',
     contentMarkdownPlaceholder: '# Minha Arquitetura\n\nExplique aqui os conceitos, diagramas e trechos de código...',
@@ -320,6 +339,11 @@ export const translations: Record<Language, Translations> = {
     alreadyAccountText: 'Já tem uma conta? Entre aqui',
     needAccountText: 'Não tem conta? Registre-se aqui',
     googleLoginBtn: 'Continuar com Google Workspace',
+    tableOfContents: 'Índice de Conteúdo',
+    aiTranslateBtn: '⚡ Traduzir com IA (Gemini)',
+    translatingWithAi: 'Traduzindo com Gemini...',
+    aiTranslateSuccess: 'Artigo traduzido com sucesso!',
+    aiTranslatePrompt: 'Selecione o idioma de destino para autotraduzir:',
     footerText: '© 2026 SYS.BLOG • Projetado para Homelab • Implantado com Docker • React + FastAPI',
   },
   fr: {
@@ -372,6 +396,7 @@ export const translations: Record<Language, Translations> = {
     uploadImageBtn: 'Télécharger une Image Locale',
     uploadingImage: 'Téléchargement de l\'image...',
     readingTimeLabel: 'Temps de lecture estimé (min)',
+    readingTimeAuto: 'Calculé automatiquement',
     tagsLabel: 'Catégories & Tags',
     contentMarkdownLabel: 'Contenu Markdown',
     contentMarkdownPlaceholder: '# Architecture\n\nExpliquez ici les concepts, diagrammes et extraits de code...',
@@ -400,6 +425,11 @@ export const translations: Record<Language, Translations> = {
     alreadyAccountText: 'Vous avez déjà un compte ? Connectez-vous',
     needAccountText: 'Pas encore de compte ? Inscrivez-vous ici',
     googleLoginBtn: 'Continuer avec Google Workspace',
+    tableOfContents: 'Table des Matières',
+    aiTranslateBtn: '⚡ Traduire avec IA (Gemini)',
+    translatingWithAi: 'Traduction avec Gemini...',
+    aiTranslateSuccess: 'Article traduit avec succès !',
+    aiTranslatePrompt: 'Sélectionnez la langue cible à traduire :',
     footerText: '© 2026 SYS.BLOG • Conçu pour Homelab • Déployé avec Docker • React + FastAPI',
   },
 };

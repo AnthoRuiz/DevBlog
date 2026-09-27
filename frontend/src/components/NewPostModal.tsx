@@ -3,6 +3,7 @@ import { X, Upload, Image as ImageIcon, Sparkles, Edit3 } from 'lucide-react';
 import { Tag, Post, PostDetail } from '../types';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
 import { uploadImage, createPost, updatePost } from '../services/api';
+import { calculateReadingTime } from '../utils/readingTime';
 
 interface NewPostModalProps {
   isOpen: boolean;
@@ -32,8 +33,17 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const [language, setLanguage] = useState<Language>(defaultLang);
   const [coverImageUrl, setCoverImageUrl] = useState('');
   const [readingTime, setReadingTime] = useState(5);
+  const [isAutoReadingTime, setIsAutoReadingTime] = useState(true);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [contentMarkdown, setContentMarkdown] = useState('');
+
+  const autoMinutes = calculateReadingTime(contentMarkdown);
+
+  useEffect(() => {
+    if (isAutoReadingTime && contentMarkdown.trim()) {
+      setReadingTime(autoMinutes);
+    }
+  }, [contentMarkdown, isAutoReadingTime, autoMinutes]);
 
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,6 +58,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setLanguage((editingPost.language as Language) || defaultLang);
       setCoverImageUrl(editingPost.cover_image_url || '');
       setReadingTime(editingPost.reading_time_minutes || 5);
+      setIsAutoReadingTime(false);
       setSelectedTagIds(editingPost.tags ? editingPost.tags.map((tg) => tg.id) : []);
       setContentMarkdown('content_markdown' in editingPost ? (editingPost as PostDetail).content_markdown : '');
     } else {
@@ -56,6 +67,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setLanguage(defaultLang);
       setCoverImageUrl('');
       setReadingTime(5);
+      setIsAutoReadingTime(true);
       setSelectedTagIds([]);
       setContentMarkdown('');
     }
@@ -302,15 +314,31 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-slate-400 mb-1.5">
-                {t.readingTimeLabel}
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-mono text-slate-400">
+                  {t.readingTimeLabel}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAutoReadingTime(true);
+                    setReadingTime(autoMinutes);
+                  }}
+                  className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
+                  title={t.readingTimeAuto}
+                >
+                  <span>⚡ Auto: {autoMinutes}m</span>
+                </button>
+              </div>
               <input
                 type="number"
                 min={1}
                 max={120}
                 value={readingTime}
-                onChange={(e) => setReadingTime(parseInt(e.target.value) || 5)}
+                onChange={(e) => {
+                  setIsAutoReadingTime(false);
+                  setReadingTime(parseInt(e.target.value) || 1);
+                }}
                 className="w-full bg-[#07090e] border border-[#1e293b] rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
               />
             </div>

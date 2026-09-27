@@ -7,7 +7,14 @@ from typing import Optional
 import uuid
 import os
 import shutil
+import math
 from datetime import datetime, timezone
+
+def calculate_reading_time(text: str | None) -> int:
+    if not text or not text.strip():
+        return 1
+    words = len(text.strip().split())
+    return max(1, math.ceil(words / 200))
 
 from app.db.session import get_db
 from app.models.post import Post, Tag, post_tags
@@ -150,6 +157,10 @@ async def create_post(
         tag_res = await db.execute(select(Tag).where(Tag.id.in_(post_in.tag_ids)))
         tags = list(tag_res.scalars().all())
 
+    reading_time = post_in.reading_time_minutes
+    if not reading_time or reading_time <= 1:
+        reading_time = calculate_reading_time(post_in.content_markdown)
+
     new_post = Post(
         author_id=current_admin.id,
         slug=slug,
@@ -158,7 +169,7 @@ async def create_post(
         summary=post_in.summary,
         content_markdown=post_in.content_markdown,
         cover_image_url=post_in.cover_image_url,
-        reading_time_minutes=post_in.reading_time_minutes,
+        reading_time_minutes=reading_time,
         is_published=post_in.is_published,
         published_at=datetime.now(timezone.utc) if post_in.is_published else None,
         tags=tags
@@ -203,6 +214,8 @@ async def update_post(
         post.cover_image_url = post_update.cover_image_url
     if post_update.reading_time_minutes is not None:
         post.reading_time_minutes = post_update.reading_time_minutes
+    elif post_update.content_markdown is not None:
+        post.reading_time_minutes = calculate_reading_time(post_update.content_markdown)
     if post_update.language is not None:
         post.language = post_update.language
     if post_update.is_published is not None:
