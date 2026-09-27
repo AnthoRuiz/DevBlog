@@ -8,6 +8,7 @@ import uuid
 import os
 import shutil
 import math
+import re
 from datetime import datetime, timezone
 
 def calculate_reading_time(text: str | None) -> int:
@@ -38,6 +39,7 @@ from app.schemas.post import (
 )
 from app.services.gemini import translate_post_content, suggest_post_tags, estimate_reading_time
 from app.api.deps import get_current_admin, get_current_author_or_admin, get_current_user_optional, get_client_hash
+from app.core.limiter import limiter
 
 router = APIRouter(prefix="/posts", tags=["Artículos"])
 
@@ -106,7 +108,9 @@ async def create_tag(
     return TagRead.model_validate(new_tag)
 
 @router.post("/ai-suggest-tags", response_model=TagSuggestResponse)
+@limiter.limit("10/minute")
 async def ai_suggest_tags(
+    request: Request,
     req: TagSuggestRequest,
     current_user: User = Depends(get_current_author_or_admin),
     db: AsyncSession = Depends(get_db)
@@ -186,7 +190,9 @@ async def upload_image(
     return {"url": f"/uploads/{filename}"}
 
 @router.post("/ai-translate", response_model=PostTranslateResponse)
+@limiter.limit("10/minute")
 async def ai_translate_post(
+    request: Request,
     req: PostTranslateRequest,
     current_user: User = Depends(get_current_author_or_admin),
 ):
@@ -365,8 +371,10 @@ async def list_comments(post_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     return [CommentRead.model_validate(c) for c in comments]
 
 @router.post("/{post_id}/comments", response_model=CommentRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
 async def create_comment(
     post_id: uuid.UUID,
+    request: Request,
     comment_in: CommentCreate,
     current_user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
@@ -376,6 +384,19 @@ async def create_comment(
     if not post:
         raise HTTPException(status_code=404, detail="Artículo no encontrado")
 
+    # Anti-Spam: Trampa Honeypot contra bots
+    if comment_in.hp_website:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Petición bloqueada por filtro anti-spam"
+        )
+
+    # Sanitización de contenido contra inyecciones de scripts
+    sanitized = re.sub(r'<\s*script[^>]*>.*?<\s*/\s*script\s*>', '', comment_in.content, flags=re.IGNORECASE | re.DOTALL)
+    sanitized = re.sub(r'<\s*iframe[^>]*>.*?<\s*/\s*iframe\s*>', '', sanitized, flags=re.IGNORECASE | re.DOTALL)
+    if not sanitized.strip():
+        raise HTTPException(status_code=400, detail="Contenido de comentario inválido")
+
     author_name = current_user.full_name if current_user else (comment_in.author_name or "Dev Reader")
     user_id = current_user.id if current_user else None
 
@@ -383,7 +404,7 @@ async def create_comment(
         post_id=post_id,
         user_id=user_id,
         author_name=author_name,
-        content=comment_in.content,
+        content=sanitized.strip(),
         is_approved=True
     )
     db.add(new_comment)
@@ -392,6 +413,7 @@ async def create_comment(
     return CommentRead.model_validate(new_comment)
 
 @router.post("/{post_id}/upvote", response_model=UpvoteResponse)
+@limiter.limit("30/minute")
 async def toggle_upvote(
     post_id: uuid.UUID,
     request: Request,

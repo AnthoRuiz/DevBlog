@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 import uuid
@@ -10,11 +10,13 @@ from app.models.user import User, UserRole, OAuthAccount
 from app.schemas.user import UserCreate, UserRead, Token, LoginRequest, OAuthLoginRequest
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.api.deps import get_current_user, get_current_admin
+from app.core.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
 
 @router.post("/register", response_model=Token)
-async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def register(request: Request, user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     # Comprobar si el email ya existe
     existing = await db.execute(select(User).where(User.email == user_in.email))
     if existing.scalar_one_or_none():
@@ -45,7 +47,8 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     return Token(access_token=token, token_type="bearer", user=UserRead.model_validate(new_user))
 
 @router.post("/login", response_model=Token)
-async def login(login_in: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, login_in: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == login_in.email))
     user = result.scalar_one_or_none()
 

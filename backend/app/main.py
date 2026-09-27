@@ -163,6 +163,23 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Configuración de Rate Limiting (SlowAPI)
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
+from fastapi import Request
+from app.core.limiter import limiter
+
+app.state.limiter = limiter
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": "Demasiadas peticiones desde tu dirección IP. Por favor espera un momento antes de volver a intentarlo (Rate Limit Exceeded)."
+        }
+    )
+
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,

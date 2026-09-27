@@ -47,6 +47,7 @@ class PostRead(BaseModel):
 class CommentCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=2000)
     author_name: Optional[str] = Field("Dev Reader", max_length=100)
+    hp_website: Optional[str] = Field(None, description="Honeypot anti-spam field, must remain empty")
 
 class CommentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
