@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowBigUp, Bookmark, Clock, Eye, Calendar, Terminal } from 'lucide-react';
+import { ArrowBigUp, Bookmark, Clock, Eye, Calendar, Terminal, Edit3, Trash2 } from 'lucide-react';
 import { Post } from '../types';
 import { Language, Translations, getLanguageFlag, getLanguageName } from '../i18n';
 
@@ -7,6 +7,12 @@ interface DigestCardProps {
   post: Post;
   onOpen: (slug: string) => void;
   onToggleUpvote: (postId: string) => Promise<{ upvoted: boolean; new_upvotes_count: number }>;
+  onSelectTag?: (tagSlug: string) => void;
+  onToggleBookmark?: (postId: string) => void;
+  isBookmarked?: boolean;
+  isAuthor?: boolean;
+  onEditPost?: (post: Post) => void;
+  onDeletePost?: (postId: string) => void;
   t: Translations;
   currentLang?: Language;
 }
@@ -15,7 +21,7 @@ export function formatPostDate(dateString?: string, lang: Language = 'es'): stri
   if (!dateString) return '';
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return '';
-  
+
   const localeMap: Record<Language, string> = {
     es: 'es-ES',
     en: 'en-US',
@@ -33,12 +39,17 @@ export const DigestCard: React.FC<DigestCardProps> = ({
   post,
   onOpen,
   onToggleUpvote,
+  onSelectTag,
+  onToggleBookmark,
+  isBookmarked = false,
+  isAuthor = false,
+  onEditPost,
+  onDeletePost,
   t,
   currentLang = 'es',
 }) => {
   const [upvotes, setUpvotes] = useState(post.upvotes_count ?? 0);
   const [hasUpvoted, setHasUpvoted] = useState(false);
-  const [isBookmarked, setIsBookmarked] = useState(false);
   const [isVoting, setIsVoting] = useState(false);
   const [imageError, setImageError] = useState(false);
 
@@ -66,7 +77,30 @@ export const DigestCard: React.FC<DigestCardProps> = ({
 
   const handleBookmark = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsBookmarked(!isBookmarked);
+    if (onToggleBookmark) {
+      onToggleBookmark(post.id);
+    }
+  };
+
+  const handleTagClick = (e: React.MouseEvent, slug: string) => {
+    e.stopPropagation();
+    if (onSelectTag) {
+      onSelectTag(slug);
+    }
+  };
+
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onEditPost) {
+      onEditPost(post);
+    }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDeletePost && window.confirm(t.confirmDeletePost)) {
+      onDeletePost(post.id);
+    }
   };
 
   const safeLang = (post.language || 'es').toLowerCase();
@@ -75,65 +109,67 @@ export const DigestCard: React.FC<DigestCardProps> = ({
 
   const primaryTag = post.tags && post.tags.length > 0 ? post.tags[0] : null;
   const secondaryTags = post.tags && post.tags.length > 1 ? post.tags.slice(1) : [];
-  
+
   const displayDate = formatPostDate(post.published_at || post.created_at, currentLang);
 
   return (
     <article
       onClick={() => onOpen(post.slug)}
-      className="group bg-[#0b0f19] border border-[#1e293b] hover:border-cyan-500/50 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-cyan-500/10 cursor-pointer"
+      className="group bg-[#0b0f19] border border-[#1e293b] hover:border-cyan-500/50 rounded-2xl overflow-hidden flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-cyan-500/10 cursor-pointer"
     >
       {/* Portada Gráfica */}
-      <div className="relative h-48 w-full bg-slate-950 overflow-hidden border-b border-[#1e293b]">
-        {post.cover_image_url && !imageError ? (
-          <>
-            <img
-              src={post.cover_image_url}
-              alt={post.title}
-              onError={() => setImageError(true)}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-[#0b0f19]/30 to-transparent" />
-          </>
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-[#0f172a] via-[#111827] to-[#07090e] flex items-center justify-center relative">
-            <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px]" />
-            <div className="w-14 h-14 rounded-2xl bg-[#0b0f19]/80 border border-[#1e293b] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-              <Terminal className="w-7 h-7 text-cyan-400" />
+      <div>
+        <div className="relative h-48 w-full bg-slate-950 overflow-hidden border-b border-[#1e293b]">
+          {post.cover_image_url && !imageError ? (
+            <>
+              <img
+                src={post.cover_image_url}
+                alt={post.title}
+                onError={() => setImageError(true)}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-[#0b0f19]/30 to-transparent" />
+            </>
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#0f172a] via-[#111827] to-[#07090e] flex items-center justify-center relative">
+              <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px]" />
+              <div className="w-14 h-14 rounded-2xl bg-[#0b0f19]/80 border border-[#1e293b] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Terminal className="w-7 h-7 text-cyan-400" />
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Badges superiores sobre la portada */}
-        <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between gap-2 z-10 pointer-events-none">
-          {primaryTag ? (
+          {/* Badges superiores sobre la portada */}
+          <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between gap-2 z-10">
+            {primaryTag ? (
+              <button
+                type="button"
+                onClick={(e) => handleTagClick(e, primaryTag.slug)}
+                className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-md border backdrop-blur-md shadow-md transition-transform hover:scale-105"
+                style={{
+                  backgroundColor: `${primaryTag.color_hex}25`,
+                  borderColor: `${primaryTag.color_hex}55`,
+                  color: primaryTag.color_hex,
+                }}
+              >
+                #{primaryTag.name}
+              </button>
+            ) : <span />}
+
+            {/* Badge de Idioma Original del Post */}
             <span
-              className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-md border backdrop-blur-md shadow-md"
-              style={{
-                backgroundColor: `${primaryTag.color_hex}25`,
-                borderColor: `${primaryTag.color_hex}55`,
-                color: primaryTag.color_hex,
-              }}
+              className="flex items-center gap-1.5 text-[11px] font-mono font-bold px-2.5 py-1 rounded-md bg-[#07090e]/90 border border-cyan-500/40 text-cyan-300 backdrop-blur-md shadow-md pointer-events-none"
+              title={`${t.originalLangBadge}: ${langFullName}`}
             >
-              #{primaryTag.name}
+              <span className="text-sm leading-none">{langFlag}</span>
+              <span>{safeLang.toUpperCase()}</span>
             </span>
-          ) : <span />}
-
-          {/* Badge de Idioma Original del Post */}
-          <span
-            className="flex items-center gap-1.5 text-[11px] font-mono font-bold px-2.5 py-1 rounded-md bg-[#07090e]/90 border border-cyan-500/40 text-cyan-300 backdrop-blur-md shadow-md"
-            title={`${t.originalLangBadge}: ${langFullName}`}
-          >
-            <span className="text-sm leading-none">{langFlag}</span>
-            <span>{safeLang.toUpperCase()}</span>
-          </span>
+          </div>
         </div>
-      </div>
 
-      {/* Cuerpo de la Tarjeta */}
-      <div className="p-5 flex-1 flex flex-col justify-between">
-        <div>
+        {/* Cuerpo de la Tarjeta */}
+        <div className="p-5">
           {/* Metadatos superiores: Fecha de Publicación, Tiempo de Lectura y Vistas */}
           <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-400 font-mono mb-2.5">
             {displayDate && (
@@ -167,19 +203,25 @@ export const DigestCard: React.FC<DigestCardProps> = ({
           {secondaryTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3">
               {secondaryTags.map((tag) => (
-                <span
+                <button
                   key={tag.id}
-                  className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#121622] text-slate-400 border border-[#1e293b]"
+                  type="button"
+                  onClick={(e) => handleTagClick(e, tag.slug)}
+                  className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#121622] text-slate-400 border border-[#1e293b] hover:border-cyan-500/40 hover:text-cyan-300 transition-colors"
                 >
                   #{tag.name}
-                </span>
+                </button>
               ))}
             </div>
           )}
         </div>
+      </div>
 
-        <div className="flex items-center justify-between border-t border-[#1e293b] pt-3.5 mt-5">
+      {/* Barra de Acciones Inferior */}
+      <div className="px-5 pb-5">
+        <div className="flex items-center justify-between border-t border-[#1e293b] pt-3.5">
           <button
+            type="button"
             onClick={handleUpvote}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-bold transition-all ${
               hasUpvoted
@@ -191,11 +233,37 @@ export const DigestCard: React.FC<DigestCardProps> = ({
             <span>{upvotes}</span>
           </button>
 
-          <div className="flex items-center gap-3 text-slate-500">
+          <div className="flex items-center gap-2">
+            {/* Controles de Autor (Editar y Eliminar) */}
+            {isAuthor && (
+              <div className="flex items-center gap-1 mr-2 border-r border-[#1e293b] pr-2">
+                <button
+                  type="button"
+                  onClick={handleEditClick}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+                  title={t.editPostBtn}
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteClick}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  title={t.deletePostBtn}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Botón de Marcador / Favorito */}
             <button
+              type="button"
               onClick={handleBookmark}
-              className={`p-1.5 rounded-lg hover:text-slate-200 transition-colors ${
-                isBookmarked ? 'text-cyan-400' : ''
+              className={`p-1.5 rounded-lg transition-colors ${
+                isBookmarked
+                  ? 'text-cyan-400 bg-cyan-500/10 border border-cyan-500/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#121622]'
               }`}
               title={isBookmarked ? t.bookmarked : t.bookmarkSave}
             >
@@ -203,7 +271,6 @@ export const DigestCard: React.FC<DigestCardProps> = ({
             </button>
           </div>
         </div>
-
       </div>
     </article>
   );

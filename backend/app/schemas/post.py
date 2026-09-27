@@ -39,10 +39,38 @@ class PostRead(BaseModel):
     created_at: datetime
     tags: list[TagRead] = []
 
+class CommentCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=2000)
+    author_name: Optional[str] = Field("Dev Reader", max_length=100)
+
+class CommentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    post_id: uuid.UUID
+    user_id: Optional[uuid.UUID] = None
+    author_name: str
+    content: str
+    created_at: datetime
+
 class PostDetailRead(PostRead):
     content_markdown: str
+    comments: list[CommentRead] = []
+
+class PostUpdate(BaseModel):
+    title: Optional[str] = Field(None, max_length=255)
+    summary: Optional[str] = Field(None, max_length=500)
+    content_markdown: Optional[str] = None
+    cover_image_url: Optional[str] = None
+    language: Optional[str] = None
+    reading_time_minutes: Optional[int] = Field(None, ge=1)
+    is_published: Optional[bool] = None
+    tag_ids: Optional[list[uuid.UUID]] = None
 
 class UpvoteResponse(BaseModel):
     post_id: uuid.UUID
     upvoted: bool
     new_upvotes_count: int
+
+class BookmarkToggleResponse(BaseModel):
+    post_id: uuid.UUID
+    is_bookmarked: bool
