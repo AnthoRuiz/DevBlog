@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Terminal, User as UserIcon, Search, Globe, LogOut } from 'lucide-react';
+import { Terminal, User as UserIcon, Search, Globe, LogOut, X } from 'lucide-react';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
 
 interface NavbarProps {
@@ -57,8 +57,18 @@ export const Navbar: FC<NavbarProps> = ({
               placeholder={t.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => onSearch(e.target.value)}
-              className="w-full bg-[#0b0f19] border border-[#1e293b] rounded-xl pl-10 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+              className="w-full bg-[#0b0f19] border border-[#1e293b] rounded-xl pl-10 pr-9 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => onSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                title="Limpiar búsqueda"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -88,6 +98,7 @@ export const Navbar: FC<NavbarProps> = ({
                 👤 {userEmail.split('@')[0]}
               </span>
               <button
+                type="button"
                 onClick={onLogout}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/30 hover:border-red-500/60 bg-red-500/10 text-xs font-medium text-red-300 transition-colors"
                 title={t.authorLogout}
@@ -98,11 +109,35 @@ export const Navbar: FC<NavbarProps> = ({
             </div>
           ) : (
             <button
+              type="button"
               onClick={onOpenLogin}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1e293b] hover:border-slate-600 bg-[#0b0f19] text-xs font-medium text-slate-300 transition-colors"
             >
               <UserIcon className="w-3.5 h-3.5 text-cyan-400" />
               <span>{t.authorLogin}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Buscador Móvil */}
+      <div className="sm:hidden px-4 pb-3">
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder={t.searchPlaceholder}
+            value={searchQuery}
+            onChange={(e) => onSearch(e.target.value)}
+            className="w-full bg-[#0b0f19] border border-[#1e293b] rounded-xl pl-10 pr-9 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => onSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+            >
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
