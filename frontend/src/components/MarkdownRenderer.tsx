@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import hljs from 'highlight.js';
 import { Copy, Check } from 'lucide-react';
+import { MermaidRenderer } from './MermaidRenderer';
 
 interface MarkdownRendererProps {
   content: string;
@@ -63,6 +64,11 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           const lines = trimmed.split('\n');
           const lang = lines[0].replace('```', '').trim().toLowerCase();
           const codeBody = lines.slice(1).join('\n').replace(/```$/, '').trim();
+
+          // Renderizar Diagramas Mermaid si el bloque es ```mermaid
+          if (lang === 'mermaid') {
+            return <MermaidRenderer key={idx} chart={codeBody} />;
+          }
 
           let highlighted = '';
           let displayLang = lang || 'code';

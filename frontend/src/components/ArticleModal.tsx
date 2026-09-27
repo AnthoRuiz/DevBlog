@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Clock, Calendar, Check, Copy, ArrowBigUp, Share2, Bookmark, MessageSquare, Send, Edit3, Trash2 } from 'lucide-react';
+import { X, Clock, Calendar, ArrowBigUp, Share2, Bookmark, MessageSquare, Send, Edit3, Trash2 } from 'lucide-react';
 import { PostDetail, Comment, Post } from '../types';
 import { Language, Translations } from '../i18n';
 import { fetchComments, createComment } from '../services/api';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface ArticleModalProps {
   post: PostDetail | null;
@@ -33,7 +34,6 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
   t,
   currentLang = 'es',
 }) => {
-  const [copied, setCopied] = useState(false);
   const [upvotes, setUpvotes] = useState(post?.upvotes_count ?? 0);
   const [hasUpvoted, setHasUpvoted] = useState(false);
 
@@ -62,12 +62,6 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
   };
 
   if (!isOpen || !post) return null;
-
-  const handleCopyCode = (codeText: string) => {
-    navigator.clipboard.writeText(codeText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleUpvote = async () => {
     try {
@@ -233,39 +227,8 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
           </div>
 
           {/* Cuerpo en Markdown renderizado */}
-          <div className="prose prose-invert max-w-none text-slate-300 space-y-5 text-sm sm:text-base leading-relaxed">
-            {post.content_markdown.split('\n\n').map((paragraph, idx) => {
-              if (paragraph.startsWith('```')) {
-                const lines = paragraph.replace(/```[a-z]*/g, '').trim();
-                return (
-                  <div key={idx} className="my-6 rounded-xl border border-[#1e293b] bg-[#07090e] overflow-hidden font-mono text-xs">
-                    <div className="bg-[#121622] px-4 py-2 border-b border-[#1e293b] flex justify-between items-center text-slate-400">
-                      <span>snippet.py</span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyCode(lines)}
-                        className="flex items-center gap-1 hover:text-white transition-colors"
-                      >
-                        {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copied ? t.copiedSnippet : t.copySnippet}</span>
-                      </button>
-                    </div>
-                    <pre className="p-4 overflow-x-auto text-emerald-400">{lines}</pre>
-                  </div>
-                );
-              }
-              if (paragraph.startsWith('# ')) {
-                return null;
-              }
-              if (paragraph.startsWith('## ')) {
-                return (
-                  <h2 key={idx} className="text-xl font-bold text-white mt-8 mb-3 border-b border-[#1e293b] pb-2">
-                    {paragraph.replace('## ', '')}
-                  </h2>
-                );
-              }
-              return <p key={idx}>{paragraph}</p>;
-            })}
+          <div className="prose prose-invert max-w-none text-slate-300">
+            <MarkdownRenderer content={post.content_markdown} />
           </div>
 
           {/* Barra de Reacción Inferior */}
