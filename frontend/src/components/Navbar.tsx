@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Terminal, User as UserIcon, Search, Globe, LogOut, X, Activity } from 'lucide-react';
+import { Terminal, User as UserIcon, Search, Globe, LogOut, X, Activity, Database } from 'lucide-react';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
 import { User } from '../types';
 
@@ -9,6 +9,7 @@ interface NavbarProps {
   onOpenLogin: () => void;
   onLogout?: () => void;
   onOpenStatus?: () => void;
+  onOpenBackups?: () => void;
   userEmail?: string | null;
   currentUser?: User | null;
   serverNode?: string;
@@ -23,6 +24,7 @@ export const Navbar: FC<NavbarProps> = ({
   onOpenLogin,
   onLogout,
   onOpenStatus,
+  onOpenBackups,
   userEmail,
   currentUser,
   serverNode = 'Homelab Docker',
@@ -95,6 +97,19 @@ export const Navbar: FC<NavbarProps> = ({
             <Activity className="w-3.5 h-3.5 text-cyan-400" />
             <span>/status</span>
           </button>
+
+          {/* Botón de Backups para ADMIN */}
+          {currentUser?.role === 'ADMIN' && onOpenBackups && (
+            <button
+              type="button"
+              onClick={onOpenBackups}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-500/50 text-xs font-mono text-purple-300 transition-colors"
+              title="Panel de copias de seguridad de PostgreSQL"
+            >
+              <Database className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden md:inline">Backups</span>
+            </button>
+          )}
 
           {/* Selector de Idioma */}
           <div className="relative flex items-center bg-[#0b0f19] border border-[#1e293b] rounded-xl px-2 py-1 text-xs">

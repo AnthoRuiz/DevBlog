@@ -6,6 +6,7 @@ import { ArticleModal } from './components/ArticleModal';
 import { LoginModal } from './components/LoginModal';
 import { NewPostModal } from './components/NewPostModal';
 import { SystemStatusModal } from './components/SystemStatusModal';
+import { BackupsModal } from './components/BackupsModal';
 import { Post, PostDetail, StreakStats, Tag, User } from './types';
 import {
   fetchPosts,
@@ -50,13 +51,17 @@ export function App() {
   const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
   const [isNewPostOpen, setIsNewPostOpen] = useState<boolean>(false);
   const [isStatusOpen, setIsStatusOpen] = useState<boolean>(false);
+  const [isBackupsModalOpen, setIsBackupsModalOpen] = useState<boolean>(false);
   const [editingPost, setEditingPost] = useState<Post | PostDetail | null>(null);
 
-  // Soporte directo para URL hash #/status
+  // Soporte directo para URL hash #/status y #/backups
   useEffect(() => {
     const handleHashChange = () => {
       if (window.location.hash === '#/status' || window.location.hash === '#status') {
         setIsStatusOpen(true);
+      }
+      if (window.location.hash === '#/backups' || window.location.hash === '#backups') {
+        setIsBackupsModalOpen(true);
       }
     };
     handleHashChange();
@@ -249,6 +254,7 @@ export function App() {
         onOpenLogin={() => setIsLoginOpen(true)}
         onLogout={handleLogout}
         onOpenStatus={handleOpenStatus}
+        onOpenBackups={() => setIsBackupsModalOpen(true)}
         userEmail={userEmail}
         currentUser={currentUser}
         serverNode={stats?.server_node}
@@ -449,6 +455,13 @@ export function App() {
         isOpen={isStatusOpen}
         onClose={handleCloseStatus}
         t={t}
+      />
+
+      {/* Modal de Backups de Base de Datos PostgreSQL (Solo ADMIN) */}
+      <BackupsModal
+        isOpen={isBackupsModalOpen}
+        onClose={() => setIsBackupsModalOpen(false)}
+        token={userToken || undefined}
       />
     </div>
   );

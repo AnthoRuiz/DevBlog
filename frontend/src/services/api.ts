@@ -1,4 +1,4 @@
-import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User } from '../types';
+import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, BackupItem, BackupsResponse } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -331,3 +331,65 @@ export async function suggestTagsWithAi(
   const data = await res.json();
   return data.suggested_tags || [];
 }
+
+export async function fetchAdminBackups(token: string): Promise<BackupsResponse> {
+  const res = await fetch(`${API_BASE}/admin/backups`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Error al obtener backups' }));
+    throw new Error(err.detail || 'Error al obtener backups');
+  }
+  return res.json();
+}
+
+export async function createAdminBackup(
+  token: string
+): Promise<{ message: string; backup: BackupItem }> {
+  const res = await fetch(`${API_BASE}/admin/backups/create`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Error al generar backup' }));
+    throw new Error(err.detail || 'Error al generar backup');
+  }
+  return res.json();
+}
+
+export async function downloadAdminBackup(filename: string, token: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/admin/backups/${encodeURIComponent(filename)}/download`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error('Error al descargar el backup de la base de datos');
+  }
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+export async function deleteAdminBackup(
+  filename: string,
+  token: string
+): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/admin/backups/${encodeURIComponent(filename)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Error al eliminar backup' }));
+    throw new Error(err.detail || 'Error al eliminar backup');
+  }
+  return res.json();
+}
+

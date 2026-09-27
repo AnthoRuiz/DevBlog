@@ -21,7 +21,10 @@ build/
 # Runtime data and storage
 logs/
 uploads/
+backups/
 *.log
+*.sql
+*.sql.gz
 
 # IDE and OS
 .vscode/

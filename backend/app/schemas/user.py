@@ -5,7 +5,7 @@ from datetime import datetime
 from app.models.user import UserRole
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: str
     full_name: str
     avatar_url: Optional[str] = None
 
@@ -28,7 +28,7 @@ class Token(BaseModel):
     user: UserRead
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 class OAuthLoginRequest(BaseModel):

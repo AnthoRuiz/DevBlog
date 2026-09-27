@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -144,6 +145,21 @@ Un túnel saliente inicia la conexión desde el interior del contenedor hacia lo
 
         await session.commit()
 
+async def automated_backup_scheduler():
+    """Ejecuta un backup diario automático (cada 24 horas) en segundo plano con rotación."""
+    while True:
+        try:
+            # Esperar 24 horas (86400 segundos)
+            await asyncio.sleep(86400)
+            from app.services import backup_service
+            res = await backup_service.create_backup(keep=7)
+            print(f"[AutoBackup] Backup automático exitoso: {res['filename']} ({res['size_display']})")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[AutoBackup] Error en tarea de backup automático: {e}")
+            await asyncio.sleep(300)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Crear tablas automáticamente al arrancar
@@ -151,8 +167,11 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     # Sembrar datos iniciales
     await seed_initial_data()
+    # Iniciar programador de backups automáticos
+    backup_task = asyncio.create_task(automated_backup_scheduler())
     yield
     # Limpieza al apagar
+    backup_task.cancel()
     await engine.dispose()
 
 app = FastAPI(

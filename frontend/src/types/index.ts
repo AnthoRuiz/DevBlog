@@ -109,3 +109,18 @@ export interface User {
   avatar_url?: string;
   role: 'ADMIN' | 'AUTHOR' | 'READER';
 }
+
+export interface BackupItem {
+  filename: string;
+  size_bytes: number;
+  size_display: string;
+  created_at: string;
+}
+
+export interface BackupsResponse {
+  status: string;
+  retention_policy: string;
+  retention_limit: number;
+  total_backups: number;
+  backups: BackupItem[];
+}
