@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Build and distribution
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Environment and sensitive data
+.env
+.env.local
+*.pem
+*.key
+
+# Runtime data and storage
+logs/
+uploads/
+*.log
+
+# IDE and OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
