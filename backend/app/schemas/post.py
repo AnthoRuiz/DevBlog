@@ -10,6 +10,10 @@ class TagRead(BaseModel):
     slug: str
     color_hex: str
 
+class TagCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50)
+    color_hex: Optional[str] = "#38bdf8"
+
 class PostBase(BaseModel):
     title: str = Field(..., max_length=255)
     summary: str = Field(..., max_length=500)
@@ -88,3 +92,11 @@ class PostTranslateResponse(BaseModel):
     content_markdown: str
     target_lang: str
     provider: str
+
+class TagSuggestRequest(BaseModel):
+    title: str = Field(..., max_length=255)
+    summary: Optional[str] = Field("", max_length=1000)
+    content_markdown: Optional[str] = ""
+
+class TagSuggestResponse(BaseModel):
+    suggested_tags: list[str]

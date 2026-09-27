@@ -52,6 +52,13 @@ export interface Translations {
   readingTimeLabel: string;
   readingTimeAuto: string;
   tagsLabel: string;
+  searchTagsPlaceholder: string;
+  createNewTagAction: string;
+  suggestTagsAiBtn: string;
+  suggestingTagsAi: string;
+  aiSuggestedTagsTitle: string;
+  noTagsFound: string;
+  selectedTagsCount: string;
   contentMarkdownLabel: string;
   contentMarkdownPlaceholder: string;
   publishPostBtn: string;
@@ -157,6 +164,13 @@ export const translations: Record<Language, Translations> = {
     readingTimeLabel: 'Tiempo estimado de lectura (min)',
     readingTimeAuto: 'Calculado automáticamente',
     tagsLabel: 'Categorías y Tags',
+    searchTagsPlaceholder: 'Buscar categoría o escribir una nueva...',
+    createNewTagAction: 'Crear nueva categoría',
+    suggestTagsAiBtn: '✨ Sugerir con IA',
+    suggestingTagsAi: 'Analizando contenido...',
+    aiSuggestedTagsTitle: 'Sugerencias de IA para este artículo:',
+    noTagsFound: 'No se encontraron categorías coincidentes. Presiona Enter para crearla.',
+    selectedTagsCount: 'seleccionadas',
     contentMarkdownLabel: 'Contenido del Artículo',
     contentMarkdownPlaceholder: '## Arquitectura\n\nExplica aquí los conceptos, diagramas y fragmentos de código...',
     publishPostBtn: 'Publicar Artículo',
@@ -260,6 +274,13 @@ export const translations: Record<Language, Translations> = {
     readingTimeLabel: 'Estimated reading time (min)',
     readingTimeAuto: 'Calculated automatically',
     tagsLabel: 'Categories & Tags',
+    searchTagsPlaceholder: 'Search category or type a new one...',
+    createNewTagAction: 'Create new category',
+    suggestTagsAiBtn: '✨ Suggest with AI',
+    suggestingTagsAi: 'Analyzing content...',
+    aiSuggestedTagsTitle: 'AI suggestions for this article:',
+    noTagsFound: 'No matching categories found. Press Enter to create it.',
+    selectedTagsCount: 'selected',
     contentMarkdownLabel: 'Article Content',
     contentMarkdownPlaceholder: '## Architecture Overview\n\nExplain concepts, system diagrams, and code snippets...',
     publishPostBtn: 'Publish Article',
@@ -363,6 +384,13 @@ export const translations: Record<Language, Translations> = {
     readingTimeLabel: 'Tempo estimado de leitura (min)',
     readingTimeAuto: 'Calculado automaticamente',
     tagsLabel: 'Categorias e Tags',
+    searchTagsPlaceholder: 'Pesquisar categoria ou digitar uma nova...',
+    createNewTagAction: 'Criar nova categoria',
+    suggestTagsAiBtn: '✨ Sugerir com IA',
+    suggestingTagsAi: 'Analisando conteúdo...',
+    aiSuggestedTagsTitle: 'Sugestões de IA para este artigo:',
+    noTagsFound: 'Nenhuma categoria correspondente encontrada. Pressione Enter para criar.',
+    selectedTagsCount: 'selecionadas',
     contentMarkdownLabel: 'Conteúdo do Artigo',
     contentMarkdownPlaceholder: '## Minha Arquitetura\n\nExplique aqui os conceitos, diagramas e trechos de código...',
     publishPostBtn: 'Publicar Artigo',
@@ -394,7 +422,7 @@ export const translations: Record<Language, Translations> = {
     aiTranslateBtn: '⚡ Traduzir com IA (Gemini)',
     translatingWithAi: 'Traduzindo com Gemini...',
     aiTranslateSuccess: 'Artigo traduzido com sucesso!',
-    aiTranslatePrompt: 'Selecione o idioma de destino para autotraduzir:',
+    aiTranslatePrompt: 'Selecione o idioma de destino para autotraducir:',
     editorWriteTab: 'Escrever',
     editorPreviewTab: 'Visualização',
     editorMarkdownHelp: 'Ajuda Markdown',
@@ -466,6 +494,13 @@ export const translations: Record<Language, Translations> = {
     readingTimeLabel: 'Temps de lecture estimé (min)',
     readingTimeAuto: 'Calculé automatiquement',
     tagsLabel: 'Catégories & Tags',
+    searchTagsPlaceholder: 'Rechercher une catégorie ou en créer une...',
+    createNewTagAction: 'Créer une nouvelle catégorie',
+    suggestTagsAiBtn: '✨ Suggérer avec IA',
+    suggestingTagsAi: 'Analyse du contenu...',
+    aiSuggestedTagsTitle: 'Suggestions IA pour cet article :',
+    noTagsFound: 'Aucune catégorie correspondante trouvée. Appuyez sur Entrée pour la créer.',
+    selectedTagsCount: 'sélectionnées',
     contentMarkdownLabel: 'Contenu de l\'Article',
     contentMarkdownPlaceholder: '## Architecture\n\nExpliquez ici les concepts, diagrammes et extraits de code...',
     publishPostBtn: 'Publier l\'Article',

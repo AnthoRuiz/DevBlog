@@ -1,8 +1,27 @@
 import { useState, useRef, useEffect, ChangeEvent, FormEvent, FC } from 'react';
-import { X, Upload, Image as ImageIcon, Sparkles, Edit3, Languages, ChevronDown, CheckCircle2 } from 'lucide-react';
+import {
+  X,
+  Upload,
+  Image as ImageIcon,
+  Sparkles,
+  Edit3,
+  Languages,
+  ChevronDown,
+  CheckCircle2,
+  Search,
+  Plus,
+  Tag as TagIcon,
+} from 'lucide-react';
 import { Tag, Post, PostDetail } from '../types';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
-import { uploadImage, createPost, updatePost, translatePostWithAi } from '../services/api';
+import {
+  uploadImage,
+  createPost,
+  updatePost,
+  translatePostWithAi,
+  createTag,
+  suggestTagsWithAi,
+} from '../services/api';
 import { calculateReadingTime } from '../utils/readingTime';
 import { MarkdownToolbar } from './MarkdownToolbar';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -38,6 +57,14 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const [isAutoReadingTime, setIsAutoReadingTime] = useState(true);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [contentMarkdown, setContentMarkdown] = useState('');
+
+  // Enhanced Tags State
+  const [availableTags, setAvailableTags] = useState<Tag[]>(tags);
+  const [tagSearchQuery, setTagSearchQuery] = useState('');
+  const [isTagSearchFocused, setIsTagSearchFocused] = useState(false);
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
+  const [isSuggestingTags, setIsSuggestingTags] = useState(false);
+  const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([]);
 
   const autoMinutes = calculateReadingTime(contentMarkdown);
 
@@ -82,15 +109,124 @@ export const NewPostModal: FC<NewPostModalProps> = ({
     }
     setEditorTab('write');
     setErrorMsg(null);
+    setAiTagSuggestions([]);
+    setTagSearchQuery('');
   }, [editingPost, isOpen, defaultLang]);
+
+  useEffect(() => {
+    setAvailableTags((prev) => {
+      const map = new Map<string, Tag>();
+      tags.forEach((t) => map.set(t.id, t));
+      prev.forEach((t) => map.set(t.id, t));
+      return Array.from(map.values());
+    });
+  }, [tags]);
 
   if (!isOpen) return null;
 
-  const handleTagToggle = (tagId: string) => {
-    setSelectedTagIds((prev) =>
-      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
-    );
+  const handleSelectTag = (tagId: string) => {
+    if (!selectedTagIds.includes(tagId)) {
+      setSelectedTagIds((prev) => [...prev, tagId]);
+    }
+    setTagSearchQuery('');
   };
+
+  const handleRemoveTag = (tagId: string) => {
+    setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
+  };
+
+  const handleCreateCustomTag = async (nameToCreate?: string) => {
+    const tagName = (nameToCreate || tagSearchQuery).trim();
+    if (!tagName || !token) return;
+
+    const existing = availableTags.find(
+      (t) => t.name.toLowerCase() === tagName.toLowerCase()
+    );
+    if (existing) {
+      if (!selectedTagIds.includes(existing.id)) {
+        setSelectedTagIds((prev) => [...prev, existing.id]);
+      }
+      setTagSearchQuery('');
+      return;
+    }
+
+    setIsCreatingTag(true);
+    setErrorMsg(null);
+    try {
+      const newTag = await createTag(tagName, token);
+      setAvailableTags((prev) => {
+        if (prev.some((t) => t.id === newTag.id)) return prev;
+        return [...prev, newTag];
+      });
+      setSelectedTagIds((prev) => [...prev, newTag.id]);
+      setTagSearchQuery('');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error creando la categoría';
+      setErrorMsg(message);
+    } finally {
+      setIsCreatingTag(false);
+    }
+  };
+
+  const handleAiSuggestTags = async () => {
+    if (!token) {
+      setErrorMsg('Debes iniciar sesión para usar el asistente de IA');
+      return;
+    }
+    if (!title.trim() && !summary.trim() && !contentMarkdown.trim()) {
+      setErrorMsg('Escribe al menos el título o resumen para sugerir categorías con IA');
+      return;
+    }
+
+    setIsSuggestingTags(true);
+    setErrorMsg(null);
+    try {
+      const suggestions = await suggestTagsWithAi(
+        title,
+        summary,
+        contentMarkdown,
+        token
+      );
+      setAiTagSuggestions(suggestions);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al sugerir categorías con IA';
+      setErrorMsg(message);
+    } finally {
+      setIsSuggestingTags(false);
+    }
+  };
+
+  const handleAddSuggestedTag = async (suggestedName: string) => {
+    const existing = availableTags.find(
+      (t) => t.name.toLowerCase() === suggestedName.toLowerCase()
+    );
+    if (existing) {
+      if (!selectedTagIds.includes(existing.id)) {
+        setSelectedTagIds((prev) => [...prev, existing.id]);
+      }
+      setAiTagSuggestions((prev) => prev.filter((s) => s.toLowerCase() !== suggestedName.toLowerCase()));
+    } else {
+      await handleCreateCustomTag(suggestedName);
+      setAiTagSuggestions((prev) => prev.filter((s) => s.toLowerCase() !== suggestedName.toLowerCase()));
+    }
+  };
+
+  const handleAddAllSuggestedTags = async () => {
+    const suggestionsToProcess = [...aiTagSuggestions];
+    for (const item of suggestionsToProcess) {
+      await handleAddSuggestedTag(item);
+    }
+  };
+
+  const filteredTags = availableTags.filter((tag) => {
+    const matchesQuery = tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase().trim());
+    const notSelected = !selectedTagIds.includes(tag.id);
+    return matchesQuery && notSelected;
+  });
+
+  const exactMatchExists = availableTags.some(
+    (tag) => tag.name.toLowerCase() === tagSearchQuery.toLowerCase().trim()
+  );
 
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -398,29 +534,201 @@ export const NewPostModal: FC<NewPostModalProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-mono text-slate-400 mb-1.5">
-                {t.tagsLabel}
-              </label>
-              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 bg-[#07090e] rounded-xl border border-[#1e293b]">
-                {tags.map((tag) => {
-                  const isSelected = selectedTagIds.includes(tag.id);
-                  return (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      onClick={() => handleTagToggle(tag.id)}
-                      className={`text-[11px] font-mono px-2.5 py-1 rounded-lg border transition-all ${
-                        isSelected
-                          ? 'border-cyan-400 text-cyan-300 bg-cyan-500/20'
-                          : 'border-[#1e293b] text-slate-400 hover:text-slate-200 bg-[#0b0f19]'
-                      }`}
-                    >
-                      #{tag.name}
-                    </button>
-                  );
-                })}
+            <div className="sm:col-span-2 space-y-2">
+              {/* Header: Label, counter and AI Suggest button */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TagIcon className="w-3.5 h-3.5 text-cyan-400" />
+                  <label className="text-xs font-mono text-slate-400">
+                    {t.tagsLabel}
+                  </label>
+                  {selectedTagIds.length > 0 && (
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-400 border border-cyan-800/40">
+                      {selectedTagIds.length} {t.selectedTagsCount}
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAiSuggestTags}
+                  disabled={isSuggestingTags}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/30 hover:border-cyan-400/50 text-[11px] font-mono text-cyan-300 hover:text-white transition-all disabled:opacity-50"
+                  title="Analiza el post con Gemini AI y sugiere categorías relevantes"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 text-purple-400 ${isSuggestingTags ? 'animate-spin' : ''}`} />
+                  <span>{isSuggestingTags ? t.suggestingTagsAi : t.suggestTagsAiBtn}</span>
+                </button>
               </div>
+
+              {/* Selected Tags Chips */}
+              {selectedTagIds.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 p-2 bg-[#07090e] rounded-xl border border-[#1e293b] min-h-[38px] items-center">
+                  {selectedTagIds.map((tagId) => {
+                    const tagObj = availableTags.find((tg) => tg.id === tagId);
+                    if (!tagObj) return null;
+                    return (
+                      <span
+                        key={tagObj.id}
+                        className="inline-flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 rounded-lg border border-cyan-500/30 text-cyan-300 bg-cyan-950/40 group transition-all"
+                        style={tagObj.color_hex ? { borderColor: `${tagObj.color_hex}55`, color: tagObj.color_hex } : undefined}
+                      >
+                        <span>#{tagObj.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTag(tagObj.id)}
+                          className="text-slate-400 hover:text-red-400 transition-colors p-0.5 rounded"
+                          title="Remover categoría"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Tag Search & Dynamic Creation Box */}
+              <div className="relative">
+                <div className="relative flex items-center">
+                  <Search className="w-3.5 h-3.5 absolute left-3 text-slate-500 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={tagSearchQuery}
+                    onChange={(e) => setTagSearchQuery(e.target.value)}
+                    onFocus={() => setIsTagSearchFocused(true)}
+                    onBlur={() => {
+                      setTimeout(() => setIsTagSearchFocused(false), 200);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (tagSearchQuery.trim()) {
+                          if (filteredTags.length > 0 && !exactMatchExists) {
+                            const firstMatch = filteredTags[0];
+                            if (firstMatch.name.toLowerCase() === tagSearchQuery.trim().toLowerCase()) {
+                              handleSelectTag(firstMatch.id);
+                            } else {
+                              handleCreateCustomTag();
+                            }
+                          } else if (filteredTags.length > 0) {
+                            handleSelectTag(filteredTags[0].id);
+                          } else {
+                            handleCreateCustomTag();
+                          }
+                        }
+                      } else if (e.key === 'Escape') {
+                        setIsTagSearchFocused(false);
+                      }
+                    }}
+                    placeholder={t.searchTagsPlaceholder}
+                    className="w-full bg-[#0b0f19] border border-[#1e293b] rounded-xl pl-9 pr-20 py-2 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500 transition-colors"
+                  />
+                  {tagSearchQuery.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => handleCreateCustomTag()}
+                      disabled={isCreatingTag}
+                      className="absolute right-1.5 px-2 py-1 rounded-lg bg-cyan-950 border border-cyan-800 text-[10px] font-mono text-cyan-300 hover:bg-cyan-900 transition-colors flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>{isCreatingTag ? '...' : 'Crear'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Autocomplete / Filtering Dropdown */}
+                {isTagSearchFocused && (
+                  <div
+                    className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-[#0d121f] border border-[#1e293b] rounded-xl shadow-2xl p-1.5 space-y-1"
+                    onMouseDown={(e) => e.preventDefault()}
+                  >
+                    {filteredTags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 p-1">
+                        {filteredTags.map((tag) => (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => handleSelectTag(tag.id)}
+                            className="inline-flex items-center gap-1 text-[11px] font-mono px-2.5 py-1 rounded-lg border border-[#1e293b] bg-[#07090e] hover:border-cyan-500/50 hover:bg-cyan-950/30 text-slate-300 hover:text-cyan-300 transition-all text-left"
+                          >
+                            <Plus className="w-3 h-3 text-slate-500" />
+                            <span>#{tag.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      tagSearchQuery.trim() && !exactMatchExists && (
+                        <div className="p-2 text-center text-xs text-slate-400 font-mono">
+                          {t.noTagsFound}
+                        </div>
+                      )
+                    )}
+
+                    {/* Option to create new custom tag if query doesn't match an existing tag exactly */}
+                    {tagSearchQuery.trim() && !exactMatchExists && (
+                      <button
+                        type="button"
+                        onClick={() => handleCreateCustomTag()}
+                        disabled={isCreatingTag}
+                        className="w-full flex items-center justify-between p-2 rounded-lg bg-cyan-950/30 hover:bg-cyan-950/60 border border-cyan-900/50 text-xs font-mono text-cyan-300 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Plus className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>
+                            {t.createNewTagAction} <strong className="text-white">#{tagSearchQuery.trim()}</strong>
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono">↵ Enter</span>
+                      </button>
+                    )}
+
+                    {filteredTags.length === 0 && !tagSearchQuery.trim() && (
+                      <div className="p-2 text-center text-xs text-slate-500 font-mono">
+                        Todas las categorías ya han sido agregadas.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* AI Suggested Tags Pill Tray */}
+              {aiTagSuggestions.length > 0 && (
+                <div className="p-2.5 bg-gradient-to-r from-purple-950/20 to-cyan-950/20 border border-purple-900/30 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-purple-300">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-purple-400" />
+                      {t.aiSuggestedTagsTitle}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddAllSuggestedTags}
+                      className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
+                    >
+                      + Agregar todas
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {aiTagSuggestions.map((suggested) => {
+                      const alreadySelected = availableTags.some(
+                        (tg) => tg.name.toLowerCase() === suggested.toLowerCase() && selectedTagIds.includes(tg.id)
+                      );
+                      if (alreadySelected) return null;
+                      return (
+                        <button
+                          key={suggested}
+                          type="button"
+                          onClick={() => handleAddSuggestedTag(suggested)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono bg-[#07090e] border border-purple-500/40 text-purple-300 hover:border-cyan-400 hover:text-cyan-300 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>#{suggested}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

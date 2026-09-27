@@ -32,8 +32,11 @@ from app.schemas.post import (
     BookmarkToggleResponse,
     PostTranslateRequest,
     PostTranslateResponse,
+    TagCreate,
+    TagSuggestRequest,
+    TagSuggestResponse,
 )
-from app.services.gemini import translate_post_content
+from app.services.gemini import translate_post_content, suggest_post_tags
 from app.api.deps import get_current_admin, get_current_user_optional, get_client_hash
 
 router = APIRouter(prefix="/posts", tags=["Artículos"])
@@ -73,6 +76,51 @@ async def list_all_tags(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Tag).order_by(Tag.name))
     tags = result.scalars().all()
     return [TagRead.model_validate(t) for t in tags]
+
+@router.post("/tags", response_model=TagRead)
+async def create_tag(
+    tag_in: TagCreate,
+    current_admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    clean_name = tag_in.name.strip()
+    clean_slug = slugify(clean_name)
+    if not clean_slug:
+        raise HTTPException(status_code=400, detail="Nombre de tag inválido")
+
+    # Verificar si ya existe por nombre o slug
+    existing = await db.execute(
+        select(Tag).where((Tag.name.ilike(clean_name)) | (Tag.slug == clean_slug))
+    )
+    found = existing.scalar_one_or_none()
+    if found:
+        return TagRead.model_validate(found)
+
+    tag_colors = ["#38bdf8", "#10b981", "#818cf8", "#06b6d4", "#f59e0b", "#ec4899", "#a855f7", "#14b8a6"]
+    assigned_color = tag_in.color_hex if tag_in.color_hex and tag_in.color_hex != "#38bdf8" else tag_colors[abs(hash(clean_slug)) % len(tag_colors)]
+
+    new_tag = Tag(name=clean_name, slug=clean_slug, color_hex=assigned_color)
+    db.add(new_tag)
+    await db.commit()
+    await db.refresh(new_tag)
+    return TagRead.model_validate(new_tag)
+
+@router.post("/ai-suggest-tags", response_model=TagSuggestResponse)
+async def ai_suggest_tags(
+    req: TagSuggestRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    res_tags = await db.execute(select(Tag.name))
+    existing_tag_names = list(res_tags.scalars().all())
+
+    suggestions = await suggest_post_tags(
+        title=req.title,
+        summary=req.summary or "",
+        content_markdown=req.content_markdown or "",
+        existing_tags=existing_tag_names
+    )
+    return TagSuggestResponse(suggested_tags=suggestions)
 
 @router.get("/bookmarks/mine", response_model=list[PostRead])
 async def list_my_bookmarks(

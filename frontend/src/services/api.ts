@@ -245,3 +245,53 @@ export async function translatePostWithAi(
 
   return res.json();
 }
+
+export async function createTag(
+  name: string,
+  token: string,
+  colorHex?: string
+): Promise<Tag> {
+  const res = await fetch(`${API_BASE}/posts/tags`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name, color_hex: colorHex || '#38bdf8' }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Error al crear la etiqueta' }));
+    throw new Error(err.detail || 'Error al crear la etiqueta');
+  }
+
+  return res.json();
+}
+
+export async function suggestTagsWithAi(
+  title: string,
+  summary: string,
+  contentMarkdown: string,
+  token: string
+): Promise<string[]> {
+  const res = await fetch(`${API_BASE}/posts/ai-suggest-tags`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      title,
+      summary,
+      content_markdown: contentMarkdown,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Error al sugerir etiquetas con IA' }));
+    throw new Error(err.detail || 'Error al sugerir etiquetas con IA');
+  }
+
+  const data = await res.json();
+  return data.suggested_tags || [];
+}

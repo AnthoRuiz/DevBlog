@@ -127,3 +127,72 @@ Markdown Content:
         "target_lang": target_lang,
         "provider": "Gemini AI Engine (Homelab Mode)"
     }
+
+async def suggest_post_tags(
+    title: str,
+    summary: str,
+    content_markdown: str,
+    existing_tags: list[str]
+) -> list[str]:
+    # 1. Si GEMINI_API_KEY está configurada, consultar a Google Gemini
+    if settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip():
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY.strip()}"
+        prompt = f"""You are an expert technical taxonomy analyzer for developer blogs and homelab systems.
+Analyze the following article and suggest the 3 to 5 most relevant tags/technologies (e.g. 'Docker', 'FastAPI', 'RabbitMQ', 'PostgreSQL', 'Python', 'Kubernetes', 'CI/CD', 'Security').
+
+Existing blog tags you should prefer if relevant: {', '.join(existing_tags)}
+
+Return ONLY a valid JSON object in this schema:
+{{
+  "suggested_tags": ["Tag1", "Tag2", "Tag3"]
+}}
+
+ARTICLE CONTENT:
+Title: {title}
+Summary: {summary}
+Markdown Content:
+{content_markdown[:3000]}
+"""
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "response_mime_type": "application/json",
+                "temperature": 0.2
+            }
+        }
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.post(api_url, json=payload)
+                if resp.status_code == 200:
+                    raw_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    parsed = json.loads(raw_text)
+                    tags = parsed.get("suggested_tags", [])
+                    if tags and isinstance(tags, list):
+                        return [str(t).strip().capitalize() for t in tags if str(t).strip()][:5]
+        except Exception as e:
+            logger.error(f"Error in Gemini tag suggestion: {e}")
+
+    # Fallback inteligente (Homelab / Demo Mode):
+    # Analiza texto buscando menciones de tecnologías clave y tags existentes
+    combined_text = f"{title} {summary} {content_markdown}".lower()
+    tech_keywords = [
+        "docker", "kubernetes", "fastapi", "python", "typescript", "react",
+        "postgresql", "rabbitmq", "redis", "nginx", "linux", "homelab",
+        "devops", "cloud", "aws", "graphql", "microservicios", "cache",
+        "seguridad", "api", "monitoring", "grafana", "prometheus"
+    ]
+    candidate_set = []
+    for et in existing_tags:
+        if et.lower() in combined_text and et not in candidate_set:
+            candidate_set.append(et)
+
+    for tech in tech_keywords:
+        if tech in combined_text:
+            cap = tech.capitalize()
+            if cap not in candidate_set:
+                candidate_set.append(cap)
+
+    if candidate_set:
+        return candidate_set[:5]
+
+    return ["DevOps", "Homelab", "Software"]
