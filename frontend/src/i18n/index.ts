@@ -14,6 +14,9 @@ export interface Translations {
   uptimeBadge: string;
   newPostBtn: string;
   allTopics: string;
+  bookmarksTab: string;
+  clearFilter: string;
+  activeTagFilter: string;
   sortByRecent: string;
   sortByTopVoted: string;
   sortByTrending: string;
@@ -24,6 +27,8 @@ export interface Translations {
   bookmarked: string;
   noArticlesFound: string;
   noArticlesSub: string;
+  noBookmarksFound: string;
+  noBookmarksSub: string;
   readingMode: string;
   byAuthor: string;
   publishedOn: string;
@@ -34,6 +39,7 @@ export interface Translations {
   votes: string;
   linkCopied: string;
   createNewPost: string;
+  editPostModalTitle: string;
   postTitleLabel: string;
   postTitlePlaceholder: string;
   postLangLabel: string;
@@ -49,7 +55,29 @@ export interface Translations {
   contentMarkdownPlaceholder: string;
   publishPostBtn: string;
   publishingPost: string;
+  saveChangesBtn: string;
+  savingChanges: string;
   cancelBtn: string;
+  commentsSectionTitle: string;
+  commentsCount: string;
+  leaveCommentTitle: string;
+  commentPlaceholder: string;
+  authorNamePlaceholder: string;
+  postCommentBtn: string;
+  postingComment: string;
+  noCommentsYet: string;
+  editPostBtn: string;
+  deletePostBtn: string;
+  confirmDeletePost: string;
+  loginTitle: string;
+  registerTitle: string;
+  fullNameLabel: string;
+  fullNamePlaceholder: string;
+  createAccountBtn: string;
+  creatingAccount: string;
+  alreadyAccountText: string;
+  needAccountText: string;
+  googleLoginBtn: string;
   footerText: string;
 }
 
@@ -58,7 +86,7 @@ export const translations: Record<Language, Translations> = {
     siteTitle: 'SYS.BLOG',
     liveNode: '● Live Node',
     searchPlaceholder: 'Buscar por tecnología o palabra clave...',
-    authorLogin: 'Acceso Autor',
+    authorLogin: 'Acceso / Registro',
     authorLogout: 'Cerrar Sesión',
     writingStreak: 'DÍAS DE RACHA DE ESCRITURA',
     activeStatus: 'ACTIVA',
@@ -68,6 +96,9 @@ export const translations: Record<Language, Translations> = {
     uptimeBadge: 'uptime',
     newPostBtn: 'Nuevo Post',
     allTopics: 'Todos los temas',
+    bookmarksTab: '📌 Guardados',
+    clearFilter: '✕ Limpiar filtro',
+    activeTagFilter: 'Filtrado por',
     sortByRecent: '✨ Más Recientes',
     sortByTopVoted: '▲ Más Votados',
     sortByTrending: '🔥 En Tendencia',
@@ -78,6 +109,8 @@ export const translations: Record<Language, Translations> = {
     bookmarked: 'Guardado',
     noArticlesFound: 'No se encontraron artículos',
     noArticlesSub: 'Prueba seleccionando otro filtro o limpiando el buscador.',
+    noBookmarksFound: 'No tienes artículos guardados todavía',
+    noBookmarksSub: 'Haz clic en el ícono de marcador en cualquier card para guardarlo aquí.',
     readingMode: 'Modo Lectura',
     byAuthor: 'Por Ingeniero de Software',
     publishedOn: 'Publicado el',
@@ -88,6 +121,7 @@ export const translations: Record<Language, Translations> = {
     votes: 'Votos',
     linkCopied: '¡Enlace del artículo copiado al portapapeles!',
     createNewPost: 'Crear Nuevo Artículo Técnico',
+    editPostModalTitle: 'Editar Artículo Técnico',
     postTitleLabel: 'Título del Artículo',
     postTitlePlaceholder: 'Ej: Diseñando un sistema de colas con RabbitMQ',
     postLangLabel: 'Idioma Original',
@@ -103,14 +137,36 @@ export const translations: Record<Language, Translations> = {
     contentMarkdownPlaceholder: '# Mi Arquitectura\n\nExplica aquí los conceptos, diagramas y fragmentos de código...',
     publishPostBtn: 'Publicar Artículo',
     publishingPost: 'Publicando...',
+    saveChangesBtn: 'Guardar Cambios',
+    savingChanges: 'Guardando...',
     cancelBtn: 'Cancelar',
+    commentsSectionTitle: 'Discusión Técnica y Comentarios',
+    commentsCount: 'comentarios',
+    leaveCommentTitle: 'Dejar un comentario o aporte',
+    commentPlaceholder: 'Escribe tu comentario o pregunta sobre esta implementación...',
+    authorNamePlaceholder: 'Tu nombre (ej: Ingeniero DevOps)',
+    postCommentBtn: 'Publicar Comentario',
+    postingComment: 'Enviando...',
+    noCommentsYet: 'Aún no hay comentarios. ¡Sé el primero en iniciar la conversación técnica!',
+    editPostBtn: 'Editar',
+    deletePostBtn: 'Eliminar',
+    confirmDeletePost: '¿Estás seguro de que deseas eliminar este artículo permanentemente?',
+    loginTitle: 'Acceso Autor / Dashboard',
+    registerTitle: 'Crear Cuenta de Lector',
+    fullNameLabel: 'Nombre Completo',
+    fullNamePlaceholder: 'Alex Developer',
+    createAccountBtn: 'Registrar Cuenta',
+    creatingAccount: 'Creando cuenta...',
+    alreadyAccountText: '¿Ya tienes cuenta? Inicia sesión',
+    needAccountText: '¿No tienes cuenta? Regístrate aquí',
+    googleLoginBtn: 'Continuar con Google Workspace',
     footerText: '© 2026 SYS.BLOG • Diseñado para Homelab • Desplegado con Docker • React + FastAPI',
   },
   en: {
     siteTitle: 'SYS.BLOG',
     liveNode: '● Live Node',
     searchPlaceholder: 'Search by technology or keyword...',
-    authorLogin: 'Author Login',
+    authorLogin: 'Login / Register',
     authorLogout: 'Log Out',
     writingStreak: 'DAYS WRITING STREAK',
     activeStatus: 'ACTIVE',
@@ -120,6 +176,9 @@ export const translations: Record<Language, Translations> = {
     uptimeBadge: 'uptime',
     newPostBtn: 'New Post',
     allTopics: 'All Topics',
+    bookmarksTab: '📌 Saved',
+    clearFilter: '✕ Clear filter',
+    activeTagFilter: 'Filtered by',
     sortByRecent: '✨ Most Recent',
     sortByTopVoted: '▲ Top Voted',
     sortByTrending: '🔥 Trending',
@@ -130,6 +189,8 @@ export const translations: Record<Language, Translations> = {
     bookmarked: 'Saved',
     noArticlesFound: 'No articles found',
     noArticlesSub: 'Try selecting a different tag or clearing your search.',
+    noBookmarksFound: 'No saved articles yet',
+    noBookmarksSub: 'Click the bookmark icon on any card to save it for reading later.',
     readingMode: 'Reading Mode',
     byAuthor: 'By Software Engineer',
     publishedOn: 'Published on',
@@ -140,6 +201,7 @@ export const translations: Record<Language, Translations> = {
     votes: 'Votes',
     linkCopied: 'Article link copied to clipboard!',
     createNewPost: 'Create New Technical Article',
+    editPostModalTitle: 'Edit Technical Article',
     postTitleLabel: 'Article Title',
     postTitlePlaceholder: 'E.g.: Designing a Queueing System with RabbitMQ',
     postLangLabel: 'Original Language',
@@ -155,14 +217,36 @@ export const translations: Record<Language, Translations> = {
     contentMarkdownPlaceholder: '# Architecture Overview\n\nExplain concepts, system diagrams, and code snippets...',
     publishPostBtn: 'Publish Article',
     publishingPost: 'Publishing...',
+    saveChangesBtn: 'Save Changes',
+    savingChanges: 'Saving...',
     cancelBtn: 'Cancel',
+    commentsSectionTitle: 'Technical Discussion & Comments',
+    commentsCount: 'comments',
+    leaveCommentTitle: 'Leave a comment or feedback',
+    commentPlaceholder: 'Write your thoughts or questions about this implementation...',
+    authorNamePlaceholder: 'Your name (e.g. DevOps Engineer)',
+    postCommentBtn: 'Post Comment',
+    postingComment: 'Posting...',
+    noCommentsYet: 'No comments yet. Be the first to spark the technical conversation!',
+    editPostBtn: 'Edit',
+    deletePostBtn: 'Delete',
+    confirmDeletePost: 'Are you sure you want to permanently delete this article?',
+    loginTitle: 'Author Access / Dashboard',
+    registerTitle: 'Create Reader Account',
+    fullNameLabel: 'Full Name',
+    fullNamePlaceholder: 'Alex Developer',
+    createAccountBtn: 'Register Account',
+    creatingAccount: 'Creating account...',
+    alreadyAccountText: 'Already have an account? Sign in',
+    needAccountText: 'Need an account? Register here',
+    googleLoginBtn: 'Continue with Google Workspace',
     footerText: '© 2026 SYS.BLOG • Built for Homelab • Deployed with Docker • React + FastAPI',
   },
   pt: {
     siteTitle: 'SYS.BLOG',
     liveNode: '● Live Node',
     searchPlaceholder: 'Pesquisar por tecnologia ou palavra-chave...',
-    authorLogin: 'Acesso Autor',
+    authorLogin: 'Entrar / Registrar',
     authorLogout: 'Encerrar Sessão',
     writingStreak: 'DIAS DE SEQUÊNCIA DE ESCRITA',
     activeStatus: 'ATIVA',
@@ -172,6 +256,9 @@ export const translations: Record<Language, Translations> = {
     uptimeBadge: 'uptime',
     newPostBtn: 'Novo Post',
     allTopics: 'Todos os temas',
+    bookmarksTab: '📌 Salvos',
+    clearFilter: '✕ Limpar filtro',
+    activeTagFilter: 'Filtrado por',
     sortByRecent: '✨ Mais Recentes',
     sortByTopVoted: '▲ Mais Votados',
     sortByTrending: '🔥 Em Tendência',
@@ -182,6 +269,8 @@ export const translations: Record<Language, Translations> = {
     bookmarked: 'Salvo',
     noArticlesFound: 'Nenhum artigo encontrado',
     noArticlesSub: 'Tente selecionar outro filtro ou limpar a pesquisa.',
+    noBookmarksFound: 'Nenhum artigo salvo ainda',
+    noBookmarksSub: 'Clique no ícone de favorito em qualquer post para guardá-lo aqui.',
     readingMode: 'Modo Leitura',
     byAuthor: 'Por Engenheiro de Software',
     publishedOn: 'Publicado em',
@@ -192,6 +281,7 @@ export const translations: Record<Language, Translations> = {
     votes: 'Votos',
     linkCopied: 'Link do artigo copiado para a área de transferência!',
     createNewPost: 'Criar Novo Artigo Técnico',
+    editPostModalTitle: 'Editar Artigo Técnico',
     postTitleLabel: 'Título do Artigo',
     postTitlePlaceholder: 'Ex: Projetando um sistema de filas com RabbitMQ',
     postLangLabel: 'Idioma Original',
@@ -207,14 +297,36 @@ export const translations: Record<Language, Translations> = {
     contentMarkdownPlaceholder: '# Minha Arquitetura\n\nExplique aqui os conceitos, diagramas e trechos de código...',
     publishPostBtn: 'Publicar Artigo',
     publishingPost: 'Publicando...',
+    saveChangesBtn: 'Salvar Alterações',
+    savingChanges: 'Salvando...',
     cancelBtn: 'Cancelar',
+    commentsSectionTitle: 'Discussão Técnica e Comentários',
+    commentsCount: 'comentários',
+    leaveCommentTitle: 'Deixe um comentário ou contribuição',
+    commentPlaceholder: 'Escreva suas dúvidas ou observações sobre esta arquitetura...',
+    authorNamePlaceholder: 'Seu nome (ex: Engenheiro DevOps)',
+    postCommentBtn: 'Publicar Comentário',
+    postingComment: 'Enviando...',
+    noCommentsYet: 'Ainda não há comentários. Seja o primeiro a iniciar a discussão técnica!',
+    editPostBtn: 'Editar',
+    deletePostBtn: 'Excluir',
+    confirmDeletePost: 'Tem certeza de que deseja excluir permanentemente este artigo?',
+    loginTitle: 'Acesso Autor / Painel',
+    registerTitle: 'Criar Conta de Leitor',
+    fullNameLabel: 'Nome Completo',
+    fullNamePlaceholder: 'Alex Developer',
+    createAccountBtn: 'Registrar Conta',
+    creatingAccount: 'Criando conta...',
+    alreadyAccountText: 'Já tem uma conta? Entre aqui',
+    needAccountText: 'Não tem conta? Registre-se aqui',
+    googleLoginBtn: 'Continuar com Google Workspace',
     footerText: '© 2026 SYS.BLOG • Projetado para Homelab • Implantado com Docker • React + FastAPI',
   },
   fr: {
     siteTitle: 'SYS.BLOG',
     liveNode: '● Live Node',
     searchPlaceholder: 'Rechercher par technologie ou mot-clé...',
-    authorLogin: 'Accès Auteur',
+    authorLogin: 'Connexion / Inscription',
     authorLogout: 'Déconnexion',
     writingStreak: 'JOURS DE SÉRIE D\'ÉCRITURE',
     activeStatus: 'ACTIVE',
@@ -224,6 +336,9 @@ export const translations: Record<Language, Translations> = {
     uptimeBadge: 'disponibilité',
     newPostBtn: 'Nouvel Article',
     allTopics: 'Tous les thèmes',
+    bookmarksTab: '📌 Enregistrés',
+    clearFilter: '✕ Effacer le filtre',
+    activeTagFilter: 'Filtré par',
     sortByRecent: '✨ Plus Récents',
     sortByTopVoted: '▲ Plus Votés',
     sortByTrending: '🔥 Tendance',
@@ -234,6 +349,8 @@ export const translations: Record<Language, Translations> = {
     bookmarked: 'Enregistré',
     noArticlesFound: 'Aucun article trouvé',
     noArticlesSub: 'Essayez de sélectionner un autre filtre ou d\'effacer la recherche.',
+    noBookmarksFound: 'Aucun article enregistré pour le moment',
+    noBookmarksSub: 'Cliquez sur l\'icône de marque-page sur n\'importe quelle carte pour le retrouver ici.',
     readingMode: 'Mode Lecture',
     byAuthor: 'Par Ingénieur Logiciel',
     publishedOn: 'Publié le',
@@ -244,6 +361,7 @@ export const translations: Record<Language, Translations> = {
     votes: 'Votes',
     linkCopied: 'Lien de l\'article copié dans le presse-papiers !',
     createNewPost: 'Créer un Nouvel Article Technique',
+    editPostModalTitle: 'Modifier l\'Article Technique',
     postTitleLabel: 'Titre de l\'Article',
     postTitlePlaceholder: 'Ex: Concevoir un système de files avec RabbitMQ',
     postLangLabel: 'Langue Originale',
@@ -259,7 +377,29 @@ export const translations: Record<Language, Translations> = {
     contentMarkdownPlaceholder: '# Architecture\n\nExpliquez ici les concepts, diagrammes et extraits de code...',
     publishPostBtn: 'Publier l\'Article',
     publishingPost: 'Publication en cours...',
+    saveChangesBtn: 'Enregistrer les Modifications',
+    savingChanges: 'Enregistrement...',
     cancelBtn: 'Annuler',
+    commentsSectionTitle: 'Discussion Technique et Commentaires',
+    commentsCount: 'commentaires',
+    leaveCommentTitle: 'Laisser un commentaire ou une remarque',
+    commentPlaceholder: 'Écrivez vos questions ou remarques sur cette architecture...',
+    authorNamePlaceholder: 'Votre nom (ex: Ingénieur DevOps)',
+    postCommentBtn: 'Publier le Commentaire',
+    postingComment: 'Envoi en cours...',
+    noCommentsYet: 'Aucun commentaire pour le moment. Soyez le premier à lancer la discussion technique !',
+    editPostBtn: 'Modifier',
+    deletePostBtn: 'Supprimer',
+    confirmDeletePost: 'Êtes-vous sûr de vouloir supprimer définitivement cet article ?',
+    loginTitle: 'Accès Auteur / Tableau de Bord',
+    registerTitle: 'Créer un Compte Lecteur',
+    fullNameLabel: 'Nom Complet',
+    fullNamePlaceholder: 'Alex Developer',
+    createAccountBtn: 'Créer le Compte',
+    creatingAccount: 'Création en cours...',
+    alreadyAccountText: 'Vous avez déjà un compte ? Connectez-vous',
+    needAccountText: 'Pas encore de compte ? Inscrivez-vous ici',
+    googleLoginBtn: 'Continuer avec Google Workspace',
     footerText: '© 2026 SYS.BLOG • Conçu pour Homelab • Déployé avec Docker • React + FastAPI',
   },
 };

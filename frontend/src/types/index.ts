@@ -5,6 +5,15 @@ export interface Tag {
   color_hex: string;
 }
 
+export interface Comment {
+  id: string;
+  post_id: string;
+  user_id?: string;
+  author_name: string;
+  content: string;
+  created_at: string;
+}
+
 export interface Post {
   id: string;
   slug: string;
@@ -23,6 +32,18 @@ export interface Post {
 
 export interface PostDetail extends Post {
   content_markdown: string;
+  comments: Comment[];
+}
+
+export interface PostUpdate {
+  title?: string;
+  summary?: string;
+  content_markdown?: string;
+  cover_image_url?: string;
+  language?: string;
+  reading_time_minutes?: number;
+  is_published?: boolean;
+  tag_ids?: string[];
 }
 
 export interface StreakStats {

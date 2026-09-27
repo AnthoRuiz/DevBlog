@@ -6,8 +6,17 @@ import { ArticleModal } from './components/ArticleModal';
 import { LoginModal } from './components/LoginModal';
 import { NewPostModal } from './components/NewPostModal';
 import { Post, PostDetail, StreakStats, Tag } from './types';
-import { fetchPosts, fetchStreakStats, fetchPostBySlug, toggleUpvote, fetchAllTags } from './services/api';
-import { Sparkles, ArrowUpDown } from 'lucide-react';
+import {
+  fetchPosts,
+  fetchStreakStats,
+  fetchPostBySlug,
+  toggleUpvote,
+  fetchAllTags,
+  toggleBookmark,
+  fetchBookmarkedPosts,
+  deletePost,
+} from './services/api';
+import { Sparkles, ArrowUpDown, Bookmark, Filter, X } from 'lucide-react';
 import { Language, translations } from './i18n';
 
 export function App() {
@@ -19,6 +28,16 @@ export function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Marcadores guardados localmente y sincronizados
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('devblog_bookmarks');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
   // Idioma activo e i18n
   const [currentLang, setCurrentLang] = useState<Language>('es');
   const t = translations[currentLang] || translations.es;
@@ -28,25 +47,55 @@ export function App() {
   const [isArticleOpen, setIsArticleOpen] = useState<boolean>(false);
   const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
   const [isNewPostOpen, setIsNewPostOpen] = useState<boolean>(false);
-  
+  const [editingPost, setEditingPost] = useState<Post | PostDetail | null>(null);
+
   const [userToken, setUserToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
   const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('user_email'));
 
+  // Debounce para búsqueda en tiempo real
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   useEffect(() => {
     loadData();
-  }, [selectedTag, sortBy, searchQuery]);
+  }, [selectedTag, sortBy, debouncedSearch]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [postsData, statsData, tagsData] = await Promise.all([
-        fetchPosts(selectedTag, sortBy, searchQuery),
-        fetchStreakStats().catch(() => null),
-        fetchAllTags().catch(() => []),
-      ]);
-      setPosts(postsData);
-      if (statsData) setStats(statsData);
-      if (tagsData.length > 0) setTags(tagsData);
+      if (selectedTag === '__bookmarks__') {
+        const [bookmarkedPosts, statsData, tagsData] = await Promise.all([
+          fetchBookmarkedPosts().catch(() => []),
+          fetchStreakStats().catch(() => null),
+          fetchAllTags().catch(() => []),
+        ]);
+
+        // Si la API devolvió vacíos pero tenemos en local, filtramos de todos los posts
+        if (bookmarkedPosts.length === 0 && bookmarkedIds.size > 0) {
+          const allPosts = await fetchPosts(undefined, sortBy);
+          const filtered = allPosts.filter((p) => bookmarkedIds.has(p.id));
+          setPosts(filtered);
+        } else {
+          setPosts(bookmarkedPosts);
+        }
+
+        if (statsData) setStats(statsData);
+        if (tagsData.length > 0) setTags(tagsData);
+      } else {
+        const [postsData, statsData, tagsData] = await Promise.all([
+          fetchPosts(selectedTag, sortBy, debouncedSearch),
+          fetchStreakStats().catch(() => null),
+          fetchAllTags().catch(() => []),
+        ]);
+        setPosts(postsData);
+        if (statsData) setStats(statsData);
+        if (tagsData.length > 0) setTags(tagsData);
+      }
     } catch (err) {
       console.error('Error cargando datos de la API:', err);
     } finally {
@@ -64,11 +113,53 @@ export function App() {
     }
   };
 
+  const handleToggleBookmark = async (postId: string) => {
+    const nextBookmarks = new Set(bookmarkedIds);
+    if (nextBookmarks.has(postId)) {
+      nextBookmarks.delete(postId);
+    } else {
+      nextBookmarks.add(postId);
+    }
+    setBookmarkedIds(nextBookmarks);
+    localStorage.setItem('devblog_bookmarks', JSON.stringify(Array.from(nextBookmarks)));
+
+    try {
+      await toggleBookmark(postId);
+    } catch (err) {
+      console.error('Error sincronizando marcador en backend:', err);
+    }
+
+    if (selectedTag === '__bookmarks__') {
+      loadData();
+    }
+  };
+
+  const handleEditPost = async (post: Post) => {
+    try {
+      const fullDetail = await fetchPostBySlug(post.slug);
+      setEditingPost(fullDetail);
+    } catch {
+      setEditingPost(post);
+    }
+    setIsNewPostOpen(true);
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    if (!userToken) return;
+    try {
+      await deletePost(postId, userToken);
+      loadData();
+    } catch (err: any) {
+      alert(err.message || 'Error eliminando el artículo');
+    }
+  };
+
   const handleLoginSuccess = (token: string, email: string) => {
     setUserToken(token);
     setUserEmail(email);
     localStorage.setItem('auth_token', token);
     localStorage.setItem('user_email', email);
+    loadData();
   };
 
   const handleLogout = () => {
@@ -76,7 +167,15 @@ export function App() {
     setUserEmail(null);
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_email');
+    loadData();
   };
+
+  const handleClearFilters = () => {
+    setSelectedTag(undefined);
+    setSearchQuery('');
+  };
+
+  const isFiltering = selectedTag !== undefined || Boolean(searchQuery);
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-300">
@@ -99,12 +198,14 @@ export function App() {
             if (!userToken) {
               setIsLoginOpen(true);
             } else {
+              setEditingPost(null);
               setIsNewPostOpen(true);
             }
           }}
           t={t}
         />
 
+        {/* Barra de Filtros por Categoría, Tags y Ordenación */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-[#1e293b] pb-4">
           <div className="flex flex-wrap items-center gap-1.5">
             <button
@@ -117,13 +218,27 @@ export function App() {
             >
               {t.allTopics}
             </button>
+
+            {/* Pestaña de Guardados */}
+            <button
+              onClick={() => setSelectedTag(selectedTag === '__bookmarks__' ? undefined : '__bookmarks__')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all border ${
+                selectedTag === '__bookmarks__'
+                  ? 'border-cyan-400 text-cyan-300 bg-cyan-500/10 font-bold'
+                  : 'border-[#1e293b] text-slate-400 hover:text-white bg-[#0b0f19]'
+              }`}
+            >
+              <Bookmark className={`w-3.5 h-3.5 ${selectedTag === '__bookmarks__' ? 'fill-current' : ''}`} />
+              <span>{t.bookmarksTab} ({bookmarkedIds.size})</span>
+            </button>
+
             {tags.map((tag) => (
               <button
                 key={tag.id}
                 onClick={() => setSelectedTag(tag.slug === selectedTag ? undefined : tag.slug)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all border ${
                   selectedTag === tag.slug
-                    ? 'border-cyan-400 text-cyan-300 bg-cyan-500/10'
+                    ? 'border-cyan-400 text-cyan-300 bg-cyan-500/10 font-bold'
                     : 'border-[#1e293b] text-slate-400 hover:text-white bg-[#0b0f19]'
                 }`}
               >
@@ -146,6 +261,31 @@ export function App() {
           </div>
         </div>
 
+        {/* Indicador de Filtro Activo con botón de Limpiar */}
+        {isFiltering && (
+          <div className="flex items-center justify-between bg-[#0b0f19] border border-cyan-500/30 rounded-xl px-4 py-2.5 mb-6 text-xs font-mono">
+            <div className="flex items-center gap-2 text-slate-300">
+              <Filter className="w-3.5 h-3.5 text-cyan-400" />
+              <span>
+                {selectedTag === '__bookmarks__'
+                  ? `${t.bookmarksTab}`
+                  : selectedTag
+                  ? `${t.activeTagFilter}: #${selectedTag}`
+                  : ''}
+                {searchQuery ? ` • Búsqueda: "${searchQuery}"` : ''}
+              </span>
+            </div>
+            <button
+              onClick={handleClearFilters}
+              className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 font-bold transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>{t.clearFilter}</span>
+            </button>
+          </div>
+        )}
+
+        {/* Cuadrícula de Artículos */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[1, 2, 3, 4].map((i) => (
@@ -155,8 +295,20 @@ export function App() {
         ) : posts.length === 0 ? (
           <div className="text-center py-16 bg-[#0b0f19] border border-[#1e293b] rounded-2xl">
             <Sparkles className="w-8 h-8 text-cyan-400 mx-auto mb-3" />
-            <h3 className="font-bold text-white text-base">{t.noArticlesFound}</h3>
-            <p className="text-xs text-slate-400 mt-1">{t.noArticlesSub}</p>
+            <h3 className="font-bold text-white text-base">
+              {selectedTag === '__bookmarks__' ? t.noBookmarksFound : t.noArticlesFound}
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              {selectedTag === '__bookmarks__' ? t.noBookmarksSub : t.noArticlesSub}
+            </p>
+            {isFiltering && (
+              <button
+                onClick={handleClearFilters}
+                className="mt-4 px-4 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold hover:bg-cyan-500/20 transition-colors"
+              >
+                {t.clearFilter}
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -166,6 +318,12 @@ export function App() {
                 post={post}
                 onOpen={handleOpenArticle}
                 onToggleUpvote={toggleUpvote}
+                onSelectTag={(slug) => setSelectedTag(slug)}
+                onToggleBookmark={handleToggleBookmark}
+                isBookmarked={bookmarkedIds.has(post.id)}
+                isAuthor={Boolean(userToken)}
+                onEditPost={handleEditPost}
+                onDeletePost={handleDeletePost}
                 t={t}
                 currentLang={currentLang}
               />
@@ -178,25 +336,41 @@ export function App() {
         <p>{t.footerText}</p>
       </footer>
 
+      {/* Modal Lector con Comentarios y Acciones */}
       <ArticleModal
         post={activeArticle}
         isOpen={isArticleOpen}
         onClose={() => setIsArticleOpen(false)}
         onToggleUpvote={toggleUpvote}
+        onSelectTag={(slug) => setSelectedTag(slug)}
+        onToggleBookmark={handleToggleBookmark}
+        isBookmarked={activeArticle ? bookmarkedIds.has(activeArticle.id) : false}
+        isAuthor={Boolean(userToken)}
+        onEditPost={handleEditPost}
+        onDeletePost={handleDeletePost}
+        t={t}
+        currentLang={currentLang}
       />
 
+      {/* Modal de Login / Registro de Usuario */}
       <LoginModal
         isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
         onLoginSuccess={handleLoginSuccess}
+        t={t}
       />
 
+      {/* Modal de Crear / Editar Post */}
       <NewPostModal
         isOpen={isNewPostOpen}
-        onClose={() => setIsNewPostOpen(false)}
+        onClose={() => {
+          setIsNewPostOpen(false);
+          setEditingPost(null);
+        }}
         tags={tags}
         token={userToken}
         onPostCreated={loadData}
+        editingPost={editingPost}
         t={t}
         defaultLang={currentLang}
       />
