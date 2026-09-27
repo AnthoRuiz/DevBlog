@@ -51,6 +51,7 @@ export interface Translations {
   uploadingImage: string;
   readingTimeLabel: string;
   readingTimeAuto: string;
+  aiReadingTimeNote: string;
   tagsLabel: string;
   searchTagsPlaceholder: string;
   createNewTagAction: string;
@@ -163,6 +164,7 @@ export const translations: Record<Language, Translations> = {
     uploadingImage: 'Subiendo imagen...',
     readingTimeLabel: 'Tiempo estimado de lectura (min)',
     readingTimeAuto: 'Calculado automáticamente',
+    aiReadingTimeNote: 'Tiempo de lectura estimado por IA según densidad técnica',
     tagsLabel: 'Categorías y Tags',
     searchTagsPlaceholder: 'Buscar categoría o escribir una nueva...',
     createNewTagAction: 'Crear nueva categoría',
@@ -273,6 +275,7 @@ export const translations: Record<Language, Translations> = {
     uploadingImage: 'Uploading image...',
     readingTimeLabel: 'Estimated reading time (min)',
     readingTimeAuto: 'Calculated automatically',
+    aiReadingTimeNote: 'Reading time estimated by AI based on technical density',
     tagsLabel: 'Categories & Tags',
     searchTagsPlaceholder: 'Search category or type a new one...',
     createNewTagAction: 'Create new category',
@@ -383,6 +386,7 @@ export const translations: Record<Language, Translations> = {
     uploadingImage: 'Enviando imagem...',
     readingTimeLabel: 'Tempo estimado de leitura (min)',
     readingTimeAuto: 'Calculado automaticamente',
+    aiReadingTimeNote: 'Tempo de leitura estimado por IA com base na densidade técnica',
     tagsLabel: 'Categorias e Tags',
     searchTagsPlaceholder: 'Pesquisar categoria ou digitar uma nova...',
     createNewTagAction: 'Criar nova categoria',
@@ -493,6 +497,7 @@ export const translations: Record<Language, Translations> = {
     uploadingImage: 'Téléchargement de l\'image...',
     readingTimeLabel: 'Temps de lecture estimé (min)',
     readingTimeAuto: 'Calculé automatiquement',
+    aiReadingTimeNote: 'Temps de lecture estimé par l\'IA selon la densité technique',
     tagsLabel: 'Catégories & Tags',
     searchTagsPlaceholder: 'Rechercher une catégorie ou en créer une...',
     createNewTagAction: 'Créer une nouvelle catégorie',

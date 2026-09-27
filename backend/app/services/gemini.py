@@ -1,6 +1,8 @@
 import json
 import logging
 import httpx
+import re
+import math
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -196,3 +198,87 @@ Markdown Content:
         return candidate_set[:5]
 
     return ["DevOps", "Homelab", "Software"]
+
+async def estimate_reading_time(
+    title: str,
+    summary: str,
+    content_markdown: str
+) -> int:
+    """
+    Estima el tiempo de lectura realista en minutos utilizando Google Gemini AI,
+    analizando el volumen de texto, la complejidad conceptual y la densidad técnica
+    (bloques de código, comandos bash, configuraciones YAML/Docker/SQL, diagramas).
+    """
+    clean_content = (content_markdown or "").strip()
+    if not clean_content:
+        return 1
+
+    # 1. Si GEMINI_API_KEY está configurada, consultar a Google Gemini
+    if settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip():
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY.strip()}"
+        prompt = f"""You are an expert technical content analyst and speed-reading psycholinguist specializing in developer blogs.
+Analyze the following technical article and estimate a realistic reading and comprehension time in minutes for a developer.
+
+EVALUATION CRITERIA:
+1. Base reading speed for regular technical prose: ~170-190 words per minute.
+2. Technical density and cognitive load:
+   - Code blocks (Python, Go, TypeScript, SQL, Bash), configuration files (YAML, Dockerfile), and API schemas require syntax inspection (~50-70 words per minute, or ~20-30 seconds per substantive snippet).
+   - Architectural explanations and troubleshooting steps require mental modeling and re-reading.
+3. Calculate total realistic minutes (integer, minimum 1).
+
+Return ONLY a valid JSON object matching this schema:
+{{
+  "reading_time_minutes": 5
+}}
+
+ARTICLE:
+Title: {title}
+Summary: {summary}
+Markdown Content:
+{clean_content[:4000]}
+"""
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "response_mime_type": "application/json",
+                "temperature": 0.1
+            }
+        }
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(api_url, json=payload)
+                if resp.status_code == 200:
+                    raw_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    parsed = json.loads(raw_text)
+                    minutes = parsed.get("reading_time_minutes")
+                    if isinstance(minutes, (int, float)) and minutes >= 1:
+                        return min(120, max(1, round(minutes)))
+        except Exception as e:
+            logger.error(f"Error calling Gemini for reading time estimation: {e}")
+
+    # Fallback inteligente (Homelab / Demo Mode):
+    # Separa prosa de bloques de código para evaluar densidad técnica
+    code_blocks = re.findall(r"```[\s\S]*?```", clean_content)
+    code_text = " ".join(code_blocks)
+    non_code_text = re.sub(r"```[\s\S]*?```", "", clean_content)
+
+    words_prose = len(non_code_text.split())
+    # Tiempo de prosa a 180 palabras por minuto
+    time_prose = words_prose / 180.0
+
+    # Tiempo de código: cada línea de código técnico toma ~3 segundos para analizar (~20 líneas/min)
+    code_lines = len(code_text.splitlines()) if code_text else 0
+    time_code = code_lines / 20.0
+
+    # Factor de densidad conceptual
+    dense_keywords = [
+        "architecture", "arquitectura", "kubernetes", "docker", "pipeline",
+        "concurrency", "distributed", "database", "postgres", "fastapi",
+        "security", "troubleshooting", "clustering", "failover", "replica"
+    ]
+    dense_hits = sum(1 for kw in dense_keywords if kw in clean_content.lower())
+    density_multiplier = 1.0 + min(0.35, dense_hits * 0.05)
+
+    total_est = (time_prose + time_code) * density_multiplier
+    return max(1, math.ceil(total_est))
+

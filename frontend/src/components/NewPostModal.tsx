@@ -22,7 +22,6 @@ import {
   createTag,
   suggestTagsWithAi,
 } from '../services/api';
-import { calculateReadingTime } from '../utils/readingTime';
 import { MarkdownToolbar } from './MarkdownToolbar';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
@@ -53,8 +52,6 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const [summary, setSummary] = useState('');
   const [language, setLanguage] = useState<Language>(defaultLang);
   const [coverImageUrl, setCoverImageUrl] = useState('');
-  const [readingTime, setReadingTime] = useState(5);
-  const [isAutoReadingTime, setIsAutoReadingTime] = useState(true);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [contentMarkdown, setContentMarkdown] = useState('');
 
@@ -65,14 +62,6 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const [isCreatingTag, setIsCreatingTag] = useState(false);
   const [isSuggestingTags, setIsSuggestingTags] = useState(false);
   const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([]);
-
-  const autoMinutes = calculateReadingTime(contentMarkdown);
-
-  useEffect(() => {
-    if (isAutoReadingTime && contentMarkdown.trim()) {
-      setReadingTime(autoMinutes);
-    }
-  }, [contentMarkdown, isAutoReadingTime, autoMinutes]);
 
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,8 +82,6 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setSummary(editingPost.summary);
       setLanguage((editingPost.language as Language) || defaultLang);
       setCoverImageUrl(editingPost.cover_image_url || '');
-      setReadingTime(editingPost.reading_time_minutes || 5);
-      setIsAutoReadingTime(false);
       setSelectedTagIds(editingPost.tags ? editingPost.tags.map((tg) => tg.id) : []);
       setContentMarkdown('content_markdown' in editingPost ? (editingPost as PostDetail).content_markdown : '');
     } else {
@@ -102,8 +89,6 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setSummary('');
       setLanguage(defaultLang);
       setCoverImageUrl('');
-      setReadingTime(5);
-      setIsAutoReadingTime(true);
       setSelectedTagIds([]);
       setContentMarkdown('');
     }
@@ -311,7 +296,6 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             language,
             content_markdown: contentMarkdown || undefined,
             cover_image_url: coverImageUrl.trim() || undefined,
-            reading_time_minutes: readingTime,
             tag_ids: selectedTagIds,
           },
           token
@@ -324,7 +308,6 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             language,
             content_markdown: contentMarkdown,
             cover_image_url: coverImageUrl.trim() || undefined,
-            reading_time_minutes: readingTime,
             tag_ids: selectedTagIds,
             is_published: true,
           },
@@ -533,233 +516,201 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="sm:col-span-2 space-y-2">
-              {/* Header: Label, counter and AI Suggest button */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <TagIcon className="w-3.5 h-3.5 text-cyan-400" />
-                  <label className="text-xs font-mono text-slate-400">
-                    {t.tagsLabel}
-                  </label>
-                  {selectedTagIds.length > 0 && (
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-400 border border-cyan-800/40">
-                      {selectedTagIds.length} {t.selectedTagsCount}
-                    </span>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleAiSuggestTags}
-                  disabled={isSuggestingTags}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/30 hover:border-cyan-400/50 text-[11px] font-mono text-cyan-300 hover:text-white transition-all disabled:opacity-50"
-                  title="Analiza el post con Gemini AI y sugiere categorías relevantes"
-                >
-                  <Sparkles className={`w-3.5 h-3.5 text-purple-400 ${isSuggestingTags ? 'animate-spin' : ''}`} />
-                  <span>{isSuggestingTags ? t.suggestingTagsAi : t.suggestTagsAiBtn}</span>
-                </button>
+          <div className="space-y-2">
+            {/* Header: Label, counter and AI Suggest button */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TagIcon className="w-3.5 h-3.5 text-cyan-400" />
+                <label className="text-xs font-mono text-slate-400">
+                  {t.tagsLabel}
+                </label>
+                {selectedTagIds.length > 0 && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-400 border border-cyan-800/40">
+                    {selectedTagIds.length} {t.selectedTagsCount}
+                  </span>
+                )}
               </div>
 
-              {/* Selected Tags Chips */}
-              {selectedTagIds.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 p-2 bg-[#07090e] rounded-xl border border-[#1e293b] min-h-[38px] items-center">
-                  {selectedTagIds.map((tagId) => {
-                    const tagObj = availableTags.find((tg) => tg.id === tagId);
-                    if (!tagObj) return null;
-                    return (
-                      <span
-                        key={tagObj.id}
-                        className="inline-flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 rounded-lg border border-cyan-500/30 text-cyan-300 bg-cyan-950/40 group transition-all"
-                        style={tagObj.color_hex ? { borderColor: `${tagObj.color_hex}55`, color: tagObj.color_hex } : undefined}
-                      >
-                        <span>#{tagObj.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTag(tagObj.id)}
-                          className="text-slate-400 hover:text-red-400 transition-colors p-0.5 rounded"
-                          title="Remover categoría"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={handleAiSuggestTags}
+                disabled={isSuggestingTags}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/30 hover:border-cyan-400/50 text-[11px] font-mono text-cyan-300 hover:text-white transition-all disabled:opacity-50"
+                title="Analiza el post con Gemini AI y sugiere categorías relevantes"
+              >
+                <Sparkles className={`w-3.5 h-3.5 text-purple-400 ${isSuggestingTags ? 'animate-spin' : ''}`} />
+                <span>{isSuggestingTags ? t.suggestingTagsAi : t.suggestTagsAiBtn}</span>
+              </button>
+            </div>
 
-              {/* Tag Search & Dynamic Creation Box */}
-              <div className="relative">
-                <div className="relative flex items-center">
-                  <Search className="w-3.5 h-3.5 absolute left-3 text-slate-500 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={tagSearchQuery}
-                    onChange={(e) => setTagSearchQuery(e.target.value)}
-                    onFocus={() => setIsTagSearchFocused(true)}
-                    onBlur={() => {
-                      setTimeout(() => setIsTagSearchFocused(false), 200);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (tagSearchQuery.trim()) {
-                          if (filteredTags.length > 0 && !exactMatchExists) {
-                            const firstMatch = filteredTags[0];
-                            if (firstMatch.name.toLowerCase() === tagSearchQuery.trim().toLowerCase()) {
-                              handleSelectTag(firstMatch.id);
-                            } else {
-                              handleCreateCustomTag();
-                            }
-                          } else if (filteredTags.length > 0) {
-                            handleSelectTag(filteredTags[0].id);
+            {/* Selected Tags Chips */}
+            {selectedTagIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 p-2 bg-[#07090e] rounded-xl border border-[#1e293b] min-h-[38px] items-center">
+                {selectedTagIds.map((tagId) => {
+                  const tagObj = availableTags.find((tg) => tg.id === tagId);
+                  if (!tagObj) return null;
+                  return (
+                    <span
+                      key={tagObj.id}
+                      className="inline-flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 rounded-lg border border-cyan-500/30 text-cyan-300 bg-cyan-950/40 group transition-all"
+                      style={tagObj.color_hex ? { borderColor: `${tagObj.color_hex}55`, color: tagObj.color_hex } : undefined}
+                    >
+                      <span>#{tagObj.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tagObj.id)}
+                        className="text-slate-400 hover:text-red-400 transition-colors p-0.5 rounded"
+                        title="Remover categoría"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Tag Search & Dynamic Creation Box */}
+            <div className="relative">
+              <div className="relative flex items-center">
+                <Search className="w-3.5 h-3.5 absolute left-3 text-slate-500 pointer-events-none" />
+                <input
+                  type="text"
+                  value={tagSearchQuery}
+                  onChange={(e) => setTagSearchQuery(e.target.value)}
+                  onFocus={() => setIsTagSearchFocused(true)}
+                  onBlur={() => {
+                    setTimeout(() => setIsTagSearchFocused(false), 200);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (tagSearchQuery.trim()) {
+                        if (filteredTags.length > 0 && !exactMatchExists) {
+                          const firstMatch = filteredTags[0];
+                          if (firstMatch.name.toLowerCase() === tagSearchQuery.trim().toLowerCase()) {
+                            handleSelectTag(firstMatch.id);
                           } else {
                             handleCreateCustomTag();
                           }
+                        } else if (filteredTags.length > 0) {
+                          handleSelectTag(filteredTags[0].id);
+                        } else {
+                          handleCreateCustomTag();
                         }
-                      } else if (e.key === 'Escape') {
-                        setIsTagSearchFocused(false);
                       }
-                    }}
-                    placeholder={t.searchTagsPlaceholder}
-                    className="w-full bg-[#0b0f19] border border-[#1e293b] rounded-xl pl-9 pr-20 py-2 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500 transition-colors"
-                  />
-                  {tagSearchQuery.trim() && (
+                    } else if (e.key === 'Escape') {
+                      setIsTagSearchFocused(false);
+                    }
+                  }}
+                  placeholder={t.searchTagsPlaceholder}
+                  className="w-full bg-[#0b0f19] border border-[#1e293b] rounded-xl pl-9 pr-20 py-2 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500 transition-colors"
+                />
+                {tagSearchQuery.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => handleCreateCustomTag()}
+                    disabled={isCreatingTag}
+                    className="absolute right-1.5 px-2 py-1 rounded-lg bg-cyan-950 border border-cyan-800 text-[10px] font-mono text-cyan-300 hover:bg-cyan-900 transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>{isCreatingTag ? '...' : 'Crear'}</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Autocomplete / Filtering Dropdown */}
+              {isTagSearchFocused && (
+                <div
+                  className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-[#0d121f] border border-[#1e293b] rounded-xl shadow-2xl p-1.5 space-y-1"
+                  onMouseDown={(e) => e.preventDefault()}
+                >
+                  {filteredTags.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 p-1">
+                      {filteredTags.map((tag) => (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => handleSelectTag(tag.id)}
+                          className="inline-flex items-center gap-1 text-[11px] font-mono px-2.5 py-1 rounded-lg border border-[#1e293b] bg-[#07090e] hover:border-cyan-500/50 hover:bg-cyan-950/30 text-slate-300 hover:text-cyan-300 transition-all text-left"
+                        >
+                          <Plus className="w-3 h-3 text-slate-500" />
+                          <span>#{tag.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    tagSearchQuery.trim() && !exactMatchExists && (
+                      <div className="p-2 text-center text-xs text-slate-400 font-mono">
+                        {t.noTagsFound}
+                      </div>
+                    )
+                  )}
+
+                  {/* Option to create new custom tag if query doesn't match an existing tag exactly */}
+                  {tagSearchQuery.trim() && !exactMatchExists && (
                     <button
                       type="button"
                       onClick={() => handleCreateCustomTag()}
                       disabled={isCreatingTag}
-                      className="absolute right-1.5 px-2 py-1 rounded-lg bg-cyan-950 border border-cyan-800 text-[10px] font-mono text-cyan-300 hover:bg-cyan-900 transition-colors flex items-center gap-1"
+                      className="w-full flex items-center justify-between p-2 rounded-lg bg-cyan-950/30 hover:bg-cyan-950/60 border border-cyan-900/50 text-xs font-mono text-cyan-300 transition-colors text-left"
                     >
-                      <Plus className="w-3 h-3" />
-                      <span>{isCreatingTag ? '...' : 'Crear'}</span>
+                      <div className="flex items-center gap-2">
+                        <Plus className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>
+                          {t.createNewTagAction} <strong className="text-white">#{tagSearchQuery.trim()}</strong>
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-mono">↵ Enter</span>
                     </button>
                   )}
-                </div>
 
-                {/* Autocomplete / Filtering Dropdown */}
-                {isTagSearchFocused && (
-                  <div
-                    className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-[#0d121f] border border-[#1e293b] rounded-xl shadow-2xl p-1.5 space-y-1"
-                    onMouseDown={(e) => e.preventDefault()}
-                  >
-                    {filteredTags.length > 0 ? (
-                      <div className="flex flex-wrap gap-1 p-1">
-                        {filteredTags.map((tag) => (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            onClick={() => handleSelectTag(tag.id)}
-                            className="inline-flex items-center gap-1 text-[11px] font-mono px-2.5 py-1 rounded-lg border border-[#1e293b] bg-[#07090e] hover:border-cyan-500/50 hover:bg-cyan-950/30 text-slate-300 hover:text-cyan-300 transition-all text-left"
-                          >
-                            <Plus className="w-3 h-3 text-slate-500" />
-                            <span>#{tag.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      tagSearchQuery.trim() && !exactMatchExists && (
-                        <div className="p-2 text-center text-xs text-slate-400 font-mono">
-                          {t.noTagsFound}
-                        </div>
-                      )
-                    )}
-
-                    {/* Option to create new custom tag if query doesn't match an existing tag exactly */}
-                    {tagSearchQuery.trim() && !exactMatchExists && (
-                      <button
-                        type="button"
-                        onClick={() => handleCreateCustomTag()}
-                        disabled={isCreatingTag}
-                        className="w-full flex items-center justify-between p-2 rounded-lg bg-cyan-950/30 hover:bg-cyan-950/60 border border-cyan-900/50 text-xs font-mono text-cyan-300 transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Plus className="w-3.5 h-3.5 text-cyan-400" />
-                          <span>
-                            {t.createNewTagAction} <strong className="text-white">#{tagSearchQuery.trim()}</strong>
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-500 font-mono">↵ Enter</span>
-                      </button>
-                    )}
-
-                    {filteredTags.length === 0 && !tagSearchQuery.trim() && (
-                      <div className="p-2 text-center text-xs text-slate-500 font-mono">
-                        Todas las categorías ya han sido agregadas.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* AI Suggested Tags Pill Tray */}
-              {aiTagSuggestions.length > 0 && (
-                <div className="p-2.5 bg-gradient-to-r from-purple-950/20 to-cyan-950/20 border border-purple-900/30 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between text-[11px] font-mono text-purple-300">
-                    <span className="flex items-center gap-1.5">
-                      <Sparkles className="w-3 h-3 text-purple-400" />
-                      {t.aiSuggestedTagsTitle}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleAddAllSuggestedTags}
-                      className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
-                    >
-                      + Agregar todas
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {aiTagSuggestions.map((suggested) => {
-                      const alreadySelected = availableTags.some(
-                        (tg) => tg.name.toLowerCase() === suggested.toLowerCase() && selectedTagIds.includes(tg.id)
-                      );
-                      if (alreadySelected) return null;
-                      return (
-                        <button
-                          key={suggested}
-                          type="button"
-                          onClick={() => handleAddSuggestedTag(suggested)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono bg-[#07090e] border border-purple-500/40 text-purple-300 hover:border-cyan-400 hover:text-cyan-300 transition-all hover:scale-105 active:scale-95 shadow-sm"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>#{suggested}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {filteredTags.length === 0 && !tagSearchQuery.trim() && (
+                    <div className="p-2 text-center text-xs text-slate-500 font-mono">
+                      Todas las categorías ya han sido agregadas.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-mono text-slate-400">
-                  {t.readingTimeLabel}
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAutoReadingTime(true);
-                    setReadingTime(autoMinutes);
-                  }}
-                  className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
-                  title={t.readingTimeAuto}
-                >
-                  <span>⚡ Auto: {autoMinutes}m</span>
-                </button>
+            {/* AI Suggested Tags Pill Tray */}
+            {aiTagSuggestions.length > 0 && (
+              <div className="p-2.5 bg-gradient-to-r from-purple-950/20 to-cyan-950/20 border border-purple-900/30 rounded-xl space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-mono text-purple-300">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-3 h-3 text-purple-400" />
+                    {t.aiSuggestedTagsTitle}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAddAllSuggestedTags}
+                    className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
+                  >
+                    + Agregar todas
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {aiTagSuggestions.map((suggested) => {
+                    const alreadySelected = availableTags.some(
+                      (tg) => tg.name.toLowerCase() === suggested.toLowerCase() && selectedTagIds.includes(tg.id)
+                    );
+                    if (alreadySelected) return null;
+                    return (
+                      <button
+                        key={suggested}
+                        type="button"
+                        onClick={() => handleAddSuggestedTag(suggested)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono bg-[#07090e] border border-purple-500/40 text-purple-300 hover:border-cyan-400 hover:text-cyan-300 transition-all hover:scale-105 active:scale-95 shadow-sm"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>#{suggested}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <input
-                type="number"
-                min={1}
-                max={120}
-                value={readingTime}
-                onChange={(e) => {
-                  setIsAutoReadingTime(false);
-                  setReadingTime(parseInt(e.target.value) || 1);
-                }}
-                className="w-full bg-[#07090e] border border-[#1e293b] rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
-              />
-            </div>
+            )}
           </div>
 
           <div>
@@ -803,26 +754,33 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             )}
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1e293b]">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-mono text-slate-400 hover:text-white transition-colors"
-            >
-              {t.cancelBtn}
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>
-                {isSubmitting
-                  ? isEditing ? t.savingChanges : t.publishingPost
-                  : isEditing ? t.saveChangesBtn : t.publishPostBtn}
-              </span>
-            </button>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-[#1e293b]">
+            <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-500">
+              <Sparkles className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+              <span>{t.aiReadingTimeNote}</span>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl text-xs font-mono text-slate-400 hover:text-white transition-colors"
+              >
+                {t.cancelBtn}
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>
+                  {isSubmitting
+                    ? isEditing ? t.savingChanges : t.publishingPost
+                    : isEditing ? t.saveChangesBtn : t.publishPostBtn}
+                </span>
+              </button>
+            </div>
           </div>
         </form>
       </div>

@@ -124,7 +124,7 @@ export async function createPost(
     language: string;
     content_markdown: string;
     cover_image_url?: string;
-    reading_time_minutes: number;
+    reading_time_minutes?: number;
     tag_ids: string[];
     is_published: boolean;
   },

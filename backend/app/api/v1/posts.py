@@ -36,7 +36,7 @@ from app.schemas.post import (
     TagSuggestRequest,
     TagSuggestResponse,
 )
-from app.services.gemini import translate_post_content, suggest_post_tags
+from app.services.gemini import translate_post_content, suggest_post_tags, estimate_reading_time
 from app.api.deps import get_current_admin, get_current_user_optional, get_client_hash
 
 router = APIRouter(prefix="/posts", tags=["Artículos"])
@@ -121,6 +121,22 @@ async def ai_suggest_tags(
         existing_tags=existing_tag_names
     )
     return TagSuggestResponse(suggested_tags=suggestions)
+
+@router.post("/ai-estimate-reading-time")
+async def ai_estimate_reading_time(
+    req: TagSuggestRequest,
+    current_admin: User = Depends(get_current_admin),
+):
+    """
+    Calcula el tiempo estimado de lectura en minutos mediante IA (Google Gemini),
+    evaluando la densidad técnica (código, terminal, diagramas) y extensión.
+    """
+    minutes = await estimate_reading_time(
+        title=req.title,
+        summary=req.summary or "",
+        content_markdown=req.content_markdown or ""
+    )
+    return {"reading_time_minutes": minutes}
 
 @router.get("/bookmarks/mine", response_model=list[PostRead])
 async def list_my_bookmarks(
@@ -227,8 +243,8 @@ async def create_post(
         tags = list(tag_res.scalars().all())
 
     reading_time = post_in.reading_time_minutes
-    if not reading_time or reading_time <= 1:
-        reading_time = calculate_reading_time(post_in.content_markdown)
+    if not reading_time or reading_time <= 0:
+        reading_time = await estimate_reading_time(post_in.title, post_in.summary, post_in.content_markdown)
 
     new_post = Post(
         author_id=current_admin.id,
@@ -245,8 +261,11 @@ async def create_post(
     )
     db.add(new_post)
     await db.commit()
-    await db.refresh(new_post)
-    return PostDetailRead.model_validate(new_post)
+    res = await db.execute(
+        select(Post).where(Post.id == new_post.id).options(selectinload(Post.tags), selectinload(Post.comments))
+    )
+    loaded_post = res.scalar_one()
+    return PostDetailRead.model_validate(loaded_post)
 
 @router.put("/{post_id}", response_model=PostDetailRead)
 async def update_post(
@@ -283,8 +302,11 @@ async def update_post(
         post.cover_image_url = post_update.cover_image_url
     if post_update.reading_time_minutes is not None:
         post.reading_time_minutes = post_update.reading_time_minutes
-    elif post_update.content_markdown is not None:
-        post.reading_time_minutes = calculate_reading_time(post_update.content_markdown)
+    elif post_update.content_markdown is not None or post_update.title is not None:
+        curr_title = post_update.title or post.title
+        curr_summary = post_update.summary or post.summary
+        curr_content = post_update.content_markdown if post_update.content_markdown is not None else post.content_markdown
+        post.reading_time_minutes = await estimate_reading_time(curr_title, curr_summary, curr_content)
     if post_update.language is not None:
         post.language = post_update.language
     if post_update.is_published is not None:
@@ -297,8 +319,11 @@ async def update_post(
         post.tags = list(tag_res.scalars().all())
 
     await db.commit()
-    await db.refresh(post)
-    return PostDetailRead.model_validate(post)
+    res = await db.execute(
+        select(Post).where(Post.id == post.id).options(selectinload(Post.tags), selectinload(Post.comments))
+    )
+    loaded_post = res.scalar_one()
+    return PostDetailRead.model_validate(loaded_post)
 
 @router.delete("/{post_id}")
 async def delete_post(

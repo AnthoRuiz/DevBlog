@@ -20,7 +20,7 @@ class PostBase(BaseModel):
     content_markdown: str
     cover_image_url: Optional[str] = None
     language: str = "es"
-    reading_time_minutes: int = Field(default=5, ge=1)
+    reading_time_minutes: Optional[int] = Field(default=None, ge=1)
     is_published: bool = True
     tag_ids: list[uuid.UUID] = []
 
