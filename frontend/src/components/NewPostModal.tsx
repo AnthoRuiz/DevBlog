@@ -4,6 +4,8 @@ import { Tag, Post, PostDetail } from '../types';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
 import { uploadImage, createPost, updatePost, translatePostWithAi } from '../services/api';
 import { calculateReadingTime } from '../utils/readingTime';
+import { MarkdownToolbar } from './MarkdownToolbar';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface NewPostModalProps {
   isOpen: boolean;
@@ -53,6 +55,9 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const [showTranslateMenu, setShowTranslateMenu] = useState(false);
   const [aiSuccessMsg, setAiSuccessMsg] = useState<string | null>(null);
 
+  const [editorTab, setEditorTab] = useState<'write' | 'preview'>('write');
+  const markdownTextareaRef = useRef<HTMLTextAreaElement>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -75,6 +80,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setSelectedTagIds([]);
       setContentMarkdown('');
     }
+    setEditorTab('write');
     setErrorMsg(null);
   }, [editingPost, isOpen, defaultLang]);
 
@@ -449,17 +455,44 @@ export const NewPostModal: FC<NewPostModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-mono text-slate-400 mb-1.5">
-              {t.contentMarkdownLabel} *
-            </label>
-            <textarea
-              required
-              rows={8}
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-mono text-slate-400">
+                {t.contentMarkdownLabel} *
+              </label>
+              <span className="text-[10px] font-mono text-cyan-400/80">
+                {editorTab === 'write' ? 'Markdown + Word Toolbar' : 'Live Preview'}
+              </span>
+            </div>
+
+            {/* Barra de formato estilo Word con pestañas Escribir y Vista Previa */}
+            <MarkdownToolbar
+              textareaRef={markdownTextareaRef}
               value={contentMarkdown}
-              onChange={(e) => setContentMarkdown(e.target.value)}
-              placeholder={t.contentMarkdownPlaceholder}
-              className="w-full bg-[#07090e] border border-[#1e293b] rounded-xl px-4 py-3 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500 leading-relaxed"
+              onChange={setContentMarkdown}
+              activeTab={editorTab}
+              onTabChange={setEditorTab}
+              t={t}
             />
+
+            {/* Área de edición o previsualización en vivo */}
+            {editorTab === 'write' ? (
+              <textarea
+                ref={markdownTextareaRef}
+                required
+                rows={9}
+                value={contentMarkdown}
+                onChange={(e) => setContentMarkdown(e.target.value)}
+                placeholder={t.contentMarkdownPlaceholder}
+                className="w-full bg-[#07090e] border border-t-0 border-[#1e293b] rounded-b-xl px-4 py-3 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500 leading-relaxed resize-y"
+              />
+            ) : (
+              <div className="w-full bg-[#07090e] border border-t-0 border-[#1e293b] rounded-b-xl p-4 sm:p-5 min-h-[200px] max-h-[420px] overflow-y-auto">
+                <MarkdownRenderer
+                  content={contentMarkdown}
+                  emptyMessage={t.editorEmptyPreview}
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1e293b]">
