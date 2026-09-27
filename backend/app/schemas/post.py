@@ -74,3 +74,17 @@ class UpvoteResponse(BaseModel):
 class BookmarkToggleResponse(BaseModel):
     post_id: uuid.UUID
     is_bookmarked: bool
+
+class PostTranslateRequest(BaseModel):
+    title: str = Field(..., max_length=255)
+    summary: str = Field(..., max_length=1000)
+    content_markdown: str
+    target_lang: str = Field(..., pattern="^(es|en|pt|fr)$")
+    source_lang: Optional[str] = "es"
+
+class PostTranslateResponse(BaseModel):
+    title: str
+    summary: str
+    content_markdown: str
+    target_lang: str
+    provider: str

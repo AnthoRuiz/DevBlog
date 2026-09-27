@@ -210,3 +210,38 @@ export async function registerUser(
 
   return res.json();
 }
+
+export interface TranslatePostResponse {
+  title: string;
+  summary: string;
+  content_markdown: string;
+  target_lang: string;
+  provider: string;
+}
+
+export async function translatePostWithAi(
+  data: {
+    title: string;
+    summary: string;
+    content_markdown: string;
+    target_lang: string;
+    source_lang?: string;
+  },
+  token: string
+): Promise<TranslatePostResponse> {
+  const res = await fetch(`${API_BASE}/posts/ai-translate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Error al traducir con IA' }));
+    throw new Error(err.detail || 'Error al traducir con IA');
+  }
+
+  return res.json();
+}

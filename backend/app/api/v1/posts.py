@@ -30,7 +30,10 @@ from app.schemas.post import (
     CommentRead,
     CommentCreate,
     BookmarkToggleResponse,
+    PostTranslateRequest,
+    PostTranslateResponse,
 )
+from app.services.gemini import translate_post_content
 from app.api.deps import get_current_admin, get_current_user_optional, get_client_hash
 
 router = APIRouter(prefix="/posts", tags=["Artículos"])
@@ -117,6 +120,24 @@ async def upload_image(
         shutil.copyfileobj(file.file, buffer)
 
     return {"url": f"/uploads/{filename}"}
+
+@router.post("/ai-translate", response_model=PostTranslateResponse)
+async def ai_translate_post(
+    req: PostTranslateRequest,
+    current_admin: User = Depends(get_current_admin),
+):
+    """
+    Traduce título, resumen y markdown a uno de los idiomas soportados (es, en, pt, fr)
+    utilizando Google Gemini AI mientras preserva bloques de código y estructura técnica.
+    """
+    res = await translate_post_content(
+        title=req.title,
+        summary=req.summary,
+        content_markdown=req.content_markdown,
+        target_lang=req.target_lang,
+        source_lang=req.source_lang or "es"
+    )
+    return PostTranslateResponse(**res)
 
 @router.get("/{slug}", response_model=PostDetailRead)
 async def get_post_by_slug(slug: str, db: AsyncSession = Depends(get_db)):

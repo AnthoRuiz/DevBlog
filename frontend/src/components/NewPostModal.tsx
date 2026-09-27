@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, ChangeEvent, FormEvent, FC } from 'react';
-import { X, Upload, Image as ImageIcon, Sparkles, Edit3 } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, Sparkles, Edit3, Languages, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { Tag, Post, PostDetail } from '../types';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
-import { uploadImage, createPost, updatePost } from '../services/api';
+import { uploadImage, createPost, updatePost, translatePostWithAi } from '../services/api';
 import { calculateReadingTime } from '../utils/readingTime';
 
 interface NewPostModalProps {
@@ -48,6 +48,10 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [showTranslateMenu, setShowTranslateMenu] = useState(false);
+  const [aiSuccessMsg, setAiSuccessMsg] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -96,6 +100,47 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setErrorMsg(message);
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleAiTranslate = async (targetLang: Language) => {
+    if (!token) {
+      setErrorMsg('Debes iniciar sesión para usar el traductor con IA');
+      return;
+    }
+    if (!title.trim() && !summary.trim() && !contentMarkdown.trim()) {
+      setErrorMsg('Escribe al menos el título o contenido para traducir');
+      return;
+    }
+
+    setIsTranslating(true);
+    setShowTranslateMenu(false);
+    setErrorMsg(null);
+    setAiSuccessMsg(null);
+
+    try {
+      const res = await translatePostWithAi(
+        {
+          title: title || 'Sin título',
+          summary: summary || '',
+          content_markdown: contentMarkdown || '',
+          target_lang: targetLang,
+          source_lang: language,
+        },
+        token
+      );
+
+      setTitle(res.title);
+      setSummary(res.summary);
+      setContentMarkdown(res.content_markdown);
+      setLanguage(targetLang);
+      setAiSuccessMsg(`${t.aiTranslateSuccess} (${res.provider})`);
+      setTimeout(() => setAiSuccessMsg(null), 6000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al traducir con IA';
+      setErrorMsg(message);
+    } finally {
+      setIsTranslating(false);
     }
   };
 
@@ -187,6 +232,65 @@ export const NewPostModal: FC<NewPostModalProps> = ({
               ⚠️ {errorMsg}
             </div>
           )}
+
+          {aiSuccessMsg && (
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono flex items-center gap-2 animate-fadeIn">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <span>{aiSuccessMsg}</span>
+            </div>
+          )}
+
+          {/* BARRA 1-CLIC AI TRANSLATOR CON GEMINI */}
+          <div className="p-3 bg-gradient-to-r from-cyan-950/40 via-[#0f1422] to-blue-950/30 border border-cyan-500/25 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-lg shadow-cyan-950/20">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping inline-block" />
+              <span className="text-xs font-mono font-bold text-cyan-300">
+                Gemini AI Translator
+              </span>
+              <span className="text-[11px] font-mono text-slate-400 hidden sm:inline">
+                • Preserva código y markdown
+              </span>
+            </div>
+
+            <div className="relative">
+              <button
+                type="button"
+                disabled={isTranslating || !title.trim()}
+                onClick={() => setShowTranslateMenu(!showTranslateMenu)}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 hover:text-white text-xs font-mono transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+              >
+                <Languages className="w-3.5 h-3.5" />
+                <span>{isTranslating ? t.translatingWithAi : t.aiTranslateBtn}</span>
+                <ChevronDown className="w-3 h-3 ml-0.5" />
+              </button>
+
+              {showTranslateMenu && (
+                <div className="absolute right-0 mt-2 w-56 bg-[#0b0f19] border border-[#1e293b] rounded-xl shadow-2xl p-1.5 z-40 animate-fadeIn backdrop-blur-lg">
+                  <div className="text-[10px] font-mono text-slate-400 px-2 py-1 uppercase tracking-wider border-b border-[#1e293b] mb-1">
+                    {t.aiTranslatePrompt}
+                  </div>
+                  {supportedLangs
+                    .filter((l) => l !== language)
+                    .map((lang) => (
+                      <button
+                        key={lang}
+                        type="button"
+                        onClick={() => handleAiTranslate(lang)}
+                        className="w-full text-left px-2.5 py-2 rounded-lg text-xs font-mono text-slate-300 hover:text-cyan-300 hover:bg-cyan-500/10 flex items-center justify-between transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <span>{languageFlags[lang]}</span>
+                          <span>{languageNames[lang]}</span>
+                        </span>
+                        <span className="text-[10px] text-cyan-400 font-bold bg-cyan-500/10 px-1.5 py-0.5 rounded">
+                          {lang.toUpperCase()}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-2">

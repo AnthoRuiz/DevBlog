@@ -30,6 +30,7 @@ services:
       - SECRET_KEY=${SECRET_KEY:-devblog_insecure_default_secret_key_change_in_production_2026}
       - ENVIRONMENT=development
       - DEBUG=True
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     ports:
       - "8000:8000"
     volumes:
