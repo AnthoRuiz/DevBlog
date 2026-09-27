@@ -17,29 +17,33 @@ export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenSt
   const [telemetry, setTelemetry] = useState<HardwareTelemetry | null>(stats?.telemetry || null);
 
   useEffect(() => {
-    if (stats?.telemetry && !telemetry) {
-      setTelemetry(stats.telemetry);
+    if (stats?.telemetry) {
+      setTelemetry((prev) => prev ?? stats.telemetry ?? null);
     }
   }, [stats]);
 
   useEffect(() => {
+    let isMounted = true;
     const update = async () => {
       try {
         const live = await fetchLiveTelemetry();
-        setTelemetry(live);
+        if (isMounted && live) {
+          setTelemetry(live);
+        }
       } catch (err) {
-        // silent fallback on network hiccup
+        console.warn('Live telemetry polling error:', err);
       }
     };
 
-    // Initial fetch if not present
-    if (!telemetry) {
-      update();
-    }
-
+    update();
     const interval = setInterval(update, 5000);
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
+
+  const activeTelemetry = telemetry || stats?.telemetry || null;
 
   return (
     <div className="bg-[#0b0f19] border border-[#1e293b] rounded-2xl p-5 mb-8 shadow-xl relative overflow-hidden">
@@ -83,7 +87,7 @@ export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenSt
             {/* Real CPU % */}
             <div className="flex items-center gap-1 text-slate-300">
               <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-              <span>CPU: <strong className="text-cyan-300">{telemetry ? `${telemetry.cpu_percent}%` : '...'}</strong></span>
+              <span>CPU: <strong className="text-cyan-300">{activeTelemetry ? `${activeTelemetry.cpu_percent}%` : '...'}</strong></span>
             </div>
 
             <span className="text-slate-700">|</span>
@@ -91,7 +95,7 @@ export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenSt
             {/* Real RAM % */}
             <div className="flex items-center gap-1 text-slate-300">
               <Activity className="w-3.5 h-3.5 text-emerald-400" />
-              <span>RAM: <strong className="text-emerald-300">{telemetry ? `${telemetry.memory_percent}%` : '...'}</strong></span>
+              <span>RAM: <strong className="text-emerald-300">{activeTelemetry ? `${activeTelemetry.memory_percent}%` : '...'}</strong></span>
             </div>
 
             <span className="text-slate-700">|</span>
@@ -99,7 +103,7 @@ export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenSt
             {/* Temperature */}
             <div className="flex items-center gap-1 text-slate-300">
               <Flame className="w-3.5 h-3.5 text-amber-400" />
-              <span><strong className="text-amber-300">{telemetry ? `${telemetry.temperature_c}°C` : '...'}</strong></span>
+              <span><strong className="text-amber-300">{activeTelemetry ? `${activeTelemetry.temperature_c}°C` : '...'}</strong></span>
             </div>
 
             <span className="text-slate-700 hidden sm:inline">|</span>
@@ -107,7 +111,7 @@ export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenSt
             {/* Uptime */}
             <div className="hidden sm:flex items-center gap-1 text-slate-300">
               <Clock className="w-3.5 h-3.5 text-sky-400" />
-              <span><strong className="text-sky-300">{telemetry ? telemetry.uptime_formatted : '...'}</strong></span>
+              <span><strong className="text-sky-300">{activeTelemetry ? activeTelemetry.uptime_formatted : '...'}</strong></span>
             </div>
 
             <span className="text-slate-700">|</span>
