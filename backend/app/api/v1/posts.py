@@ -1,17 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from sqlalchemy.orm import selectinload
 from slugify import slugify
 from typing import Optional
 import uuid
+import os
+import shutil
 from datetime import datetime, timezone
 
 from app.db.session import get_db
 from app.models.post import Post, Tag, post_tags
-from app.models.interaction import Upvote
+from app.models.interaction import Upvote, Bookmark, Comment
 from app.models.user import User
-from app.schemas.post import PostRead, PostDetailRead, PostCreate, TagRead, UpvoteResponse
+from app.schemas.post import (
+    PostRead,
+    PostDetailRead,
+    PostCreate,
+    PostUpdate,
+    TagRead,
+    UpvoteResponse,
+    CommentRead,
+    CommentCreate,
+    BookmarkToggleResponse,
+)
 from app.api.deps import get_current_admin, get_current_user_optional, get_client_hash
 
 router = APIRouter(prefix="/posts", tags=["Artículos"])
@@ -37,7 +49,6 @@ async def list_posts(
     if sort == "top_voted":
         query = query.order_by(desc(Post.upvotes_count), desc(Post.created_at))
     elif sort == "trending":
-        # Trending: combinación ponderada de upvotes y views
         query = query.order_by(desc(Post.upvotes_count * 2 + Post.views_count), desc(Post.created_at))
     else:
         query = query.order_by(desc(Post.published_at), desc(Post.created_at))
@@ -47,22 +58,74 @@ async def list_posts(
     posts = result.scalars().all()
     return [PostRead.model_validate(p) for p in posts]
 
+@router.get("/tags/all", response_model=list[TagRead])
+async def list_all_tags(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Tag).order_by(Tag.name))
+    tags = result.scalars().all()
+    return [TagRead.model_validate(t) for t in tags]
+
+@router.get("/bookmarks/mine", response_model=list[PostRead])
+async def list_my_bookmarks(
+    request: Request,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
+):
+    client_hash = get_client_hash(request)
+    if current_user:
+        query = (
+            select(Post)
+            .join(Bookmark, Bookmark.post_id == Post.id)
+            .where(Bookmark.user_id == current_user.id, Post.is_published == True)
+            .options(selectinload(Post.tags))
+            .order_by(desc(Bookmark.created_at))
+        )
+    else:
+        query = (
+            select(Post)
+            .join(Bookmark, Bookmark.post_id == Post.id)
+            .where(Bookmark.client_hash == client_hash, Post.is_published == True)
+            .options(selectinload(Post.tags))
+            .order_by(desc(Bookmark.created_at))
+        )
+    result = await db.execute(query)
+    posts = result.scalars().all()
+    return [PostRead.model_validate(p) for p in posts]
+
+@router.post("/upload-image")
+async def upload_image(
+    file: UploadFile = File(...),
+    current_admin: User = Depends(get_current_admin)
+):
+    uploads_dir = "/app/uploads" if os.path.exists("/app/uploads") else os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads"))
+    os.makedirs(uploads_dir, exist_ok=True)
+
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"]:
+        raise HTTPException(status_code=400, detail="Formato de archivo no soportado. Usa JPG, PNG, WEBP, GIF o SVG.")
+
+    filename = f"img_{uuid.uuid4().hex[:12]}{ext}"
+    file_path = os.path.join(uploads_dir, filename)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    return {"url": f"/uploads/{filename}"}
+
 @router.get("/{slug}", response_model=PostDetailRead)
 async def get_post_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Post)
         .where(Post.slug == slug, Post.is_published == True)
-        .options(selectinload(Post.tags))
+        .options(selectinload(Post.tags), selectinload(Post.comments))
     )
     post = result.scalar_one_or_none()
     if not post:
         raise HTTPException(status_code=404, detail="Artículo no encontrado")
-    
-    # Incrementar vistas
+
     post.views_count += 1
     await db.commit()
     await db.refresh(post)
-    
+
     return PostDetailRead.model_validate(post)
 
 @router.post("", response_model=PostDetailRead, status_code=status.HTTP_201_CREATED)
@@ -74,8 +137,7 @@ async def create_post(
     base_slug = slugify(post_in.title)
     slug = base_slug
     counter = 1
-    
-    # Asegurar slug único
+
     while True:
         existing = await db.execute(select(Post).where(Post.slug == slug))
         if not existing.scalar_one_or_none():
@@ -83,7 +145,6 @@ async def create_post(
         slug = f"{base_slug}-{counter}"
         counter += 1
 
-    # Obtener tags
     tags = []
     if post_in.tag_ids:
         tag_res = await db.execute(select(Tag).where(Tag.id.in_(post_in.tag_ids)))
@@ -93,6 +154,7 @@ async def create_post(
         author_id=current_admin.id,
         slug=slug,
         title=post_in.title,
+        language=post_in.language,
         summary=post_in.summary,
         content_markdown=post_in.content_markdown,
         cover_image_url=post_in.cover_image_url,
@@ -105,6 +167,108 @@ async def create_post(
     await db.commit()
     await db.refresh(new_post)
     return PostDetailRead.model_validate(new_post)
+
+@router.put("/{post_id}", response_model=PostDetailRead)
+async def update_post(
+    post_id: uuid.UUID,
+    post_update: PostUpdate,
+    current_admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(Post).where(Post.id == post_id).options(selectinload(Post.tags), selectinload(Post.comments))
+    )
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(status_code=404, detail="Artículo no encontrado")
+
+    if post_update.title is not None and post_update.title != post.title:
+        post.title = post_update.title
+        base_slug = slugify(post_update.title)
+        slug = base_slug
+        counter = 1
+        while True:
+            existing = await db.execute(select(Post).where(Post.slug == slug, Post.id != post_id))
+            if not existing.scalar_one_or_none():
+                break
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        post.slug = slug
+
+    if post_update.summary is not None:
+        post.summary = post_update.summary
+    if post_update.content_markdown is not None:
+        post.content_markdown = post_update.content_markdown
+    if post_update.cover_image_url is not None:
+        post.cover_image_url = post_update.cover_image_url
+    if post_update.reading_time_minutes is not None:
+        post.reading_time_minutes = post_update.reading_time_minutes
+    if post_update.language is not None:
+        post.language = post_update.language
+    if post_update.is_published is not None:
+        post.is_published = post_update.is_published
+        if post.is_published and not post.published_at:
+            post.published_at = datetime.now(timezone.utc)
+
+    if post_update.tag_ids is not None:
+        tag_res = await db.execute(select(Tag).where(Tag.id.in_(post_update.tag_ids)))
+        post.tags = list(tag_res.scalars().all())
+
+    await db.commit()
+    await db.refresh(post)
+    return PostDetailRead.model_validate(post)
+
+@router.delete("/{post_id}")
+async def delete_post(
+    post_id: uuid.UUID,
+    current_admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(Post).where(Post.id == post_id))
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(status_code=404, detail="Artículo no encontrado")
+
+    await db.delete(post)
+    await db.commit()
+    return {"status": "success", "message": "Artículo eliminado correctamente", "id": str(post_id)}
+
+@router.get("/{post_id}/comments", response_model=list[CommentRead])
+async def list_comments(post_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Comment)
+        .where(Comment.post_id == post_id, Comment.is_approved == True)
+        .order_by(desc(Comment.created_at))
+    )
+    comments = result.scalars().all()
+    return [CommentRead.model_validate(c) for c in comments]
+
+@router.post("/{post_id}/comments", response_model=CommentRead, status_code=status.HTTP_201_CREATED)
+async def create_comment(
+    post_id: uuid.UUID,
+    comment_in: CommentCreate,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
+):
+    post_res = await db.execute(select(Post).where(Post.id == post_id))
+    post = post_res.scalar_one_or_none()
+    if not post:
+        raise HTTPException(status_code=404, detail="Artículo no encontrado")
+
+    author_name = current_user.full_name if current_user else (comment_in.author_name or "Dev Reader")
+    user_id = current_user.id if current_user else None
+
+    new_comment = Comment(
+        post_id=post_id,
+        user_id=user_id,
+        author_name=author_name,
+        content=comment_in.content,
+        is_approved=True
+    )
+    db.add(new_comment)
+    await db.commit()
+    await db.refresh(new_comment)
+    return CommentRead.model_validate(new_comment)
 
 @router.post("/{post_id}/upvote", response_model=UpvoteResponse)
 async def toggle_upvote(
@@ -120,7 +284,6 @@ async def toggle_upvote(
 
     client_hash = get_client_hash(request)
 
-    # Buscar voto existente
     if current_user:
         upvote_res = await db.execute(
             select(Upvote).where(Upvote.post_id == post_id, Upvote.user_id == current_user.id)
@@ -132,12 +295,10 @@ async def toggle_upvote(
     existing_upvote = upvote_res.scalar_one_or_none()
 
     if existing_upvote:
-        # Retirar voto (toggle off)
         await db.delete(existing_upvote)
         post.upvotes_count = max(0, post.upvotes_count - 1)
         upvoted = False
     else:
-        # Registrar voto (toggle on)
         new_upvote = Upvote(
             post_id=post_id,
             user_id=current_user.id if current_user else None,
@@ -151,8 +312,41 @@ async def toggle_upvote(
     await db.refresh(post)
     return UpvoteResponse(post_id=post.id, upvoted=upvoted, new_upvotes_count=post.upvotes_count)
 
-@router.get("/tags/all", response_model=list[TagRead])
-async def list_all_tags(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Tag).order_by(Tag.name))
-    tags = result.scalars().all()
-    return [TagRead.model_validate(t) for t in tags]
+@router.post("/{post_id}/bookmark", response_model=BookmarkToggleResponse)
+async def toggle_bookmark(
+    post_id: uuid.UUID,
+    request: Request,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db)
+):
+    post_res = await db.execute(select(Post).where(Post.id == post_id))
+    post = post_res.scalar_one_or_none()
+    if not post:
+        raise HTTPException(status_code=404, detail="Artículo no encontrado")
+
+    client_hash = get_client_hash(request)
+
+    if current_user:
+        bookmark_res = await db.execute(
+            select(Bookmark).where(Bookmark.post_id == post_id, Bookmark.user_id == current_user.id)
+        )
+    else:
+        bookmark_res = await db.execute(
+            select(Bookmark).where(Bookmark.post_id == post_id, Bookmark.client_hash == client_hash)
+        )
+    existing_bm = bookmark_res.scalar_one_or_none()
+
+    if existing_bm:
+        await db.delete(existing_bm)
+        is_bookmarked = False
+    else:
+        new_bm = Bookmark(
+            post_id=post_id,
+            user_id=current_user.id if current_user else None,
+            client_hash=client_hash if not current_user else None
+        )
+        db.add(new_bm)
+        is_bookmarked = True
+
+    await db.commit()
+    return BookmarkToggleResponse(post_id=post.id, is_bookmarked=is_bookmarked)

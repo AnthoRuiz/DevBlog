@@ -1,8 +1,8 @@
-import { useState, useRef, ChangeEvent, FormEvent, FC } from 'react';
-import { X, Upload, Image as ImageIcon, Sparkles } from 'lucide-react';
-import { Tag } from '../types';
+import { useState, useRef, useEffect, ChangeEvent, FormEvent, FC } from 'react';
+import { X, Upload, Image as ImageIcon, Sparkles, Edit3 } from 'lucide-react';
+import { Tag, Post, PostDetail } from '../types';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
-import { uploadImage, createPost } from '../services/api';
+import { uploadImage, createPost, updatePost } from '../services/api';
 
 interface NewPostModalProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface NewPostModalProps {
   tags: Tag[];
   token: string | null;
   onPostCreated: () => void;
+  editingPost?: Post | PostDetail | null;
   t: Translations;
   defaultLang: Language;
 }
@@ -20,9 +21,12 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   tags,
   token,
   onPostCreated,
+  editingPost = null,
   t,
   defaultLang,
 }) => {
+  const isEditing = Boolean(editingPost);
+
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
   const [language, setLanguage] = useState<Language>(defaultLang);
@@ -30,12 +34,33 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const [readingTime, setReadingTime] = useState(5);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [contentMarkdown, setContentMarkdown] = useState('');
-  
+
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingPost) {
+      setTitle(editingPost.title);
+      setSummary(editingPost.summary);
+      setLanguage((editingPost.language as Language) || defaultLang);
+      setCoverImageUrl(editingPost.cover_image_url || '');
+      setReadingTime(editingPost.reading_time_minutes || 5);
+      setSelectedTagIds(editingPost.tags ? editingPost.tags.map((tg) => tg.id) : []);
+      setContentMarkdown('content_markdown' in editingPost ? (editingPost as PostDetail).content_markdown : '');
+    } else {
+      setTitle('');
+      setSummary('');
+      setLanguage(defaultLang);
+      setCoverImageUrl('');
+      setReadingTime(5);
+      setSelectedTagIds([]);
+      setContentMarkdown('');
+    }
+    setErrorMsg(null);
+  }, [editingPost, isOpen, defaultLang]);
 
   if (!isOpen) return null;
 
@@ -65,12 +90,12 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) {
-      setErrorMsg('Debes iniciar sesión para publicar un artículo');
+      setErrorMsg('Debes iniciar sesión para publicar o editar un artículo');
       return;
     }
 
-    if (!title.trim() || !summary.trim() || !contentMarkdown.trim()) {
-      setErrorMsg('Por favor completa el título, resumen y contenido.');
+    if (!title.trim() || !summary.trim()) {
+      setErrorMsg('Por favor completa el título y el resumen.');
       return;
     }
 
@@ -78,23 +103,39 @@ export const NewPostModal: FC<NewPostModalProps> = ({
     setErrorMsg(null);
 
     try {
-      await createPost(
-        {
-          title,
-          summary,
-          language,
-          content_markdown: contentMarkdown,
-          cover_image_url: coverImageUrl.trim() || undefined,
-          reading_time_minutes: readingTime,
-          tag_ids: selectedTagIds,
-          is_published: true,
-        },
-        token
-      );
+      if (isEditing && editingPost) {
+        await updatePost(
+          editingPost.id,
+          {
+            title,
+            summary,
+            language,
+            content_markdown: contentMarkdown || undefined,
+            cover_image_url: coverImageUrl.trim() || undefined,
+            reading_time_minutes: readingTime,
+            tag_ids: selectedTagIds,
+          },
+          token
+        );
+      } else {
+        await createPost(
+          {
+            title,
+            summary,
+            language,
+            content_markdown: contentMarkdown,
+            cover_image_url: coverImageUrl.trim() || undefined,
+            reading_time_minutes: readingTime,
+            tag_ids: selectedTagIds,
+            is_published: true,
+          },
+          token
+        );
+      }
       onPostCreated();
       onClose();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error creando el artículo';
+      const message = err instanceof Error ? err.message : 'Error al guardar el artículo';
       setErrorMsg(message);
     } finally {
       setIsSubmitting(false);
@@ -108,8 +149,17 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       <div className="relative w-full max-w-3xl bg-[#0b0f19] border border-[#1e293b] rounded-2xl shadow-2xl my-auto overflow-hidden">
         <div className="sticky top-0 bg-[#0b0f19]/95 backdrop-blur border-b border-[#1e293b] p-4 flex items-center justify-between z-20">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm font-bold text-white tracking-tight">{t.createNewPost}</span>
+            {isEditing ? (
+              <>
+                <Edit3 className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm font-bold text-white tracking-tight">{t.editPostModalTitle}</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm font-bold text-white tracking-tight">{t.createNewPost}</span>
+              </>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -294,7 +344,11 @@ export const NewPostModal: FC<NewPostModalProps> = ({
               className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>{isSubmitting ? t.publishingPost : t.publishPostBtn}</span>
+              <span>
+                {isSubmitting
+                  ? isEditing ? t.savingChanges : t.publishingPost
+                  : isEditing ? t.saveChangesBtn : t.publishPostBtn}
+              </span>
             </button>
           </div>
         </form>
