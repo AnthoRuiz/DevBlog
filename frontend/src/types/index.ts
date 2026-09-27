@@ -46,6 +46,38 @@ export interface PostUpdate {
   tag_ids?: string[];
 }
 
+export interface HardwareTelemetry {
+  cpu_percent: number;
+  cpu_cores_logical: number;
+  cpu_cores_physical: number;
+  memory_used_gb: number;
+  memory_total_gb: number;
+  memory_percent: number;
+  temperature_c: number;
+  uptime_seconds: number;
+  uptime_formatted: string;
+  disk_used_gb: number;
+  disk_total_gb: number;
+  disk_percent: number;
+  platform_os: string;
+  server_node: string;
+}
+
+export interface ServiceStatus {
+  name: string;
+  status: 'operational' | 'degraded' | 'down';
+  latency_ms: number;
+  details: string;
+}
+
+export interface SystemStatusResponse {
+  status: 'operational' | 'degraded' | 'down';
+  timestamp: string;
+  overall_latency_ms: number;
+  hardware: HardwareTelemetry;
+  services: ServiceStatus[];
+}
+
 export interface StreakStats {
   current_streak_days: number;
   total_articles_published: number;
@@ -53,6 +85,7 @@ export interface StreakStats {
   total_upvotes: number;
   homelab_uptime_percent: number;
   server_node: string;
+  telemetry?: HardwareTelemetry;
 }
 
 export interface User {

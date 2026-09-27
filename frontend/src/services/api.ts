@@ -1,10 +1,22 @@
-import { Post, PostDetail, StreakStats, Tag, Comment } from '../types';
+import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse } from '../types';
 
 const API_BASE = '/api/v1';
 
 export async function fetchStreakStats(): Promise<StreakStats> {
   const res = await fetch(`${API_BASE}/stats/streak`);
   if (!res.ok) throw new Error('Error al obtener estadísticas de racha');
+  return res.json();
+}
+
+export async function fetchLiveTelemetry(): Promise<HardwareTelemetry> {
+  const res = await fetch(`${API_BASE}/stats/telemetry`);
+  if (!res.ok) throw new Error('Error al obtener telemetría de hardware');
+  return res.json();
+}
+
+export async function fetchSystemStatus(): Promise<SystemStatusResponse> {
+  const res = await fetch(`${API_BASE}/stats/status`);
+  if (!res.ok) throw new Error('Error al obtener estado del sistema');
   return res.json();
 }
 

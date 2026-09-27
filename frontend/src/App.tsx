@@ -5,6 +5,7 @@ import { DigestCard } from './components/DigestCard';
 import { ArticleModal } from './components/ArticleModal';
 import { LoginModal } from './components/LoginModal';
 import { NewPostModal } from './components/NewPostModal';
+import { SystemStatusModal } from './components/SystemStatusModal';
 import { Post, PostDetail, StreakStats, Tag } from './types';
 import {
   fetchPosts,
@@ -47,7 +48,20 @@ export function App() {
   const [isArticleOpen, setIsArticleOpen] = useState<boolean>(false);
   const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
   const [isNewPostOpen, setIsNewPostOpen] = useState<boolean>(false);
+  const [isStatusOpen, setIsStatusOpen] = useState<boolean>(false);
   const [editingPost, setEditingPost] = useState<Post | PostDetail | null>(null);
+
+  // Soporte directo para URL hash #/status
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash === '#/status' || window.location.hash === '#status') {
+        setIsStatusOpen(true);
+      }
+    };
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   const [userToken, setUserToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
   const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('user_email'));
@@ -170,6 +184,18 @@ export function App() {
     loadData();
   };
 
+  const handleOpenStatus = () => {
+    window.location.hash = '#/status';
+    setIsStatusOpen(true);
+  };
+
+  const handleCloseStatus = () => {
+    if (window.location.hash === '#/status' || window.location.hash === '#status') {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+    setIsStatusOpen(false);
+  };
+
   const handleClearFilters = () => {
     setSelectedTag(undefined);
     setSearchQuery('');
@@ -184,6 +210,7 @@ export function App() {
         searchQuery={searchQuery}
         onOpenLogin={() => setIsLoginOpen(true)}
         onLogout={handleLogout}
+        onOpenStatus={handleOpenStatus}
         userEmail={userEmail}
         serverNode={stats?.server_node}
         currentLang={currentLang}
@@ -202,6 +229,7 @@ export function App() {
               setIsNewPostOpen(true);
             }
           }}
+          onOpenStatus={handleOpenStatus}
           t={t}
         />
 
@@ -373,6 +401,13 @@ export function App() {
         editingPost={editingPost}
         t={t}
         defaultLang={currentLang}
+      />
+
+      {/* Modal de Telemetría y Estado del Sistema Homelab (/status) */}
+      <SystemStatusModal
+        isOpen={isStatusOpen}
+        onClose={handleCloseStatus}
+        t={t}
       />
     </div>
   );

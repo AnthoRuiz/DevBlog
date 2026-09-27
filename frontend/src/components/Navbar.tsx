@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Terminal, User as UserIcon, Search, Globe, LogOut, X } from 'lucide-react';
+import { Terminal, User as UserIcon, Search, Globe, LogOut, X, Activity } from 'lucide-react';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
 
 interface NavbarProps {
@@ -7,6 +7,7 @@ interface NavbarProps {
   searchQuery: string;
   onOpenLogin: () => void;
   onLogout?: () => void;
+  onOpenStatus?: () => void;
   userEmail?: string | null;
   serverNode?: string;
   currentLang: Language;
@@ -19,6 +20,7 @@ export const Navbar: FC<NavbarProps> = ({
   searchQuery,
   onOpenLogin,
   onLogout,
+  onOpenStatus,
   userEmail,
   serverNode = 'Homelab Docker',
   currentLang,
@@ -38,9 +40,15 @@ export const Navbar: FC<NavbarProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold tracking-tight text-white text-base">{t.siteTitle}</span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-medium">
-                {t.liveNode}
-              </span>
+              <button
+                type="button"
+                onClick={onOpenStatus}
+                className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 hover:border-emerald-400 text-emerald-400 font-medium transition-all flex items-center gap-1 cursor-pointer"
+                title="Ver estado de hardware y latencias (/status)"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{t.liveNode}</span>
+              </button>
             </div>
             <div className="text-[11px] font-mono text-slate-500 -mt-0.5">
               {serverNode}
@@ -74,6 +82,17 @@ export const Navbar: FC<NavbarProps> = ({
 
         {/* Botones de Acción */}
         <div className="flex items-center gap-2.5">
+          {/* Botón de Acceso Rápido a Estado del Servidor */}
+          <button
+            type="button"
+            onClick={onOpenStatus}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#0b0f19] hover:bg-[#121622] border border-[#1e293b] hover:border-cyan-500/40 text-xs font-mono text-cyan-400 transition-colors"
+            title="Ver latencias del sistema y telemetría (/status)"
+          >
+            <Activity className="w-3.5 h-3.5 text-cyan-400" />
+            <span>/status</span>
+          </button>
+
           {/* Selector de Idioma */}
           <div className="relative flex items-center bg-[#0b0f19] border border-[#1e293b] rounded-xl px-2 py-1 text-xs">
             <Globe className="w-3.5 h-3.5 text-cyan-400 mr-1.5" />

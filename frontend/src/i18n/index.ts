@@ -109,6 +109,23 @@ export interface Translations {
   toolbarDivider: string;
   editorEmptyPreview: string;
   markdownGuideTitle: string;
+  systemStatusBtn: string;
+  systemStatusTitle: string;
+  systemStatusSubtitle: string;
+  systemOperational: string;
+  systemDegraded: string;
+  overallLatency: string;
+  servicesHealth: string;
+  hardwareTelemetry: string;
+  cpuUsage: string;
+  ramUsage: string;
+  diskUsage: string;
+  temperature: string;
+  systemUptime: string;
+  hostPlatform: string;
+  autoRefreshLive: string;
+  refreshNow: string;
+  viewSystemStatus: string;
   footerText: string;
 }
 
@@ -222,6 +239,23 @@ export const translations: Record<Language, Translations> = {
     toolbarDivider: 'Línea divisoria (---)',
     editorEmptyPreview: 'El artículo aún no tiene contenido. Escribe en la pestaña "Escribir" para ver la previsualización.',
     markdownGuideTitle: 'Guía Rápida de Formato Markdown (Estilo Word)',
+    systemStatusBtn: '🖥️ Estado (/status)',
+    systemStatusTitle: 'Estado del Sistema y Telemetría',
+    systemStatusSubtitle: 'Métricas de hardware y latencias en vivo del nodo Homelab',
+    systemOperational: 'Todos los servicios operacionales',
+    systemDegraded: 'Rendimiento degradado',
+    overallLatency: 'Latencia general',
+    servicesHealth: 'Salud de Servicios y Conectividad',
+    hardwareTelemetry: 'Telemetría de Hardware en Vivo',
+    cpuUsage: 'Uso de CPU',
+    ramUsage: 'Memoria RAM',
+    diskUsage: 'Almacenamiento NVMe',
+    temperature: 'Temperatura',
+    systemUptime: 'Tiempo Activo',
+    hostPlatform: 'Plataforma Host',
+    autoRefreshLive: 'En vivo (5s)',
+    refreshNow: 'Actualizar',
+    viewSystemStatus: 'Ver Estado del Servidor',
     footerText: '© 2026 SYS.BLOG • Diseñado para Homelab • Desplegado con Docker • React + FastAPI',
   },
   en: {
@@ -333,6 +367,23 @@ export const translations: Record<Language, Translations> = {
     toolbarDivider: 'Divider line (---)',
     editorEmptyPreview: 'The article does not have content yet. Write in the "Write" tab to see the live preview.',
     markdownGuideTitle: 'Quick Markdown Formatting Guide (Word-like)',
+    systemStatusBtn: '🖥️ Status (/status)',
+    systemStatusTitle: 'System Status & Telemetry',
+    systemStatusSubtitle: 'Live hardware metrics and service latencies of this Homelab node',
+    systemOperational: 'All systems operational',
+    systemDegraded: 'Degraded performance',
+    overallLatency: 'Overall latency',
+    servicesHealth: 'Services Health & Latencies',
+    hardwareTelemetry: 'Live Hardware Telemetry',
+    cpuUsage: 'CPU Usage',
+    ramUsage: 'RAM Memory',
+    diskUsage: 'NVMe Storage',
+    temperature: 'Temperature',
+    systemUptime: 'System Uptime',
+    hostPlatform: 'Host Platform',
+    autoRefreshLive: 'Live (5s)',
+    refreshNow: 'Refresh',
+    viewSystemStatus: 'View System Status',
     footerText: '© 2026 SYS.BLOG • Built for Homelab • Deployed with Docker • React + FastAPI',
   },
   pt: {
@@ -444,6 +495,23 @@ export const translations: Record<Language, Translations> = {
     toolbarDivider: 'Linha divisória (---)',
     editorEmptyPreview: 'O artigo ainda não tem conteúdo. Escreva na aba "Escrever" para ver a pré-visualização.',
     markdownGuideTitle: 'Guia Rápido de Formatação Markdown (Estilo Word)',
+    systemStatusBtn: '🖥️ Status (/status)',
+    systemStatusTitle: 'Status do Sistema e Telemetria',
+    systemStatusSubtitle: 'Métricas de hardware em tempo real e latências do nó Homelab',
+    systemOperational: 'Todos os sistemas operacionais',
+    systemDegraded: 'Desempenho degradado',
+    overallLatency: 'Latência geral',
+    servicesHealth: 'Saúde dos Serviços e Latências',
+    hardwareTelemetry: 'Telemetria de Hardware em Tempo Real',
+    cpuUsage: 'Uso de CPU',
+    ramUsage: 'Memória RAM',
+    diskUsage: 'Armazenamento NVMe',
+    temperature: 'Temperatura',
+    systemUptime: 'Tempo de Atividade',
+    hostPlatform: 'Plataforma Host',
+    autoRefreshLive: 'Ao vivo (5s)',
+    refreshNow: 'Atualizar',
+    viewSystemStatus: 'Ver Status do Servidor',
     footerText: '© 2026 SYS.BLOG • Projetado para Homelab • Implantado com Docker • React + FastAPI',
   },
   fr: {
@@ -555,6 +623,23 @@ export const translations: Record<Language, Translations> = {
     toolbarDivider: 'Ligne de séparation (---)',
     editorEmptyPreview: 'L\'article n\'a pas encore de contenu. Écrivez dans l\'onglet "Écrire" pour voir l\'aperçu.',
     markdownGuideTitle: 'Guide Rapide de Formatage Markdown (Style Word)',
+    systemStatusBtn: '🖥️ Statut (/status)',
+    systemStatusTitle: 'Statut du Système & Télémétrie',
+    systemStatusSubtitle: 'Métriques matérielles en direct et latences du nœud Homelab',
+    systemOperational: 'Tous les systèmes sont opérationnels',
+    systemDegraded: 'Performances dégradées',
+    overallLatency: 'Latence globale',
+    servicesHealth: 'Santé des Services & Latences',
+    hardwareTelemetry: 'Télémétrie Matérielle en Direct',
+    cpuUsage: 'Utilisation CPU',
+    ramUsage: 'Mémoire RAM',
+    diskUsage: 'Stockage NVMe',
+    temperature: 'Température',
+    systemUptime: 'Temps de Fonctionnement',
+    hostPlatform: 'Plateforme Hôte',
+    autoRefreshLive: 'En direct (5s)',
+    refreshNow: 'Actualiser',
+    viewSystemStatus: 'Voir l\'État du Serveur',
     footerText: '© 2026 SYS.BLOG • Conçu pour Homelab • Déployé avec Docker • React + FastAPI',
   },
 };
