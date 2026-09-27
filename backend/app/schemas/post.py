@@ -30,6 +30,7 @@ class PostCreate(PostBase):
 class PostRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
+    author_id: Optional[uuid.UUID] = None
     slug: str
     title: str
     summary: str

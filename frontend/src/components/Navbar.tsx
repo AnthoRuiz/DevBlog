@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { Terminal, User as UserIcon, Search, Globe, LogOut, X, Activity } from 'lucide-react';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
+import { User } from '../types';
 
 interface NavbarProps {
   onSearch: (q: string) => void;
@@ -9,6 +10,7 @@ interface NavbarProps {
   onLogout?: () => void;
   onOpenStatus?: () => void;
   userEmail?: string | null;
+  currentUser?: User | null;
   serverNode?: string;
   currentLang: Language;
   onSelectLanguage: (lang: Language) => void;
@@ -22,6 +24,7 @@ export const Navbar: FC<NavbarProps> = ({
   onLogout,
   onOpenStatus,
   userEmail,
+  currentUser,
   serverNode = 'Homelab Docker',
   currentLang,
   onSelectLanguage,
@@ -113,8 +116,21 @@ export const Navbar: FC<NavbarProps> = ({
           {/* Botón de Acceso / Sesión Autor */}
           {userEmail ? (
             <div className="flex items-center gap-2">
-              <span className="hidden md:inline text-xs font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2.5 py-1 rounded-lg">
-                👤 {userEmail.split('@')[0]}
+              <span className="hidden md:inline-flex items-center gap-1.5 text-xs font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2.5 py-1 rounded-lg">
+                <span>👤 {userEmail.split('@')[0]}</span>
+                {currentUser?.role && (
+                  <span
+                    className={`text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded border uppercase ${
+                      currentUser.role === 'ADMIN'
+                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm shadow-purple-500/10'
+                        : currentUser.role === 'AUTHOR'
+                        ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}
+                  >
+                    {currentUser.role}
+                  </span>
+                )}
               </span>
               <button
                 type="button"

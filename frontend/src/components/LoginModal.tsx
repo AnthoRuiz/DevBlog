@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { X, Lock, Mail, User as UserIcon, ShieldCheck } from 'lucide-react';
 import { Translations } from '../i18n';
-import { registerUser } from '../services/api';
+import { registerUser, loginUser } from '../services/api';
+import { User } from '../types';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoginSuccess: (token: string, userEmail: string) => void;
+  onLoginSuccess: (token: string, user: User) => void;
   t?: Translations;
 }
 
@@ -28,19 +29,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
     try {
       if (mode === 'register') {
         const data = await registerUser(email, password, fullName || 'Dev Reader');
-        onLoginSuccess(data.access_token, data.user.email);
+        onLoginSuccess(data.access_token, data.user);
         onClose();
       } else {
-        const res = await fetch('/api/v1/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.detail || 'Error al iniciar sesión');
-        }
-        onLoginSuccess(data.access_token, data.user.email);
+        const data = await loginUser(email, password);
+        onLoginSuccess(data.access_token, data.user);
         onClose();
       }
     } catch (err: any) {
@@ -56,17 +49,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
     try {
       // Intentar login con usuario demo o registrarlo si no existe
       try {
-        const res = await fetch('/api/v1/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: 'google.reader@devblog.local', password: 'google_reader_pass' }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          onLoginSuccess(data.access_token, data.user.email);
-          onClose();
-          return;
-        }
+        const data = await loginUser('google.reader@devblog.local', 'google_reader_pass');
+        onLoginSuccess(data.access_token, data.user);
+        onClose();
+        return;
       } catch {
         // Fallback a registro
       }
@@ -77,11 +63,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
         'google_reader_pass',
         'Google Workspace Reader'
       );
-      onLoginSuccess(regData.access_token, regData.user.email);
+      onLoginSuccess(regData.access_token, regData.user);
       onClose();
     } catch {
       // Fallback a login con admin por defecto
-      setEmail('admin@devblog.local');
+      setEmail('admin@devblog.io');
       setPassword('admin123456');
       setError('Credenciales de demostración cargadas. Presiona "Ingresar".');
     } finally {

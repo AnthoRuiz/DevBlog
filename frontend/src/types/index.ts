@@ -1,3 +1,16 @@
+export type UserRole = 'ADMIN' | 'AUTHOR' | 'READER';
+
+export interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url?: string;
+  role: UserRole;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: string;
+}
+
 export interface Tag {
   id: string;
   name: string;
@@ -16,6 +29,7 @@ export interface Comment {
 
 export interface Post {
   id: string;
+  author_id?: string;
   slug: string;
   title: string;
   summary: string;

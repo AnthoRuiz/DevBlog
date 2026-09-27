@@ -1,4 +1,4 @@
-import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse } from '../types';
+import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -204,11 +204,35 @@ export async function deletePost(postId: string, token: string): Promise<void> {
   }
 }
 
+export async function fetchCurrentUser(token: string): Promise<User> {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Sesión inválida o expirada');
+  return res.json();
+}
+
+export async function loginUser(
+  email: string,
+  password: string
+): Promise<{ access_token: string; token_type: string; user: User }> {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Credenciales inválidas' }));
+    throw new Error(err.detail || 'Credenciales inválidas');
+  }
+  return res.json();
+}
+
 export async function registerUser(
   email: string,
   password: string,
   fullName: string
-): Promise<{ access_token: string; user: { email: string; full_name: string } }> {
+): Promise<{ access_token: string; token_type: string; user: User }> {
   const res = await fetch(`${API_BASE}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

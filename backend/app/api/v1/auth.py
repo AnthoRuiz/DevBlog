@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+import uuid
+from pydantic import BaseModel
 import httpx
 
 from app.db.session import get_db
 from app.models.user import User, UserRole, OAuthAccount
 from app.schemas.user import UserCreate, UserRead, Token, LoginRequest, OAuthLoginRequest
 from app.core.security import get_password_hash, verify_password, create_access_token
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_admin
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
 
@@ -137,3 +139,39 @@ async def oauth_google(oauth_in: OAuthLoginRequest, db: AsyncSession = Depends(g
 @router.get("/me", response_model=UserRead)
 async def get_me(current_user: User = Depends(get_current_user)):
     return UserRead.model_validate(current_user)
+
+class UserRoleUpdate(BaseModel):
+    role: UserRole
+
+@router.get("/users", response_model=list[UserRead])
+async def list_users(
+    current_admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(User).order_by(User.created_at))
+    return [UserRead.model_validate(u) for u in result.scalars().all()]
+
+@router.put("/users/{user_id}/role", response_model=UserRead)
+async def update_user_role(
+    user_id: uuid.UUID,
+    role_in: UserRoleUpdate,
+    current_admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if user.id == current_admin.id and role_in.role != UserRole.ADMIN:
+        admin_count = await db.execute(select(func.count(User.id)).where(User.role == UserRole.ADMIN))
+        if (admin_count.scalar() or 0) <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="No puedes removerte a ti mismo de administrador si eres el único en el sistema"
+            )
+
+    user.role = role_in.role
+    await db.commit()
+    await db.refresh(user)
+    return UserRead.model_validate(user)

@@ -19,7 +19,7 @@ def calculate_reading_time(text: str | None) -> int:
 from app.db.session import get_db
 from app.models.post import Post, Tag, post_tags
 from app.models.interaction import Upvote, Bookmark, Comment
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.post import (
     PostRead,
     PostDetailRead,
@@ -37,7 +37,7 @@ from app.schemas.post import (
     TagSuggestResponse,
 )
 from app.services.gemini import translate_post_content, suggest_post_tags, estimate_reading_time
-from app.api.deps import get_current_admin, get_current_user_optional, get_client_hash
+from app.api.deps import get_current_admin, get_current_author_or_admin, get_current_user_optional, get_client_hash
 
 router = APIRouter(prefix="/posts", tags=["Artículos"])
 
@@ -80,7 +80,7 @@ async def list_all_tags(db: AsyncSession = Depends(get_db)):
 @router.post("/tags", response_model=TagRead)
 async def create_tag(
     tag_in: TagCreate,
-    current_admin: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_author_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
     clean_name = tag_in.name.strip()
@@ -108,7 +108,7 @@ async def create_tag(
 @router.post("/ai-suggest-tags", response_model=TagSuggestResponse)
 async def ai_suggest_tags(
     req: TagSuggestRequest,
-    current_admin: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_author_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
     res_tags = await db.execute(select(Tag.name))
@@ -125,7 +125,7 @@ async def ai_suggest_tags(
 @router.post("/ai-estimate-reading-time")
 async def ai_estimate_reading_time(
     req: TagSuggestRequest,
-    current_admin: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_author_or_admin),
 ):
     """
     Calcula el tiempo estimado de lectura en minutos mediante IA (Google Gemini),
@@ -168,7 +168,7 @@ async def list_my_bookmarks(
 @router.post("/upload-image")
 async def upload_image(
     file: UploadFile = File(...),
-    current_admin: User = Depends(get_current_admin)
+    current_user: User = Depends(get_current_author_or_admin)
 ):
     uploads_dir = "/app/uploads" if os.path.exists("/app/uploads") else os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads"))
     os.makedirs(uploads_dir, exist_ok=True)
@@ -188,7 +188,7 @@ async def upload_image(
 @router.post("/ai-translate", response_model=PostTranslateResponse)
 async def ai_translate_post(
     req: PostTranslateRequest,
-    current_admin: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_author_or_admin),
 ):
     """
     Traduce título, resumen y markdown a uno de los idiomas soportados (es, en, pt, fr)
@@ -223,7 +223,7 @@ async def get_post_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
 @router.post("", response_model=PostDetailRead, status_code=status.HTTP_201_CREATED)
 async def create_post(
     post_in: PostCreate,
-    current_admin: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_author_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
     base_slug = slugify(post_in.title)
@@ -247,7 +247,7 @@ async def create_post(
         reading_time = await estimate_reading_time(post_in.title, post_in.summary, post_in.content_markdown)
 
     new_post = Post(
-        author_id=current_admin.id,
+        author_id=current_user.id,
         slug=slug,
         title=post_in.title,
         language=post_in.language,
@@ -271,7 +271,7 @@ async def create_post(
 async def update_post(
     post_id: uuid.UUID,
     post_update: PostUpdate,
-    current_admin: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_author_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(
@@ -280,6 +280,13 @@ async def update_post(
     post = result.scalar_one_or_none()
     if not post:
         raise HTTPException(status_code=404, detail="Artículo no encontrado")
+
+    # Verificación de permisos RBAC: Solo ADMIN o el autor original del post
+    if current_user.role != UserRole.ADMIN and post.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permisos insuficientes: solo el autor original o un administrador pueden editar este artículo"
+        )
 
     if post_update.title is not None and post_update.title != post.title:
         post.title = post_update.title
@@ -328,13 +335,20 @@ async def update_post(
 @router.delete("/{post_id}")
 async def delete_post(
     post_id: uuid.UUID,
-    current_admin: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_author_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(select(Post).where(Post.id == post_id))
     post = result.scalar_one_or_none()
     if not post:
         raise HTTPException(status_code=404, detail="Artículo no encontrado")
+
+    # Verificación de permisos RBAC: Solo ADMIN o el autor original del post
+    if current_user.role != UserRole.ADMIN and post.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permisos insuficientes: solo el autor original o un administrador pueden eliminar este artículo"
+        )
 
     await db.delete(post)
     await db.commit()

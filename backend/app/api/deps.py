@@ -55,3 +55,13 @@ async def get_current_admin(
             detail="Permisos insuficientes (Se requiere rol ADMIN)"
         )
     return current_user
+
+async def get_current_author_or_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    if current_user.role not in [UserRole.ADMIN, UserRole.AUTHOR]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permisos insuficientes: se requiere rol AUTHOR o ADMIN para gestionar artículos"
+        )
+    return current_user

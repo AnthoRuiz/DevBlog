@@ -6,7 +6,7 @@ import { ArticleModal } from './components/ArticleModal';
 import { LoginModal } from './components/LoginModal';
 import { NewPostModal } from './components/NewPostModal';
 import { SystemStatusModal } from './components/SystemStatusModal';
-import { Post, PostDetail, StreakStats, Tag } from './types';
+import { Post, PostDetail, StreakStats, Tag, User } from './types';
 import {
   fetchPosts,
   fetchStreakStats,
@@ -16,6 +16,7 @@ import {
   toggleBookmark,
   fetchBookmarkedPosts,
   deletePost,
+  fetchCurrentUser,
 } from './services/api';
 import { Sparkles, ArrowUpDown, Bookmark, Filter, X } from 'lucide-react';
 import { Language, translations } from './i18n';
@@ -65,6 +66,30 @@ export function App() {
 
   const [userToken, setUserToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
   const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('user_email'));
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const stored = localStorage.getItem('current_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Mantener actualizado el perfil y rol del usuario desde /auth/me
+  useEffect(() => {
+    if (userToken) {
+      fetchCurrentUser(userToken)
+        .then((user) => {
+          setCurrentUser(user);
+          setUserEmail(user.email);
+          localStorage.setItem('current_user', JSON.stringify(user));
+        })
+        .catch(() => {
+          // Token inválido o expirado
+          handleLogout();
+        });
+    }
+  }, [userToken]);
 
   // Debounce para búsqueda en tiempo real
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
@@ -168,20 +193,33 @@ export function App() {
     }
   };
 
-  const handleLoginSuccess = (token: string, email: string) => {
+  const handleLoginSuccess = (token: string, user: User) => {
     setUserToken(token);
-    setUserEmail(email);
+    setUserEmail(user.email);
+    setCurrentUser(user);
     localStorage.setItem('auth_token', token);
-    localStorage.setItem('user_email', email);
+    localStorage.setItem('user_email', user.email);
+    localStorage.setItem('current_user', JSON.stringify(user));
     loadData();
   };
 
   const handleLogout = () => {
     setUserToken(null);
     setUserEmail(null);
+    setCurrentUser(null);
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_email');
+    localStorage.removeItem('current_user');
     loadData();
+  };
+
+  // Permisos RBAC
+  const canCreatePost = currentUser?.role === 'ADMIN' || currentUser?.role === 'AUTHOR';
+  const canEditPost = (post: Post | null | undefined): boolean => {
+    if (!post || !currentUser) return false;
+    if (currentUser.role === 'ADMIN') return true;
+    if (currentUser.role === 'AUTHOR' && post.author_id === currentUser.id) return true;
+    return false;
   };
 
   const handleOpenStatus = () => {
@@ -212,6 +250,7 @@ export function App() {
         onLogout={handleLogout}
         onOpenStatus={handleOpenStatus}
         userEmail={userEmail}
+        currentUser={currentUser}
         serverNode={stats?.server_node}
         currentLang={currentLang}
         onSelectLanguage={setCurrentLang}
@@ -222,8 +261,10 @@ export function App() {
         <StreakHeader
           stats={stats}
           onNewPost={() => {
-            if (!userToken) {
+            if (!currentUser) {
               setIsLoginOpen(true);
+            } else if (!canCreatePost) {
+              alert('Tu cuenta tiene rol de Lector (READER). Solo usuarios con rol AUTHOR o ADMIN pueden crear nuevos artículos.');
             } else {
               setEditingPost(null);
               setIsNewPostOpen(true);
@@ -349,7 +390,7 @@ export function App() {
                 onSelectTag={(slug) => setSelectedTag(slug)}
                 onToggleBookmark={handleToggleBookmark}
                 isBookmarked={bookmarkedIds.has(post.id)}
-                isAuthor={Boolean(userToken)}
+                isAuthor={canEditPost(post)}
                 onEditPost={handleEditPost}
                 onDeletePost={handleDeletePost}
                 t={t}
@@ -373,7 +414,7 @@ export function App() {
         onSelectTag={(slug) => setSelectedTag(slug)}
         onToggleBookmark={handleToggleBookmark}
         isBookmarked={activeArticle ? bookmarkedIds.has(activeArticle.id) : false}
-        isAuthor={Boolean(userToken)}
+        isAuthor={canEditPost(activeArticle)}
         onEditPost={handleEditPost}
         onDeletePost={handleDeletePost}
         t={t}
