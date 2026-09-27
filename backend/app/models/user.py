@@ -30,6 +30,7 @@ class User(Base):
     oauth_accounts: Mapped[list["OAuthAccount"]] = relationship("OAuthAccount", back_populates="user", cascade="all, delete-orphan")
     posts: Mapped[list["Post"]] = relationship("Post", back_populates="author")
     bookmarks: Mapped[list["Bookmark"]] = relationship("Bookmark", back_populates="user", cascade="all, delete-orphan")
+    comments: Mapped[list["Comment"]] = relationship("Comment", back_populates="user")
 
 class OAuthAccount(Base):
     __tablename__ = "oauth_accounts"

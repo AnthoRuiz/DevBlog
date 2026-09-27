@@ -1,18 +1,65 @@
-import React, { useState } from 'react';
-import { X, Clock, Calendar, Check, Copy, ArrowBigUp, Share2 } from 'lucide-react';
-import { PostDetail } from '../types';
+import React, { useState, useEffect } from 'react';
+import { X, Clock, Calendar, Check, Copy, ArrowBigUp, Share2, Bookmark, MessageSquare, Send, Edit3, Trash2 } from 'lucide-react';
+import { PostDetail, Comment, Post } from '../types';
+import { Language, Translations } from '../i18n';
+import { fetchComments, createComment } from '../services/api';
 
 interface ArticleModalProps {
   post: PostDetail | null;
   isOpen: boolean;
   onClose: () => void;
   onToggleUpvote: (postId: string) => Promise<{ upvoted: boolean; new_upvotes_count: number }>;
+  onSelectTag?: (tagSlug: string) => void;
+  onToggleBookmark?: (postId: string) => void;
+  isBookmarked?: boolean;
+  isAuthor?: boolean;
+  onEditPost?: (post: Post) => void;
+  onDeletePost?: (postId: string) => void;
+  t: Translations;
+  currentLang?: Language;
 }
 
-export const ArticleModal: React.FC<ArticleModalProps> = ({ post, isOpen, onClose, onToggleUpvote }) => {
+export const ArticleModal: React.FC<ArticleModalProps> = ({
+  post,
+  isOpen,
+  onClose,
+  onToggleUpvote,
+  onSelectTag,
+  onToggleBookmark,
+  isBookmarked = false,
+  isAuthor = false,
+  onEditPost,
+  onDeletePost,
+  t,
+  currentLang = 'es',
+}) => {
   const [copied, setCopied] = useState(false);
   const [upvotes, setUpvotes] = useState(post?.upvotes_count ?? 0);
   const [hasUpvoted, setHasUpvoted] = useState(false);
+
+  // Comentarios
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentContent, setCommentContent] = useState('');
+  const [authorName, setAuthorName] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [commentError, setCommentError] = useState('');
+
+  useEffect(() => {
+    if (post && isOpen) {
+      setUpvotes(post.upvotes_count ?? 0);
+      setHasUpvoted(false);
+      loadComments(post.id);
+    }
+  }, [post?.id, isOpen]);
+
+  const loadComments = async (postId: string) => {
+    try {
+      const data = await fetchComments(postId);
+      setComments(data);
+    } catch {
+      setComments(post?.comments || []);
+    }
+  };
 
   if (!isOpen || !post) return null;
 
@@ -32,6 +79,42 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ post, isOpen, onClos
     }
   };
 
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentContent.trim()) return;
+
+    setIsSubmittingComment(true);
+    setCommentError('');
+    try {
+      const token = localStorage.getItem('auth_token') || undefined;
+      const newComment = await createComment(post.id, commentContent.trim(), authorName.trim() || undefined, token);
+      setComments((prev) => [newComment, ...prev]);
+      setCommentContent('');
+    } catch (err: any) {
+      setCommentError(err.message || 'Error al publicar comentario');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handleTagClick = (slug: string) => {
+    if (onSelectTag) {
+      onSelectTag(slug);
+      onClose();
+    }
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleDateString(currentLang === 'es' ? 'es-ES' : currentLang === 'pt' ? 'pt-BR' : currentLang === 'fr' ? 'fr-FR' : 'en-US', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex justify-center p-4 sm:p-6 animate-fadeIn">
       <div className="relative w-full max-w-4xl bg-[#0b0f19] border border-[#1e293b] rounded-2xl shadow-2xl my-auto overflow-hidden">
@@ -40,25 +123,68 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ post, isOpen, onClos
         <div className="sticky top-0 bg-[#0b0f19]/95 backdrop-blur border-b border-[#1e293b] p-4 flex items-center justify-between z-20">
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-md border border-cyan-500/20">
-              Modo Lectura
+              {t.readingMode}
             </span>
+
+            {isAuthor && (
+              <div className="flex items-center gap-1 ml-2">
+                <button
+                  onClick={() => {
+                    onClose();
+                    if (onEditPost) onEditPost(post);
+                  }}
+                  className="flex items-center gap-1 text-xs font-mono text-slate-300 hover:text-cyan-400 bg-[#121622] hover:bg-[#1a2030] border border-[#1e293b] px-2.5 py-1 rounded-md transition-colors"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>{t.editPostBtn}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (onDeletePost && window.confirm(t.confirmDeletePost)) {
+                      onClose();
+                      onDeletePost(post.id);
+                    }
+                  }}
+                  className="flex items-center gap-1 text-xs font-mono text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-2.5 py-1 rounded-md transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{t.deletePostBtn}</span>
+                </button>
+              </div>
+            )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1e293b] transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onToggleBookmark && onToggleBookmark(post.id)}
+              className={`p-1.5 rounded-lg border transition-colors ${
+                isBookmarked
+                  ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300'
+                  : 'border-[#1e293b] text-slate-400 hover:text-white hover:bg-[#1e293b]'
+              }`}
+              title={isBookmarked ? t.bookmarked : t.bookmarkSave}
+            >
+              <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1e293b] transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Contenido del Artículo */}
         <div className="p-6 sm:p-10 max-w-3xl mx-auto">
-          {/* Tags */}
+          {/* Tags interactivos */}
           <div className="flex flex-wrap gap-2 mb-4">
             {post.tags.map((tag) => (
-              <span
+              <button
                 key={tag.id}
-                className="text-xs font-mono font-medium px-2.5 py-0.5 rounded-full border"
+                type="button"
+                onClick={() => handleTagClick(tag.slug)}
+                className="text-xs font-mono font-medium px-2.5 py-0.5 rounded-full border transition-transform hover:scale-105"
                 style={{
                   backgroundColor: `${tag.color_hex}15`,
                   borderColor: `${tag.color_hex}40`,
@@ -66,7 +192,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ post, isOpen, onClos
                 }}
               >
                 #{tag.name}
-              </span>
+              </button>
             ))}
           </div>
 
@@ -75,24 +201,35 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ post, isOpen, onClos
             {post.title}
           </h1>
 
-          {/* Byline / Metadatos */}
+          {/* Metadatos */}
           <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-slate-400 border-b border-[#1e293b] pb-6 mt-4 mb-8">
-            <span>Por Ingeniero de Software</span>
+            <span>{t.byAuthor}</span>
             <span>&bull;</span>
             <span className="flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" />
-              {post.reading_time_minutes} min de lectura
+              {post.reading_time_minutes} {t.minRead}
             </span>
             <span>&bull;</span>
             <span className="flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
-              {new Date(post.created_at).toLocaleDateString()}
+              {formatDate(post.published_at || post.created_at)}
             </span>
           </div>
 
+          {/* Portada si existe */}
+          {post.cover_image_url && (
+            <div className="mb-8 rounded-2xl overflow-hidden border border-[#1e293b] max-h-96">
+              <img
+                src={post.cover_image_url}
+                alt={post.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
           {/* Resumen Destacado */}
           <div className="p-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 text-slate-300 text-sm leading-relaxed mb-8">
-            <strong>Resumen:</strong> {post.summary}
+            <strong>{t.summaryLabel}</strong> {post.summary}
           </div>
 
           {/* Cuerpo en Markdown renderizado */}
@@ -105,11 +242,12 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ post, isOpen, onClos
                     <div className="bg-[#121622] px-4 py-2 border-b border-[#1e293b] flex justify-between items-center text-slate-400">
                       <span>snippet.py</span>
                       <button
+                        type="button"
                         onClick={() => handleCopyCode(lines)}
                         className="flex items-center gap-1 hover:text-white transition-colors"
                       >
                         {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copied ? 'Copiado' : 'Copiar'}</span>
+                        <span>{copied ? t.copiedSnippet : t.copySnippet}</span>
                       </button>
                     </div>
                     <pre className="p-4 overflow-x-auto text-emerald-400">{lines}</pre>
@@ -117,7 +255,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ post, isOpen, onClos
                 );
               }
               if (paragraph.startsWith('# ')) {
-                return null; // Omitir H1 ya renderizado arriba
+                return null;
               }
               if (paragraph.startsWith('## ')) {
                 return (
@@ -133,6 +271,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ post, isOpen, onClos
           {/* Barra de Reacción Inferior */}
           <div className="flex items-center justify-between border-t border-[#1e293b] pt-6 mt-12">
             <button
+              type="button"
               onClick={handleUpvote}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-mono font-bold text-sm transition-all ${
                 hasUpvoted
@@ -141,20 +280,108 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ post, isOpen, onClos
               }`}
             >
               <ArrowBigUp className={`w-5 h-5 ${hasUpvoted ? 'fill-current' : ''}`} />
-              <span>{upvotes} Votos</span>
+              <span>{upvotes} {t.votes}</span>
             </button>
 
             <button
+              type="button"
               onClick={() => {
                 navigator.clipboard.writeText(window.location.href);
-                alert('¡Enlace del artículo copiado al portapapeles!');
+                alert(t.linkCopied);
               }}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[#1e293b] hover:border-slate-600 text-xs font-mono text-slate-300 transition-colors"
             >
               <Share2 className="w-4 h-4 text-cyan-400" />
-              <span>Compartir</span>
+              <span>{t.shareBtn}</span>
             </button>
           </div>
+
+          {/* SECCIÓN DE COMENTARIOS */}
+          <section className="mt-14 pt-8 border-t border-[#1e293b]">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-cyan-400" />
+                <h3 className="font-bold text-white text-lg">{t.commentsSectionTitle}</h3>
+              </div>
+              <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-full">
+                {comments.length} {t.commentsCount}
+              </span>
+            </div>
+
+            {/* Formulario para publicar comentario */}
+            <form onSubmit={handleAddComment} className="bg-[#07090e] border border-[#1e293b] rounded-2xl p-4 sm:p-5 mb-8">
+              <h4 className="text-xs font-mono text-slate-400 uppercase tracking-wider mb-3">
+                {t.leaveCommentTitle}
+              </h4>
+
+              {commentError && (
+                <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs mb-3">
+                  {commentError}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  placeholder={t.authorNamePlaceholder}
+                  value={authorName}
+                  onChange={(e) => setAuthorName(e.target.value)}
+                  className="w-full bg-[#0b0f19] border border-[#1e293b] rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+
+                <textarea
+                  required
+                  rows={3}
+                  placeholder={t.commentPlaceholder}
+                  value={commentContent}
+                  onChange={(e) => setCommentContent(e.target.value)}
+                  className="w-full bg-[#0b0f19] border border-[#1e293b] rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 leading-relaxed resize-none"
+                />
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingComment || !commentContent.trim()}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-colors shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{isSubmittingComment ? t.postingComment : t.postCommentBtn}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            {/* Lista de Comentarios */}
+            <div className="space-y-4">
+              {comments.length === 0 ? (
+                <div className="text-center py-8 px-4 rounded-xl border border-[#1e293b]/60 bg-[#07090e]/40 text-xs font-mono text-slate-500">
+                  {t.noCommentsYet}
+                </div>
+              ) : (
+                comments.map((comm) => (
+                  <div
+                    key={comm.id}
+                    className="bg-[#07090e] border border-[#1e293b] rounded-xl p-4 transition-all hover:border-slate-700"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-mono text-[10px] font-bold flex items-center justify-center">
+                          {comm.author_name.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-bold text-xs text-slate-200">{comm.author_name}</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500">
+                        {formatDate(comm.created_at)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed pl-8">
+                      {comm.content}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
 
         </div>
       </div>

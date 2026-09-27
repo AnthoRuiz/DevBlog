@@ -47,3 +47,4 @@ class Post(Base):
     tags: Mapped[list[Tag]] = relationship("Tag", secondary=post_tags, back_populates="posts")
     upvotes: Mapped[list["Upvote"]] = relationship("Upvote", back_populates="post", cascade="all, delete-orphan")
     bookmarks: Mapped[list["Bookmark"]] = relationship("Bookmark", back_populates="post", cascade="all, delete-orphan")
+    comments: Mapped[list["Comment"]] = relationship("Comment", back_populates="post", cascade="all, delete-orphan", order_by="desc(Comment.created_at)")
