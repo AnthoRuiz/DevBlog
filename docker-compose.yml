@@ -56,6 +56,16 @@ services:
     networks:
       - devblog_net
 
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: devblog_tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - frontend
+    networks:
+      - devblog_net
+
 volumes:
   postgres_data:
     driver: local
