@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { StreakHeader } from './components/StreakHeader';
 import { DigestCard } from './components/DigestCard';
@@ -21,7 +21,7 @@ import {
   updateMyRole,
   loginUser,
 } from './services/api';
-import { Sparkles, ArrowUpDown, Bookmark, Filter, X } from 'lucide-react';
+import { Sparkles, ArrowUpDown, Bookmark, Filter, X, ChevronDown, Search, Tag as TagIcon } from 'lucide-react';
 import { Language, translations } from './i18n';
 
 export function App() {
@@ -32,6 +32,9 @@ export function App() {
   const [sortBy, setSortBy] = useState<string>('recent');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isTagsDropdownOpen, setIsTagsDropdownOpen] = useState<boolean>(false);
+  const [tagSearchQuery, setTagSearchQuery] = useState<string>('');
+  const tagsDropdownRef = useRef<HTMLDivElement>(null);
 
   // Marcadores guardados localmente y sincronizados
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(() => {
@@ -70,6 +73,21 @@ export function App() {
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  // Cerrar el selector desplegable de tags al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (tagsDropdownRef.current && !tagsDropdownRef.current.contains(event.target as Node)) {
+        setIsTagsDropdownOpen(false);
+      }
+    };
+    if (isTagsDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isTagsDropdownOpen]);
 
   const [userToken, setUserToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
   const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('user_email'));
@@ -273,6 +291,19 @@ export function App() {
 
   const isFiltering = selectedTag !== undefined || Boolean(searchQuery);
 
+  // Agrupación y compactación de etiquetas para optimizar espacio en pantalla
+  const PRIMARY_TAG_LIMIT = 6;
+  const primaryTags = tags.slice(0, PRIMARY_TAG_LIMIT);
+  const remainingTags = tags.slice(PRIMARY_TAG_LIMIT);
+  const isSelectedInPrimary = primaryTags.some((t) => t.slug === selectedTag);
+  const selectedTagObject = tags.find((t) => t.slug === selectedTag);
+  const showPinnedSelectedTag = Boolean(selectedTag && selectedTag !== '__bookmarks__' && !isSelectedInPrimary);
+
+  const filteredRemainingTags = remainingTags.filter((tag) =>
+    tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase()) ||
+    tag.slug.toLowerCase().includes(tagSearchQuery.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-300">
       {/* Barra de Testing de Roles (Siempre visible en Homelab) */}
@@ -421,7 +452,8 @@ export function App() {
               <span>{t.bookmarksTab} ({bookmarkedIds.size})</span>
             </button>
 
-            {tags.map((tag) => (
+            {/* Etiquetas Principales (Límite para ahorrar espacio en pantalla) */}
+            {primaryTags.map((tag) => (
               <button
                 key={tag.id}
                 onClick={() => setSelectedTag(tag.slug === selectedTag ? undefined : tag.slug)}
@@ -434,6 +466,94 @@ export function App() {
                 #{tag.name}
               </button>
             ))}
+
+            {/* Tag activo fijado si proviene de la lista desplegable */}
+            {showPinnedSelectedTag && selectedTagObject && (
+              <button
+                onClick={() => setSelectedTag(undefined)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all border border-cyan-400 text-cyan-300 bg-cyan-500/20 shadow-sm hover:bg-cyan-500/30"
+                title="Quitar filtro de etiqueta"
+              >
+                <span>#{selectedTagObject.name}</span>
+                <X className="w-3.5 h-3.5 text-cyan-400 hover:text-white" />
+              </button>
+            )}
+
+            {/* Selector desplegable compacto para el resto de etiquetas */}
+            {remainingTags.length > 0 && (
+              <div className="relative" ref={tagsDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsTagsDropdownOpen(!isTagsDropdownOpen)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all border ${
+                    isTagsDropdownOpen || showPinnedSelectedTag
+                      ? 'border-cyan-400 text-cyan-300 bg-cyan-500/10'
+                      : 'border-[#1e293b] text-slate-400 hover:text-white bg-[#0b0f19]'
+                  }`}
+                  title="Ver más etiquetas disponibles"
+                >
+                  <TagIcon className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>+{remainingTags.length} más</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isTagsDropdownOpen ? 'rotate-180 text-cyan-400' : ''}`} />
+                </button>
+
+                {isTagsDropdownOpen && (
+                  <div className="absolute left-0 top-full mt-2 w-64 bg-[#0d131f] border border-[#1e293b] rounded-xl shadow-2xl z-40 p-2.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-150">
+                    <div className="relative mb-2">
+                      <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Buscar etiqueta..."
+                        value={tagSearchQuery}
+                        onChange={(e) => setTagSearchQuery(e.target.value)}
+                        className="w-full bg-[#070a12] border border-[#1e293b] rounded-lg pl-8 pr-7 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                        autoFocus
+                      />
+                      {tagSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setTagSearchQuery('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                      {filteredRemainingTags.length === 0 ? (
+                        <div className="p-3 text-center text-xs text-slate-500 font-mono">
+                          No se encontraron tags
+                        </div>
+                      ) : (
+                        filteredRemainingTags.map((tag) => (
+                          <button
+                            key={tag.id}
+                            onClick={() => {
+                              setSelectedTag(tag.slug === selectedTag ? undefined : tag.slug);
+                              setIsTagsDropdownOpen(false);
+                              setTagSearchQuery('');
+                            }}
+                            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-mono transition-colors text-left ${
+                              selectedTag === tag.slug
+                                ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30'
+                                : 'text-slate-300 hover:bg-[#151c2d] hover:text-white'
+                            }`}
+                          >
+                            <span className="truncate">#{tag.name}</span>
+                            {selectedTag === tag.slug && (
+                              <span className="text-[10px] bg-cyan-500 text-slate-950 font-bold px-1.5 py-0.5 rounded ml-2 shrink-0">
+                                Activo
+                              </span>
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
