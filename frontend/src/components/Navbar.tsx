@@ -100,16 +100,16 @@ export const Navbar: FC<NavbarProps> = ({
             <span>/status</span>
           </button>
 
-          {/* Botón de Backups para ADMIN */}
+          {/* Botón de Panel Admin */}
           {currentUser?.role === 'ADMIN' && onOpenBackups && (
             <button
               type="button"
               onClick={onOpenBackups}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-500/50 text-xs font-mono text-purple-300 transition-colors"
-              title="Panel de copias de seguridad de PostgreSQL"
+              title="Abrir Panel de Administración y Roles"
             >
               <Database className="w-3.5 h-3.5 text-purple-400" />
-              <span className="hidden md:inline">Backups</span>
+              <span>Panel Admin</span>
             </button>
           )}
 
@@ -133,7 +133,7 @@ export const Navbar: FC<NavbarProps> = ({
           {/* Botón de Acceso / Sesión Autor */}
           {userEmail ? (
             <div className="flex items-center gap-2">
-              <span className="hidden md:inline-flex items-center gap-1.5 text-xs font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2.5 py-1 rounded-lg">
+              <span className="inline-flex items-center gap-1.5 text-xs font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2.5 py-1 rounded-lg">
                 <span>👤 {userEmail.split('@')[0]}</span>
                 {currentUser?.role && onSwitchRole ? (
                   <select
