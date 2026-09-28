@@ -379,6 +379,7 @@ export function App() {
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
         <StreakHeader
           stats={stats}
+          isAdmin={currentUser?.role === 'ADMIN'}
           onNewPost={() => {
             if (!currentUser) {
               setIsLoginOpen(true);

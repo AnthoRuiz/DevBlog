@@ -8,13 +8,15 @@ interface StreakHeaderProps {
   stats: StreakStats | null;
   onNewPost: () => void;
   onOpenStatus?: () => void;
+  isAdmin?: boolean;
   t: Translations;
 }
 
-export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenStatus, t }) => {
+export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenStatus, isAdmin = false, t }) => {
   const streak = stats?.current_streak_days ?? 14;
 
   const [telemetry, setTelemetry] = useState<HardwareTelemetry | null>(stats?.telemetry || null);
+  const [isDown, setIsDown] = useState<boolean>(false);
 
   useEffect(() => {
     if (stats?.telemetry && !telemetry) {
@@ -27,8 +29,9 @@ export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenSt
       try {
         const live = await fetchLiveTelemetry();
         setTelemetry(live);
-      } catch (err) {
-        // silent fallback on network hiccup
+        setIsDown(false);
+      } catch {
+        setIsDown(true);
       }
     };
 
@@ -66,57 +69,80 @@ export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenSt
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Homelab Live Hardware Telemetry Widget */}
-          <div
-            onClick={onOpenStatus}
-            className="flex items-center gap-2.5 sm:gap-3 bg-[#121622] hover:bg-[#181f30] border border-[#1e293b] hover:border-cyan-500/40 px-3.5 py-2 rounded-xl text-xs font-mono transition-all cursor-pointer shadow-sm group select-none"
-            title="Haz clic para ver el Estado del Sistema y Latencias (/status)"
-          >
-            <div className="flex items-center gap-1.5 text-emerald-400">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="font-bold text-[10px] hidden sm:inline tracking-wider">LIVE</span>
+        <div className="flex flex-wrap items-center gap-3">
+          {isAdmin ? (
+            /* Homelab Live Hardware Telemetry Widget (Exclusivo para ADMIN) */
+            <div
+              onClick={onOpenStatus}
+              className="flex items-center gap-2.5 sm:gap-3 bg-[#121622] hover:bg-[#181f30] border border-[#1e293b] hover:border-cyan-500/40 px-3.5 py-2 rounded-xl text-xs font-mono transition-all cursor-pointer shadow-sm group select-none"
+              title="Haz clic para ver el Estado del Sistema y Latencias (/status)"
+            >
+              <div className="flex items-center gap-1.5 text-emerald-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="font-bold text-[10px] hidden sm:inline tracking-wider">LIVE</span>
+              </div>
+
+              <span className="text-slate-700">|</span>
+
+              {/* Real CPU % */}
+              <div className="flex items-center gap-1 text-slate-300">
+                <Cpu className="w-3.5 h-3.5 text-cyan-400" />
+                <span>CPU: <strong className="text-cyan-300">{telemetry ? `${telemetry.cpu_percent}%` : '...'}</strong></span>
+              </div>
+
+              <span className="text-slate-700">|</span>
+
+              {/* Real RAM % */}
+              <div className="flex items-center gap-1 text-slate-300">
+                <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                <span>RAM: <strong className="text-emerald-300">{telemetry ? `${telemetry.memory_percent}%` : '...'}</strong></span>
+              </div>
+
+              <span className="text-slate-700">|</span>
+
+              {/* Temperature */}
+              <div className="flex items-center gap-1 text-slate-300">
+                <Flame className="w-3.5 h-3.5 text-amber-400" />
+                <span><strong className="text-amber-300">{telemetry ? `${telemetry.temperature_c}°C` : '...'}</strong></span>
+              </div>
+
+              <span className="text-slate-700 hidden sm:inline">|</span>
+
+              {/* Uptime */}
+              <div className="hidden sm:flex items-center gap-1 text-slate-300">
+                <Clock className="w-3.5 h-3.5 text-sky-400" />
+                <span><strong className="text-sky-300">{telemetry ? telemetry.uptime_formatted : '...'}</strong></span>
+              </div>
+
+              <span className="text-slate-700">|</span>
+
+              <span className="text-[10px] font-bold text-cyan-400 group-hover:underline flex items-center gap-0.5">
+                /status ↗
+              </span>
             </div>
-
-            <span className="text-slate-700">|</span>
-
-            {/* Real CPU % */}
-            <div className="flex items-center gap-1 text-slate-300">
-              <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-              <span>CPU: <strong className="text-cyan-300">{telemetry ? `${telemetry.cpu_percent}%` : '...'}</strong></span>
+          ) : (
+            /* Indicador simple LIVE / DOWN para AUTHOR, READER y visitantes */
+            <div
+              onClick={onOpenStatus}
+              className={`flex items-center gap-2 border px-3.5 py-2 rounded-xl text-xs font-mono transition-all cursor-pointer shadow-sm group select-none ${
+                isDown
+                  ? 'bg-red-500/10 border-red-500/30 hover:border-red-500/50 text-red-400'
+                  : 'bg-[#121622] hover:bg-[#181f30] border-[#1e293b] hover:border-emerald-500/40 text-emerald-400'
+              }`}
+              title={isDown ? 'Servidor no disponible (DOWN) — Ver estado' : 'Servidor Homelab Activo (LIVE) — Ver estado (/status)'}
+            >
+              <span className={`w-2 h-2 rounded-full ${isDown ? 'bg-red-400' : 'bg-emerald-400 animate-pulse'}`} />
+              <span className="font-extrabold text-xs tracking-wider">
+                {isDown ? 'DOWN' : 'LIVE'}
+              </span>
+              <span className="text-slate-700">|</span>
+              <span className="text-[10px] font-bold text-slate-400 group-hover:text-cyan-400 flex items-center gap-0.5">
+                /status ↗
+              </span>
             </div>
+          )}
 
-            <span className="text-slate-700">|</span>
-
-            {/* Real RAM % */}
-            <div className="flex items-center gap-1 text-slate-300">
-              <Activity className="w-3.5 h-3.5 text-emerald-400" />
-              <span>RAM: <strong className="text-emerald-300">{telemetry ? `${telemetry.memory_percent}%` : '...'}</strong></span>
-            </div>
-
-            <span className="text-slate-700">|</span>
-
-            {/* Temperature */}
-            <div className="flex items-center gap-1 text-slate-300">
-              <Flame className="w-3.5 h-3.5 text-amber-400" />
-              <span><strong className="text-amber-300">{telemetry ? `${telemetry.temperature_c}°C` : '...'}</strong></span>
-            </div>
-
-            <span className="text-slate-700 hidden sm:inline">|</span>
-
-            {/* Uptime */}
-            <div className="hidden sm:flex items-center gap-1 text-slate-300">
-              <Clock className="w-3.5 h-3.5 text-sky-400" />
-              <span><strong className="text-sky-300">{telemetry ? telemetry.uptime_formatted : '...'}</strong></span>
-            </div>
-
-            <span className="text-slate-700">|</span>
-
-            <span className="text-[10px] font-bold text-cyan-400 group-hover:underline flex items-center gap-0.5">
-              /status ↗
-            </span>
-          </div>
-
+          {/* Botón Nuevo Post alineado perfectamente en la misma fila */}
           <button
             onClick={onNewPost}
             className="flex items-center gap-1.5 bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
