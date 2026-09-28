@@ -30,7 +30,7 @@ async def seed_initial_data():
 
         # 2. Usuario admin por defecto
         admin_res = await session.execute(select(User).where(User.role == UserRole.ADMIN))
-        admin = admin_res.scalar_one_or_none()
+        admin = admin_res.scalars().first()
         if not admin:
             admin = User(
                 email="admin@devblog.local",
