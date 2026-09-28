@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { Terminal, User as UserIcon, Search, Globe, LogOut, X, Activity, Database } from 'lucide-react';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
-import { User } from '../types';
+import { User, UserRole } from '../types';
 
 interface NavbarProps {
   onSearch: (q: string) => void;
@@ -10,6 +10,7 @@ interface NavbarProps {
   onLogout?: () => void;
   onOpenStatus?: () => void;
   onOpenBackups?: () => void;
+  onSwitchRole?: (role: UserRole) => void;
   userEmail?: string | null;
   currentUser?: User | null;
   serverNode?: string;
@@ -25,6 +26,7 @@ export const Navbar: FC<NavbarProps> = ({
   onLogout,
   onOpenStatus,
   onOpenBackups,
+  onSwitchRole,
   userEmail,
   currentUser,
   serverNode = 'Homelab Docker',
@@ -133,7 +135,25 @@ export const Navbar: FC<NavbarProps> = ({
             <div className="flex items-center gap-2">
               <span className="hidden md:inline-flex items-center gap-1.5 text-xs font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2.5 py-1 rounded-lg">
                 <span>👤 {userEmail.split('@')[0]}</span>
-                {currentUser?.role && (
+                {currentUser?.role && onSwitchRole ? (
+                  <select
+                    value={currentUser.role}
+                    onChange={(e) => onSwitchRole(e.target.value as UserRole)}
+                    aria-label="Cambiar rol para pruebas"
+                    title="Selector de rol para pruebas en homelab"
+                    className={`text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded border uppercase cursor-pointer focus:outline-none transition-colors ${
+                      currentUser.role === 'ADMIN'
+                        ? 'bg-[#0f1422] text-purple-300 border-purple-500/50 shadow-sm shadow-purple-500/10'
+                        : currentUser.role === 'AUTHOR'
+                        ? 'bg-[#0f1422] text-cyan-300 border-cyan-500/50'
+                        : 'bg-[#0f1422] text-slate-400 border-slate-700'
+                    }`}
+                  >
+                    <option value="ADMIN" className="bg-[#0b0f19] text-purple-300">ADMIN</option>
+                    <option value="AUTHOR" className="bg-[#0b0f19] text-cyan-300">AUTHOR</option>
+                    <option value="READER" className="bg-[#0b0f19] text-slate-300">READER</option>
+                  </select>
+                ) : currentUser?.role ? (
                   <span
                     className={`text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded border uppercase ${
                       currentUser.role === 'ADMIN'
@@ -145,7 +165,7 @@ export const Navbar: FC<NavbarProps> = ({
                   >
                     {currentUser.role}
                   </span>
-                )}
+                ) : null}
               </span>
               <button
                 type="button"

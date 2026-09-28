@@ -146,6 +146,21 @@ async def get_me(current_user: User = Depends(get_current_user)):
 class UserRoleUpdate(BaseModel):
     role: UserRole
 
+@router.put("/me/role", response_model=UserRead)
+async def update_my_role_for_testing(
+    role_in: UserRoleUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Selector de rol para pruebas rápidas de permisos en homelab:
+    Permite alternar el rol del usuario autenticado entre ADMIN, AUTHOR y READER.
+    """
+    current_user.role = role_in.role
+    await db.commit()
+    await db.refresh(current_user)
+    return UserRead.model_validate(current_user)
+
 @router.get("/users", response_model=list[UserRead])
 async def list_users(
     current_admin: User = Depends(get_current_admin),

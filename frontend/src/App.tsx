@@ -7,7 +7,7 @@ import { LoginModal } from './components/LoginModal';
 import { NewPostModal } from './components/NewPostModal';
 import { SystemStatusModal } from './components/SystemStatusModal';
 import { BackupsModal } from './components/BackupsModal';
-import { Post, PostDetail, StreakStats, Tag, User } from './types';
+import { Post, PostDetail, StreakStats, Tag, User, UserRole } from './types';
 import {
   fetchPosts,
   fetchStreakStats,
@@ -18,6 +18,7 @@ import {
   fetchBookmarkedPosts,
   deletePost,
   fetchCurrentUser,
+  updateMyRole,
 } from './services/api';
 import { Sparkles, ArrowUpDown, Bookmark, Filter, X } from 'lucide-react';
 import { Language, translations } from './i18n';
@@ -95,6 +96,17 @@ export function App() {
         });
     }
   }, [userToken]);
+
+  const handleSwitchRole = async (newRole: UserRole) => {
+    if (!userToken) return;
+    try {
+      const updatedUser = await updateMyRole(newRole, userToken);
+      setCurrentUser(updatedUser);
+      localStorage.setItem('current_user', JSON.stringify(updatedUser));
+    } catch (err: any) {
+      alert(err.message || 'Error al cambiar de rol');
+    }
+  };
 
   // Debounce para búsqueda en tiempo real
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
@@ -255,6 +267,7 @@ export function App() {
         onLogout={handleLogout}
         onOpenStatus={handleOpenStatus}
         onOpenBackups={() => setIsBackupsModalOpen(true)}
+        onSwitchRole={handleSwitchRole}
         userEmail={userEmail}
         currentUser={currentUser}
         serverNode={stats?.server_node}
@@ -457,11 +470,16 @@ export function App() {
         t={t}
       />
 
-      {/* Modal de Backups de Base de Datos PostgreSQL (Solo ADMIN) */}
+      {/* Modal de Backups de Base de Datos PostgreSQL y Selector de Roles */}
       <BackupsModal
         isOpen={isBackupsModalOpen}
         onClose={() => setIsBackupsModalOpen(false)}
         token={userToken || undefined}
+        currentUser={currentUser}
+        onRoleChanged={(updatedUser) => {
+          setCurrentUser(updatedUser);
+          localStorage.setItem('current_user', JSON.stringify(updatedUser));
+        }}
       />
     </div>
   );

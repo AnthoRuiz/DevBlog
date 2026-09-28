@@ -1,4 +1,4 @@
-import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, BackupItem, BackupsResponse } from '../types';
+import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -392,4 +392,52 @@ export async function deleteAdminBackup(
   }
   return res.json();
 }
+
+export async function updateMyRole(role: UserRole, token: string): Promise<User> {
+  const res = await fetch(`${API_BASE}/auth/me/role`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Error al cambiar de rol' }));
+    throw new Error(err.detail || 'Error al cambiar de rol');
+  }
+  return res.json();
+}
+
+export async function fetchUsers(token: string): Promise<User[]> {
+  const res = await fetch(`${API_BASE}/auth/users`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Error al obtener usuarios' }));
+    throw new Error(err.detail || 'Error al obtener usuarios');
+  }
+  return res.json();
+}
+
+export async function updateUserRole(
+  userId: string,
+  role: UserRole,
+  token: string
+): Promise<User> {
+  const res = await fetch(`${API_BASE}/auth/users/${userId}/role`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Error al actualizar rol de usuario' }));
+    throw new Error(err.detail || 'Error al actualizar rol de usuario');
+  }
+  return res.json();
+}
+
 

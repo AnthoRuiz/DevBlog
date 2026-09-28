@@ -102,14 +102,6 @@ export interface StreakStats {
   telemetry?: HardwareTelemetry;
 }
 
-export interface User {
-  id: string;
-  email: string;
-  full_name: string;
-  avatar_url?: string;
-  role: 'ADMIN' | 'AUTHOR' | 'READER';
-}
-
 export interface BackupItem {
   filename: string;
   size_bytes: number;
