@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     # permite que cualquier usuario autenticado se asigne el rol ADMIN.
     ALLOW_ROLE_SELF_SWITCH: bool = False
 
+    # Admin inicial sembrado al arrancar con la base de datos vacía.
+    # Si ADMIN_PASSWORD no está definida se genera una aleatoria y se imprime una sola vez en stdout.
+    ADMIN_EMAIL: str = "admin@devblog.local"
+    ADMIN_PASSWORD: Optional[str] = None
+
     # OAuth
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None

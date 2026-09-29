@@ -66,10 +66,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
       onLoginSuccess(regData.access_token, regData.user);
       onClose();
     } catch {
-      // Fallback a login con admin por defecto
-      setEmail('admin@devblog.io');
-      setPassword('admin123456');
-      setError('Credenciales de demostración cargadas. Presiona "Ingresar".');
+      setError('No se pudo iniciar la sesión de demostración. Ingresa con tu cuenta.');
     } finally {
       setIsLoading(false);
     }

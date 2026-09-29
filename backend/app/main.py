@@ -1,4 +1,5 @@
 import asyncio
+import secrets
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -10,7 +11,11 @@ from app.api.v1.router import api_router
 from app.db.session import engine, Base, AsyncSessionLocal
 from app.models.user import User, UserRole
 from app.models.post import Tag, Post
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, verify_password
+from app.core.logging import logger
+
+# Contraseña que versiones anteriores sembraban para el admin; se detecta para forzar su rotación
+LEGACY_ADMIN_PASSWORD = "admin123456"
 
 async def seed_initial_data():
     """Siembra datos iniciales (tags, usuario admin y posts de ejemplo) si la base de datos está vacía."""
@@ -30,11 +35,34 @@ async def seed_initial_data():
 
         # 2. Usuario admin por defecto
         admin_res = await session.execute(select(User).where(User.role == UserRole.ADMIN))
-        admin = admin_res.scalars().first()
+        admins = list(admin_res.scalars().all())
+        admin = admins[0] if admins else None
+
+        # Instalaciones antiguas sembraban el admin con una contraseña pública conocida
+        for existing_admin in admins:
+            if existing_admin.hashed_password and verify_password(LEGACY_ADMIN_PASSWORD, existing_admin.hashed_password):
+                if settings.ADMIN_PASSWORD:
+                    existing_admin.hashed_password = get_password_hash(settings.ADMIN_PASSWORD)
+                    logger.warning(f"[Seed] Contraseña por defecto del admin {existing_admin.email} rotada a ADMIN_PASSWORD")
+                else:
+                    logger.warning(
+                        f"[Seed] ¡INSEGURO! El admin {existing_admin.email} usa la contraseña por defecto. "
+                        "Define ADMIN_PASSWORD en .env y reinicia para rotarla."
+                    )
+
         if not admin:
+            admin_password = settings.ADMIN_PASSWORD
+            if not admin_password:
+                admin_password = secrets.token_urlsafe(18)
+                # Solo stdout (docker logs): no debe quedar en server.log
+                print(
+                    f"[Seed] Admin inicial creado: {settings.ADMIN_EMAIL} / contraseña generada: {admin_password}\n"
+                    "[Seed] Guárdala ahora; no se volverá a mostrar.",
+                    flush=True,
+                )
             admin = User(
-                email="admin@devblog.local",
-                hashed_password=get_password_hash("admin123456"),
+                email=settings.ADMIN_EMAIL,
+                hashed_password=get_password_hash(admin_password),
                 full_name="Software Engineer",
                 role=UserRole.ADMIN,
                 is_active=True,
