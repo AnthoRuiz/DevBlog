@@ -1,0 +1,14 @@
+# Datos de ejecución: se montan como volúmenes y nunca deben quedar dentro de la imagen
+# (los backups contienen la base de datos completa, incluidos hashes de contraseñas)
+backups/
+uploads/
+logs/
+.env
+.env.*
+
+# Artefactos locales
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/

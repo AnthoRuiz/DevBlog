@@ -44,7 +44,9 @@ services:
       # Solo accesible desde el host; el tráfico público entra por Nginx (frontend) y el túnel
       - "127.0.0.1:8000:8000"
     volumes:
-      - ./backend:/app
+      # El código va dentro de la imagen (sin montar ./backend). Para desarrollo con recarga:
+      #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+      - ./backend/backups:/app/backups
       - uploads_data:/app/uploads
       - logs_data:/app/logs
     depends_on:
@@ -60,7 +62,9 @@ services:
     container_name: devblog_frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      # Solo desde este equipo: el acceso público es vía túnel (red interna devblog_net).
+      # Si necesitas verlo desde otro dispositivo de tu red local, cambia a "3000:80".
+      - "127.0.0.1:3000:80"
     depends_on:
       - backend
     networks:
