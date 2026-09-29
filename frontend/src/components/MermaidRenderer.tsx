@@ -27,7 +27,8 @@ function initMermaid() {
       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
       fontSize: '12px',
     },
-    securityLevel: 'loose',
+    // 'strict' sanea etiquetas HTML y desactiva los eventos click en diagramas (evita XSS desde posts)
+    securityLevel: 'strict',
   });
   mermaidInitialized = true;
 }

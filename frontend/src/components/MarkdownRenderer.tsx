@@ -3,6 +3,24 @@ import hljs from 'highlight.js';
 import { Copy, Check } from 'lucide-react';
 import { MermaidRenderer } from './MermaidRenderer';
 
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/\u0000/g, '');
+
+// Solo http(s), mailto y rutas relativas; bloquea javascript:, data:, vbscript:, etc.
+const safeUrl = (escapedUrl: string) => {
+  const url = escapedUrl.trim();
+  if (/[\u0000-\u001f\u007f]/.test(url)) return '#';
+  if (/^(https?:|mailto:)/i.test(url)) return url;
+  if (!/^[^/?#]*:/.test(url)) return url;
+  return '#';
+};
+
 interface MarkdownRendererProps {
   content: string;
   emptyMessage?: string;
@@ -39,15 +57,22 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     // Reemplazar cursiva *texto*
     const italicRegex = /\*([^*]+)\*/g;
 
-    let html = text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+    let html = escapeHtml(text);
+
+    // Los enlaces se extraen antes del resto del formato para que negrita/cursiva no inserten
+    // marcado dentro del atributo href
+    const links: string[] = [];
+    html = html.replace(linkRegex, (_, label: string, url: string) => {
+      links.push(
+        `<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition-colors">${label}</a>`
+      );
+      return `\u0000${links.length - 1}\u0000`;
+    });
 
     html = html.replace(boldRegex, '<strong class="text-white font-bold">$1</strong>');
     html = html.replace(italicRegex, '<em class="text-slate-200 italic">$1</em>');
     html = html.replace(codeRegex, '<code class="text-cyan-300 bg-cyan-950/40 px-1.5 py-0.5 rounded text-xs font-mono border border-cyan-500/20">$1</code>');
-    html = html.replace(linkRegex, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition-colors">$1</a>');
+    html = html.replace(/\u0000(\d+)\u0000/g, (_, i: string) => links[Number(i)]);
 
     return <span dangerouslySetInnerHTML={{ __html: html }} />;
   };
@@ -81,7 +106,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               displayLang = auto.language || 'code';
             }
           } catch {
-            highlighted = codeBody;
+            highlighted = escapeHtml(codeBody);
           }
 
           const isCopied = copiedIdx === idx;
