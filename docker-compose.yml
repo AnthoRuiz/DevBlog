@@ -8,7 +8,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devblog_secure_pass_2026}
       POSTGRES_DB: ${POSTGRES_DB:-devblog}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Solo accesible desde el host (el backend usa la red interna devblog_net)
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -28,11 +29,16 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-devblog_user}:${POSTGRES_PASSWORD:-devblog_secure_pass_2026}@db:5432/${POSTGRES_DB:-devblog}
       - SECRET_KEY=${SECRET_KEY:-devblog_insecure_default_secret_key_change_in_production_2026}
-      - ENVIRONMENT=development
-      - DEBUG=True
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-False}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@devblog.local}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ALLOW_ROLE_SELF_SWITCH=${ALLOW_ROLE_SELF_SWITCH:-False}
     ports:
-      - "8000:8000"
+      # Solo accesible desde el host; el tráfico público entra por Nginx (frontend) y el túnel
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./backend:/app
       - uploads_data:/app/uploads

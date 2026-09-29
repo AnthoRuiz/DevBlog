@@ -202,11 +202,14 @@ async def lifespan(app: FastAPI):
     backup_task.cancel()
     await engine.dispose()
 
+# En producción no se publica el esquema OpenAPI (/api/v1/openapi.json es accesible a través de Nginx)
+_expose_docs = settings.ENVIRONMENT != "production"
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    openapi_url=f"{settings.API_V1_STR}/openapi.json" if _expose_docs else None,
+    docs_url="/docs" if _expose_docs else None,
+    redoc_url="/redoc" if _expose_docs else None,
     lifespan=lifespan
 )
 

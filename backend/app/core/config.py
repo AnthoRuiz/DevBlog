@@ -53,3 +53,24 @@ class Settings(BaseSettings):
         extra = "allow"
 
 settings = Settings()
+
+# Claves publicadas en el repositorio: cualquiera podría firmar JWT válidos con ellas
+_PUBLIC_SECRET_KEYS = {
+    "devblog_insecure_default_secret_key_change_in_production_2026",
+    "change_this_to_a_secure_random_key_in_production_2026",
+}
+
+def _validate_security_settings(s: Settings) -> None:
+    insecure_key = s.SECRET_KEY in _PUBLIC_SECRET_KEYS or len(s.SECRET_KEY) < 32
+    if s.ENVIRONMENT == "production":
+        problems = []
+        if insecure_key:
+            problems.append("SECRET_KEY es un valor por defecto o tiene menos de 32 caracteres")
+        if s.ALLOW_ROLE_SELF_SWITCH:
+            problems.append("ALLOW_ROLE_SELF_SWITCH=True permite escalar a ADMIN")
+        if problems:
+            raise RuntimeError("Configuración insegura para producción: " + "; ".join(problems))
+    elif insecure_key:
+        print("[Config] AVISO: SECRET_KEY insegura. Genera una con: openssl rand -hex 32", flush=True)
+
+_validate_security_settings(settings)
