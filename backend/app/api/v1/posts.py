@@ -6,7 +6,6 @@ from slugify import slugify
 from typing import Optional
 import uuid
 import os
-import shutil
 import math
 import re
 from datetime import datetime, timezone
@@ -169,6 +168,20 @@ async def list_my_bookmarks(
     posts = result.scalars().all()
     return [PostRead.model_validate(p) for p in posts]
 
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+
+def _detect_image_ext(data: bytes) -> Optional[str]:
+    """Identifica JPG, PNG, GIF o WEBP por su firma binaria (magic bytes)."""
+    if data.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if data.startswith((b"GIF87a", b"GIF89a")):
+        return ".gif"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return ".webp"
+    return None
+
 @router.post("/upload-image")
 async def upload_image(
     file: UploadFile = File(...),
@@ -177,15 +190,22 @@ async def upload_image(
     uploads_dir = "/app/uploads" if os.path.exists("/app/uploads") else os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads"))
     os.makedirs(uploads_dir, exist_ok=True)
 
-    ext = os.path.splitext(file.filename or "")[1].lower()
-    if ext not in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"]:
-        raise HTTPException(status_code=400, detail="Formato de archivo no soportado. Usa JPG, PNG, WEBP, GIF o SVG.")
+    # Leer como máximo el límite + 1 byte para detectar archivos demasiado grandes sin cargarlos enteros
+    data = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"La imagen supera el máximo de {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.")
+
+    # La extensión se decide por el contenido real, no por el nombre enviado por el cliente.
+    # SVG no se admite: puede contener JavaScript y se serviría desde el mismo dominio.
+    ext = _detect_image_ext(data)
+    if not ext:
+        raise HTTPException(status_code=400, detail="Formato de archivo no soportado. Usa JPG, PNG, WEBP o GIF.")
 
     filename = f"img_{uuid.uuid4().hex[:12]}{ext}"
     file_path = os.path.join(uploads_dir, filename)
 
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        buffer.write(data)
 
     return {"url": f"/uploads/{filename}"}
 
