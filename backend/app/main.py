@@ -100,6 +100,7 @@ async def seed_initial_data():
             p1 = Post(
                 author_id=admin.id,
                 slug="designing-eventually-consistent-cache",
+                cover_image_url="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&auto=format&fit=crop&q=80",
                 title="Designing an eventually consistent caching layer with Python and Docker",
                 summary="How I structured a microservice cluster on my home PC and cut latency from 45ms to 2ms with reactive invalidation.",
                 language="en",
@@ -137,6 +138,7 @@ async def fetch_article(slug: str) -> PostSchema:
             p2 = Post(
                 author_id=admin.id,
                 slug="strict-typescript-react-19-type-inference",
+                cover_image_url="https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&auto=format&fit=crop&q=80",
                 title="Strict TypeScript in React 19: Advanced type inference patterns",
                 summary="How to structure components, custom hooks and end-to-end typed API calls without a single 'any'.",
                 language="en",
@@ -171,6 +173,7 @@ This removes any mismatch between what the database stores and what the UI rende
             p3 = Post(
                 author_id=admin.id,
                 slug="self-hosting-cloudflare-tunnels-zero-open-ports",
+                cover_image_url="https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=800&auto=format&fit=crop&q=80",
                 title="Self-hosting with Cloudflare Tunnels: Zero Open Ports",
                 summary="Step-by-step guide to running your own secure web server behind an encrypted tunnel without exposing your home IP.",
                 language="en",
