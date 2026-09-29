@@ -1,83 +1,105 @@
 # SYS.BLOG • Developer Digest & Homelab Hub
 
-A high-performance technical blog engine and daily digest system designed for self-hosting on homelab servers. Built with **React 18 + TypeScript**, **FastAPI + SQLAlchemy Async**, **PostgreSQL 16**, and **Docker**.
+A high-performance technical engineering blog engine and Homelab observability hub self-hosted on bare-metal hardware and globally routed via Cloudflare Zero Trust.
+
+- 🌐 **Live Production URL:** [https://anthoruiz.dev](https://anthoruiz.dev)
+- 📖 **Comprehensive E2E Architecture Manual:** [`docs/ARCHITECTURE_E2E.md`](./docs/ARCHITECTURE_E2E.md)
 
 ---
 
 ## 🌟 Key Features
 
-- **Daily Digest Grid (2 Columns):** High-density technical feed with writing streak counter, reading time, upvotes, and view metrics.
-- **Multilingual Support (i18n):** Native internationalization in 4 languages:
+- **Daily Technical Digest (2 Columns):** High-density engineering feed featuring reading streak counter, view counts, bookmarks, and optimistic upvotes.
+- **Homelab Hardware Telemetry:** Real-time host metrics (CPU %, RAM %, Temperature °C, and OS uptime) powered by `psutil` with role-aware UI display (`ADMIN` vs public).
+- **Zero-Port-Forwarding Ingress:** Outbound encrypted QUIC tunnel (`cloudflared`) to Cloudflare Edge. Zero open residential router ports.
+- **Multilingual Native i18n:** Built-in 4-language support without external bloat:
   - 🇪🇸 Español (`es`)
   - 🇺🇸 English (`en`)
   - 🇧🇷 Português (`pt`)
   - 🇫🇷 Français (`fr`)
-- **Original Language Badges:** Visual flag indicator on each post card to denote the author's primary drafting language.
-- **Production Observability & Centralized Logs:**
-  - FastAPI ASGI latency tracking and HTTP request logger.
-  - Rotating server logs (`/app/logs/server.log`).
-  - React `ErrorBoundary` with client diagnostic screen and automatic crash reporting to `/api/v1/logs/client`.
-  - Live log viewer endpoint at `GET /api/v1/logs/recent`.
-- **Media & Cover Images:** High-resolution post banners with smooth hover zoom animations and a local image uploader (`POST /api/v1/posts/upload-image`).
-- **Secure Author Authentication:** JWT token-based authentication with bcrypt password hashing.
+- **Dark-Themed Mermaid.js:** Interactive code-to-diagram rendering (flowcharts, sequence diagrams, ER diagrams, class models) with dark palette matching the obsidian UI.
+- **Google Gemini AI Integration:** Automatic technical reading time estimation and semantic tag suggestions based on post content.
+- **Role-Based Access Control (RBAC):** Strict 3-tier hierarchy (`ADMIN`, `AUTHOR`, `READER`) with persistent top testing switcher.
+- **Automated Database Backups:** Daily PostgreSQL snapshots with rolling 7-day retention and one-click admin download.
+- **Security & Anti-DDoS:** Leaky-bucket Nginx rate limiting, SlowAPI per-IP limits, and anti-spam honeypot inputs on comments.
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ System Architecture
 
 ```
-                      ┌──────────────────────┐
-                      │    Client Browser    │
-                      └──────────┬───────────┘
-                                 │ :3000
-                                 ▼
-                     ┌────────────────────────┐
-                     │   Nginx Reverse Proxy  │
-                     └────┬──────────────┬────┘
-                          │              │
-           Static Files   │              │ /api/ & /uploads/
-                          ▼              ▼
-                     ┌─────────┐   ┌───────────────┐
-                     │  React  │   │ FastAPI (App) │
-                     │   18    │   └───────┬───────┘
-                     └─────────┘           │ :5432
+                                  WAN (Public Internet)
+                                            │
+                                            ▼
+                        ┌──────────────────────────────────────┐
+                        │      Cloudflare Edge Anycast         │
+                        │   SSL/TLS • WAF • DDoS Mitigation    │
+                        │       https://anthoruiz.dev          │
+                        └──────────────────┬───────────────────┘
+                                           │
+                         Encrypted Outbound QUIC Tunnel
+                                           │
                                            ▼
-                                   ┌───────────────┐
-                                   │ PostgreSQL 16 │
-                                   └───────────────┘
+             ┌────────────────────────────────────────────────────────────┐
+             │       Homelab Host Node (Windows 11 + WSL2 Ubuntu)         │
+             │                                                            │
+             │   ┌────────────────────────────────────────────────────┐   │
+             │   │       Docker Bridge Network (devblog_net)          │   │
+             │   │                                                    │   │
+             │   │   ┌────────────────────────────────────────────┐   │   │
+             │   │   │ devblog_tunnel (cloudflare/cloudflared)    │   │   │
+             │   │   └─────────────────────┬──────────────────────┘   │   │
+             │   │                         │                          │   │
+             │   │                         ▼                          │   │
+             │   │   ┌────────────────────────────────────────────┐   │   │
+             │   │   │ devblog_frontend (Nginx Alpine + React 18) │   │   │
+             │   │   └──────────────┬─────────────────────────────┘   │   │
+             │   │                  │ Proxy /api/ & /uploads/         │   │
+             │   │                  ▼                                 │   │
+             │   │   ┌────────────────────────────────────────────┐   │   │
+             │   │   │ devblog_backend (FastAPI + SQLAlchemy)     │   │   │
+             │   │   └──────────────┬─────────────────────────────┘   │   │
+             │   │                  │ asyncpg connection pool         │   │
+             │   │                  ▼                                 │   │
+             │   │   ┌────────────────────────────────────────────┐   │   │
+             │   │   │ devblog_postgres (PostgreSQL 16 Alpine)    │   │   │
+             │   │   └────────────────────────────────────────────┘   │   │
+             │   └────────────────────────────────────────────────────┘   │
+             └────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🚀 Quick Start (Docker)
+## 🚀 Quick Start (Local & Homelab)
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/<your-username>/devblog.git
-cd devblog
-```
+### 1. Requirements
+- Docker Engine & Docker Compose
+- WSL2 (if running on Windows) or native Linux (Ubuntu/Debian)
 
-### 2. Configure Environment
+### 2. Setup Environment
 ```bash
 cp .env.example .env
+# Edit .env and supply your credentials and tokens:
+# - POSTGRES_PASSWORD
+# - SECRET_KEY
+# - GEMINI_API_KEY (optional, from https://aistudio.google.com/)
+# - CLOUDFLARE_TUNNEL_TOKEN (from Cloudflare Zero Trust)
 ```
 
-### 3. Launch with Docker Compose
+### 3. Launch Services
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
-### 4. Access the Application
-- **Frontend App:** [http://localhost:3000](http://localhost:3000)
+### 4. Endpoints & Access
+- **Production Web:** [https://anthoruiz.dev](https://anthoruiz.dev)
+- **Local Frontend:** [http://localhost:3000](http://localhost:3000)
 - **API Documentation (Swagger):** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **System Logs Viewer:** [http://localhost:3000/api/v1/logs/recent](http://localhost:3000/api/v1/logs/recent)
+- **System Latency Status:** [http://localhost:3000/#/status](http://localhost:3000/#/status)
 
 ---
 
-## 📝 Conventional Commits Reference
-This repository follows the [Conventional Commits](https://www.conventionalcommits.org/) specification:
-- `chore(setup)`: Tooling, containerization, and configuration.
-- `feat(backend)`: FastAPI routes, business logic, and schemas.
-- `feat(frontend)`: React UI components, styling, and hooks.
-- `feat(i18n)`: Translations and internationalization dictionaries.
-- `feat(observability)`: Logging middleware and error boundaries.
+## 📚 Technical Documentation
+
+For the complete in-depth specification, schema contracts, sequence diagrams, and operational recovery playbooks, consult:
+👉 **[E2E Technical Specification (docs/ARCHITECTURE_E2E.md)](./docs/ARCHITECTURE_E2E.md)**
