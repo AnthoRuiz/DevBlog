@@ -132,7 +132,7 @@ done
 ok "Backend responds (/health)"
 
 if docker inspect -f '{{join .Config.Cmd " "}}' devblog_backend | grep -q -- '--reload'; then
-  warn "Backend is running with --reload (development mode). Deploy without -f docker-compose.dev.yml."
+  warn "Backend is running with --reload (development mode). Production must not use docker-compose.dev.yml."
 else
   ok "Backend in production mode (no --reload)"
 fi

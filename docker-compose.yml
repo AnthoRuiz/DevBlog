@@ -46,8 +46,8 @@ services:
       # Host-only access; public traffic comes in through Nginx (frontend) and the tunnel
       - "127.0.0.1:8000:8000"
     volumes:
-      # Code ships inside the image (./backend is not mounted). For development with live reload:
-      #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+      # Code ships inside the image (./backend is not mounted).
+      # Local development runs as a separate stack: see docker-compose.dev.yml
       - ./backend/backups:/app/backups
       - uploads_data:/app/uploads
       - logs_data:/app/logs

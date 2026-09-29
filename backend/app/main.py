@@ -17,20 +17,40 @@ from app.core.logging import logger
 # Password older versions seeded for the admin; detected so it can be rotated
 LEGACY_ADMIN_PASSWORD = "admin123456"
 
+# Starter tags seeded into an empty database: (name, slug, color)
+DEFAULT_TAGS = [
+    # Technology
+    ("Software Engineering", "software-engineering", "#38bdf8"),
+    ("Python", "python", "#10b981"),
+    ("JavaScript & TypeScript", "javascript-typescript", "#facc15"),
+    ("React", "react", "#818cf8"),
+    ("Backend & APIs", "backend-apis", "#22c55e"),
+    ("Databases", "databases", "#0ea5e9"),
+    ("Distributed Systems", "distributed-systems", "#6366f1"),
+    ("Cloud & DevOps", "cloud-devops", "#f59e0b"),
+    ("Docker & Homelab", "docker-homelab", "#06b6d4"),
+    ("Security", "security", "#ef4444"),
+    ("AI & Machine Learning", "ai-machine-learning", "#a855f7"),
+    # Career and interviews
+    ("Interview Prep", "interview-prep", "#f97316"),
+    ("System Design", "system-design", "#14b8a6"),
+    ("Algorithms & Data Structures", "algorithms-data-structures", "#eab308"),
+    ("Career Growth", "career-growth", "#84cc16"),
+    # Wellbeing
+    ("Mental Health", "mental-health", "#ec4899"),
+    ("Productivity & Habits", "productivity-habits", "#f472b6"),
+    # Gaming
+    ("Video Games", "video-games", "#8b5cf6"),
+    ("Game Development", "game-development", "#d946ef"),
+]
+
 async def seed_initial_data():
-    """Seed initial data (tags, admin user and sample posts) when the database is empty."""
+    """Seed starter tags and the admin user; demo posts only when SEED_DEMO_POSTS is enabled."""
     async with AsyncSessionLocal() as session:
         # 1. Initial tags
         existing_tags = await session.execute(select(Tag))
         if not existing_tags.scalars().first():
-            default_tags = [
-                Tag(name="Distributed Systems", slug="distributed-systems", color_hex="#38bdf8"),
-                Tag(name="Python & FastAPI", slug="python-fastapi", color_hex="#10b981"),
-                Tag(name="React & TypeScript", slug="react-typescript", color_hex="#818cf8"),
-                Tag(name="Docker & Homelab", slug="docker-homelab", color_hex="#06b6d4"),
-                Tag(name="Cloud & AWS", slug="cloud-aws", color_hex="#f59e0b"),
-            ]
-            session.add_all(default_tags)
+            session.add_all(Tag(name=name, slug=slug, color_hex=color) for name, slug, color in DEFAULT_TAGS)
             await session.flush()
 
         # 2. Default admin user
@@ -71,9 +91,9 @@ async def seed_initial_data():
             session.add(admin)
             await session.flush()
 
-        # 3. Sample demo posts
+        # 3. Sample demo posts (development only: SEED_DEMO_POSTS=True)
         posts_res = await session.execute(select(Post))
-        if not posts_res.scalars().first():
+        if settings.SEED_DEMO_POSTS and not posts_res.scalars().first():
             tag_res = await session.execute(select(Tag))
             all_tags = list(tag_res.scalars().all())
 
@@ -111,7 +131,7 @@ async def fetch_article(slug: str) -> PostSchema:
                 upvotes_count=142,
                 views_count=1240,
                 is_published=True,
-                tags=[t for t in all_tags if t.slug in ["distributed-systems", "python-fastapi", "docker-homelab"]]
+                tags=[t for t in all_tags if t.slug in ["distributed-systems", "python", "docker-homelab"]]
             )
 
             p2 = Post(
@@ -145,7 +165,7 @@ This removes any mismatch between what the database stores and what the UI rende
                 upvotes_count=98,
                 views_count=890,
                 is_published=True,
-                tags=[t for t in all_tags if t.slug in ["react-typescript", "python-fastapi"]]
+                tags=[t for t in all_tags if t.slug in ["react", "javascript-typescript"]]
             )
 
             p3 = Post(
@@ -169,7 +189,7 @@ An outbound tunnel opens the connection from inside the container to Cloudflare'
                 upvotes_count=114,
                 views_count=1520,
                 is_published=True,
-                tags=[t for t in all_tags if t.slug in ["docker-homelab", "cloud-aws"]]
+                tags=[t for t in all_tags if t.slug in ["docker-homelab", "cloud-devops", "security"]]
             )
 
             session.add_all([p1, p2, p3])

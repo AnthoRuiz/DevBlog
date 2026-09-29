@@ -1,8 +1,69 @@
-# Local development overrides: mount the backend source and enable live reload.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-# Never use for the public deployment: any change under ./backend would go live immediately.
+# Local development environment, fully isolated from production:
+# its own Compose project, database, volumes and ports, and no Cloudflare tunnel.
+#
+#   Start:  docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
+#   Stop:   docker compose -f docker-compose.dev.yml --env-file .env.dev down
+#   Reset:  docker compose -f docker-compose.dev.yml --env-file .env.dev down -v   (wipes the dev database)
+#
+# Frontend: run `npm run dev` in ./frontend (http://localhost:5173); Vite proxies /api and /uploads
+# to this backend on port 8001.
+name: devblog-dev
+
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: devblog_dev_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env.dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.dev}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env.dev}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: devblog_dev_backend
+    restart: unless-stopped
+    # Live reload: the source is mounted below
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:?Set POSTGRES_USER in .env.dev}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.dev}
+      - POSTGRES_DB=${POSTGRES_DB:?Set POSTGRES_DB in .env.dev}
+      - POSTGRES_HOST=db
+      - SECRET_KEY=${SECRET_KEY:?Set SECRET_KEY in .env.dev}
+      - ENVIRONMENT=development
+      - DEBUG=${DEBUG:-True}
+      - SEED_DEMO_POSTS=${SEED_DEMO_POSTS:-True}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@devblog.local}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ALLOW_ROLE_SELF_SWITCH=${ALLOW_ROLE_SELF_SWITCH:-False}
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8001}:8000"
     volumes:
       - ./backend:/app
+      # Named volumes shadow the mounted source folders so dev data never mixes with production's
+      - backups_dev_data:/app/backups
+      - uploads_dev_data:/app/uploads
+      - logs_dev_data:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_dev_data:
+  backups_dev_data:
+  uploads_dev_data:
+  logs_dev_data:

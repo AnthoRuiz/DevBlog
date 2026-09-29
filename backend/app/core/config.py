@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = "admin@devblog.local"
     ADMIN_PASSWORD: Optional[str] = None
 
+    # Seed the three demo posts into an empty database (development only)
+    SEED_DEMO_POSTS: bool = False
+
     # OAuth
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
