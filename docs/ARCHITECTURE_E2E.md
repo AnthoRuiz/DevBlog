@@ -1,22 +1,23 @@
 # SYS.BLOG • End-to-End Technical Specification & Architecture Manual
 
-> **Document Version:** 2.0.0  
-> **Target Audience:** Systems Architects, AI Agents, DevOps Engineers, and Full-Stack Developers  
-> **Production URL:** `https://anthoruiz.dev`  
-> **Local Endpoints:** Frontend: `http://localhost:3000` | Backend API: `http://localhost:8000/docs`
+> **Document Version:** 3.0.0 (2026-09-29)  
+> **Target Audience:** Systems architects, AI agents, DevOps engineers and full-stack developers  
+> **Production URL:** `https://blog.anthoruiz.dev`  
+> **Local endpoints:** Production stack: frontend `127.0.0.1:3000`, API `127.0.0.1:8000` · Development stack: frontend `localhost:5173`, API `localhost:8001/docs`
 
 ---
 
 ## 1. Executive Summary & System Philosophy
 
-**SYS.BLOG** is a production-grade, self-hosted engineering publication platform and Homelab observability hub. Designed to run on consumer hardware (e.g., bare-metal laptop or mini-PC) while delivering enterprise-tier reliability, global edge distribution, zero-trust security, and real-time hardware telemetry.
+**SYS.BLOG** is a self-hosted engineering publication platform and Homelab observability hub. It runs on consumer hardware (a laptop or mini-PC under Windows 11 + WSL2) and is published worldwide through Cloudflare's edge without opening any router ports.
 
 ### Core Architectural Tenets
-1. **Edge-Routed, Zero Port-Forwarding:** No residential router ports (80/443) are opened. All ingress traffic traverses an outbound-only encrypted QUIC tunnel (`cloudflared`) to Cloudflare Anycast edge locations.
-2. **Homelab Transparency:** Hardware metrics (CPU utilization %, RAM consumption %, CPU temperature °C, and OS uptime) are polled from the underlying host and rendered in real time.
-3. **Role-Based Access Control (RBAC):** Strict 3-tier authorization model (`ADMIN`, `AUTHOR`, `READER`) enforced at both database queries and API route dependencies.
-4. **Resilience & Autonomous Operations:** Automated rolling 7-day database backups, asynchronous non-blocking task loops, rate limiting, anti-spam honeypots, and self-healing Docker restart policies.
-5. **AI Integration:** Google Gemini integration for dynamic technical reading time estimation and automated content-aware taxonomy/tag generation.
+1. **Edge-routed, zero port forwarding:** no residential router ports (80/443) are opened. All ingress traverses an outbound-only encrypted tunnel (`cloudflared`) to Cloudflare's edge. Every other service listens on `127.0.0.1` only.
+2. **Secure by default:** secrets are required (no insecure fallbacks), production refuses to start with weak settings, and admin-only surfaces (telemetry, logs, backups, user management) require the `ADMIN` role.
+3. **Role-based access control (RBAC):** a 3-tier model (`ADMIN`, `AUTHOR`, `READER`) enforced through FastAPI route dependencies. Roles are assigned by admins only.
+4. **Isolated environments:** production and development are separate Docker Compose projects with their own databases, volumes, ports and configuration files.
+5. **Autonomous operations:** automatic daily database backups with 7-copy rotation, Docker restart policies, and a deployment script with pre- and post-deploy checks.
+6. **AI assistance:** Google Gemini for post translation, tag suggestions and reading-time estimation, with deterministic offline fallbacks.
 
 ---
 
@@ -25,46 +26,41 @@
 ```mermaid
 flowchart TD
     subgraph WAN ["Public Internet"]
-        UserBrowser["Client Browser / Mobile<br/>(HTTPS https://anthoruiz.dev)"]
+        UserBrowser["Client browser / mobile<br/>(https://blog.anthoruiz.dev)"]
     end
 
     subgraph CF ["Cloudflare Edge Network"]
-        CFDNS["Cloudflare DNS (anthoruiz.dev)"]
-        CFWAF["Edge WAF & DDoS Protection"]
-        CFSSL["Universal SSL/TLS Termination"]
+        CFDNS["Cloudflare DNS"]
+        CFWAF["Edge WAF & DDoS protection"]
+        CFSSL["TLS termination"]
     end
 
-    subgraph Host ["Homelab Host Node (Windows 11 / WSL2 Ubuntu 22.04)"]
-        subgraph DockerBridge ["Docker Bridge Network: devblog_net"]
-            
-            Tunnel["Container: devblog_tunnel<br/>(cloudflare/cloudflared:latest)<br/>Outbound QUIC Tunnel"]
-            
-            Nginx["Container: devblog_frontend<br/>(nginx:alpine)<br/>Port 80 (Internal) / 3000 (Host)"]
-            
-            FastAPI["Container: devblog_backend<br/>(python:3.10-slim)<br/>Uvicorn ASGI @ Port 8000"]
-            
-            Postgres[("Container: devblog_postgres<br/>(postgres:16-alpine)<br/>Port 5432 (Internal)")]
-            
+    subgraph Host ["Homelab host (Windows 11 / WSL2 Ubuntu 22.04 / Docker Engine)"]
+        subgraph DockerBridge ["Docker bridge network: devblog_net"]
+            Tunnel["devblog_tunnel<br/>(cloudflare/cloudflared)<br/>Outbound tunnel"]
+            Nginx["devblog_frontend<br/>(nginx:alpine + React build)<br/>:80 internal · 127.0.0.1:3000"]
+            FastAPI["devblog_backend<br/>(python:3.10-slim · Uvicorn)<br/>:8000 internal · 127.0.0.1:8000"]
+            Postgres[("devblog_postgres<br/>(postgres:16-alpine)<br/>:5432 internal · 127.0.0.1:5432")]
         end
-        
-        subgraph Volumes ["Host Persistent Storage"]
+
+        subgraph Storage ["Persistent storage"]
             V_DB[("postgres_data")]
             V_Uploads[("uploads_data")]
             V_Logs[("logs_data")]
+            B_Backups[("./backend/backups<br/>(host bind mount)")]
         end
     end
 
-    UserBrowser -->|"HTTPS:443"| CFDNS
-    CFDNS --> CFWAF
-    CFWAF --> CFSSL
-    CFSSL <==|"Outbound QUIC Tunnel"| Tunnel
-    Tunnel -->|"HTTP Proxy (frontend:80)"| Nginx
-    Nginx -->|"Static React SPA Assets"| Nginx
+    UserBrowser -->|"HTTPS :443"| CFDNS
+    CFDNS --> CFWAF --> CFSSL
+    CFSSL <==>|"Outbound encrypted tunnel"| Tunnel
+    Tunnel -->|"http://frontend:80"| Nginx
     Nginx -->|"Proxy /api/ & /uploads/"| FastAPI
-    FastAPI -->|"asyncpg Connection Pool"| Postgres
+    FastAPI -->|"asyncpg pool"| Postgres
     Postgres --- V_DB
     FastAPI --- V_Uploads
     FastAPI --- V_Logs
+    FastAPI --- B_Backups
 ```
 
 ---
@@ -72,62 +68,102 @@ flowchart TD
 ## 3. Infrastructure & Deployment Specification
 
 ### 3.1 Host & Virtualization Layer
-- **Hardware:** Consumer x86_64 Laptop / Mini PC.
-- **Operating System:** Windows 11 Pro with WSL2 (Windows Subsystem for Linux 2).
-- **WSL Distribution:** Ubuntu 22.04 LTS running Linux kernel 5.15+ with systemd and Docker Engine.
-- **Keep-Alive Daemon:** Host execution of `wsl -d Ubuntu sleep infinity` to prevent Windows connected standby / idle suspension from freezing WSL2 virtual interfaces.
+- **Hardware:** consumer x86_64 laptop / mini-PC.
+- **Operating system:** Windows 11 with WSL2.
+- **WSL distribution:** Ubuntu 22.04 LTS with Docker Engine installed **inside WSL**. All Docker commands must run from the `Ubuntu` distribution (`wsl -d Ubuntu`); the Windows Docker CLI (`cmd`, PowerShell, Git Bash) is not connected to this engine.
+- **Keep-alive:** keep a `wsl -d Ubuntu sleep infinity` process running on the host so Windows idle/standby does not suspend WSL2 and its network interfaces.
 
-### 3.2 Container Orchestration (`docker-compose.yml`)
+### 3.2 Environments
 
-The complete stack is declared as four decoupled services connected via a single internal bridge network (`devblog_net`):
+| | Production | Development |
+|---|---|---|
+| Compose file / project | `docker-compose.yml` (project `blog`) | `docker-compose.dev.yml` (project `devblog-dev`) |
+| Configuration | `.env` | `.env.dev` |
+| Containers | `devblog_postgres`, `devblog_backend`, `devblog_frontend`, `devblog_tunnel` | `devblog_dev_postgres`, `devblog_dev_backend` |
+| Frontend | Nginx serving the production build · `127.0.0.1:3000` | Vite dev server on the host · `localhost:5173` |
+| Backend | Code baked into the image, no reload · `127.0.0.1:8000` | Source mounted, `--reload` · `127.0.0.1:8001` |
+| Database | `devblog` · `127.0.0.1:5432` | `devblog_dev` · `127.0.0.1:5433` |
+| OpenAPI docs | Disabled | `http://localhost:8001/docs` |
+| Seed | 19 starter tags + admin | 19 starter tags + admin + 3 demo posts |
+| Cloudflare Tunnel | Yes | No |
+| Deploy | `./deploy.sh` | Automatic on save |
 
-| Container Name | Service Name | Base Image | Internal Port | Host Port | Purpose |
+The Vite dev server proxies `/api` and `/uploads` to the development backend (`VITE_API_PROXY_TARGET`, default `http://localhost:8001`) — never to production.
+
+### 3.3 Production Container Orchestration (`docker-compose.yml`)
+
+| Container | Service | Image | Internal port | Host binding | Purpose |
 |---|---|---|---|---|---|
-| `devblog_postgres` | `db` | `postgres:16-alpine` | `5432` | `5432` | Relational persistence with healthcheck |
-| `devblog_backend` | `backend` | Custom (`python:3.10-slim`) | `8000` | `8000` | FastAPI ASGI core, Gemini AI, Backups |
-| `devblog_frontend` | `frontend` | Multi-stage (`nginx:alpine`) | `80` | `3000` | Nginx reverse proxy & React SPA delivery |
-| `devblog_tunnel` | `tunnel` | `cloudflare/cloudflared:latest` | N/A | None | Encrypted outbound edge tunnel connector |
+| `devblog_postgres` | `db` | `postgres:16-alpine` | `5432` | `127.0.0.1:${POSTGRES_PORT}` | Relational persistence with `pg_isready` healthcheck |
+| `devblog_backend` | `backend` | Custom (`python:3.10-slim`) | `8000` | `127.0.0.1:8000` | FastAPI API, Gemini integration, backups, telemetry |
+| `devblog_frontend` | `frontend` | Multi-stage (`node:20-alpine` → `nginx:alpine`) | `80` | `127.0.0.1:3000` | Nginx reverse proxy and React SPA |
+| `devblog_tunnel` | `tunnel` | `cloudflare/cloudflared:latest` | — | — | Outbound edge tunnel connector |
 
-### 3.3 Network Ingress & Cloudflare Zero Trust Architecture
-1. **Connector Execution:** `cloudflared` launches with the flag `--no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}`.
-2. **Tunnel Negotiation:** Establishes 4 concurrent multiplexed QUIC/HTTP2 connections to geographically redundant Cloudflare Edge points of presence (PoPs).
-3. **Public Hostname Mapping:**
-   - Hostname: `anthoruiz.dev` (and `*.anthoruiz.dev`)
-   - Origin Service: `http://frontend:80`
-4. **Nginx Ingress Configuration (`frontend/nginx.conf`):**
-   - **Rate Limiting:** Leaky bucket rate limiter configured at `30 requests/second` with a burst buffer of `50 requests` (`zone=api_gateway_limit:10m`). Returns HTTP 429 upon exhaustion.
-   - **Static File Fallback:** `try_files $uri $uri/ /index.html;` ensures seamless HTML5 client-side React router navigation.
-   - **Gzip Compression:** Active for `text/plain`, `text/css`, `application/json`, `application/javascript`, and `text/xml`.
-   - **Uploads Proxying:** Static media cache headers set to 30 days (`Cache-Control: public, no-transform`).
+**Configuration contract:** required values use `${VAR:?message}` interpolation, so Compose aborts with a clear error instead of falling back to a default. Required: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `SECRET_KEY`, `ENVIRONMENT`, `CLOUDFLARE_TUNNEL_TOKEN`. Optional settings only default to their safe value (`DEBUG=False`, `ALLOW_ROLE_SELF_SWITCH=False`).
+
+**Volumes:** `postgres_data`, `uploads_data` and `logs_data` are named volumes; `./backend/backups` is bind-mounted so snapshots are visible on the host. `backend/.dockerignore` keeps backups, uploads, logs and `.env*` out of the image.
+
+### 3.4 Deployment (`deploy.sh`)
+`./deploy.sh [service...] [--check] [--yes]`, run from WSL:
+1. **Environment:** Linux/WSL with a reachable Docker engine; warns if a `docker-compose.override.yml` would be auto-applied.
+2. **Configuration:** `.env` must define `SECRET_KEY` (≥ 32 chars), `CLOUDFLARE_TUNNEL_TOKEN`, `POSTGRES_PASSWORD` and `ENVIRONMENT=production`; refuses `ALLOW_ROLE_SELF_SWITCH=True`; runs `docker compose config` to catch unresolved variables.
+3. **Git state:** shows branch/commit and lists uncommitted changes under `backend/`, `frontend/` or `docker-compose.yml` (ignoring CRLF-only differences), asking for confirmation.
+4. **Deploy:** `docker compose up -d --build --remove-orphans`.
+5. **Verification:** all 4 containers running, backend `/health` (up to 60 s), no `--reload`, public site and API respond, and `/api/v1/logs/recent`, `/api/v1/stats/telemetry` and `/api/v1/stats/status` return `401` without a session.
+
+`--check` runs steps 1–3 and 5 without deploying.
+
+### 3.5 Network Ingress & Cloudflare Tunnel
+1. **Connector:** `cloudflared tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}`.
+2. **Public hostname:** `blog.anthoruiz.dev` → origin `http://frontend:80` (configured in Cloudflare Zero Trust; unmatched hostnames return 404).
+3. **Nginx (`frontend/nginx.conf`):**
+   - **Real client IP:** `set_real_ip_from 172.16.0.0/12` + `real_ip_header CF-Connecting-IP`, so `$remote_addr` is the visitor rather than the tunnel container.
+   - **Rate limiting:** leaky bucket at `30 r/s` per visitor with `burst=50` (`zone=api_gateway_limit:10m`), HTTP 429 on exhaustion.
+   - **Security headers:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (camera/microphone/geolocation off); `server_tokens off`.
+   - **SPA fallback:** `try_files $uri $uri/ /index.html`.
+   - **API proxy:** `/api/` → `backend:8000/api/`, `client_max_body_size 6m` for uploads.
+   - **Uploads:** `/uploads/` → backend, cached 30 days, served with `nosniff` and `Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox`.
+   - **gzip** for text, CSS, JSON, JavaScript and XML.
 
 ---
 
 ## 4. Backend Architecture (FastAPI & Python 3.10)
 
 ### 4.1 Technology Stack
-- **Framework:** FastAPI `>=0.110.0` (Asynchronous ASGI framework).
-- **ASGI Server:** Uvicorn with auto-reload in development.
-- **ORM & Driver:** SQLAlchemy `2.0+` async declarative mapping via `asyncpg`.
-- **Validation & Serialization:** Pydantic `v2` schemas.
-- **Security:** `passlib[bcrypt]` for password hashing, `pyjwt` for token encoding/decoding.
-- **System Monitoring:** `psutil` for host hardware telemetry.
-- **AI SDK:** Google Gemini API integration.
+- **Framework:** FastAPI `0.110` on Uvicorn `0.28` (ASGI).
+- **ORM & driver:** SQLAlchemy `2.0` async with `asyncpg`; tables are created on startup with `Base.metadata.create_all` (no migrations yet).
+- **Validation & settings:** Pydantic `2.6` and `pydantic-settings`.
+- **Security:** `passlib[bcrypt]` for password hashing, `python-jose` for JWT (HS256, 24 h expiry).
+- **Rate limiting:** SlowAPI (in-memory, keyed by `CF-Connecting-IP` / `X-Forwarded-For` / peer address).
+- **Monitoring:** `psutil` for host telemetry.
+- **HTTP client:** `httpx` for Gemini and Google token verification.
 
-### 4.2 Database Schema & Entity Relationships
+### 4.2 Configuration (`backend/app/core/config.py`)
+- `DATABASE_URL` is built from `POSTGRES_USER/PASSWORD/HOST/PORT/DB` with the user and password **percent-encoded**, so passwords may contain `@ : / # %`. A full `DATABASE_URL` can be supplied instead.
+- `SECRET_KEY` has no default; startup fails without it.
+- **Production guard:** with `ENVIRONMENT=production` the app raises at startup if `SECRET_KEY` is a published default or shorter than 32 characters, or if `ALLOW_ROLE_SELF_SWITCH` is enabled. In development it only prints a warning.
+- OpenAPI (`/api/v1/openapi.json`, `/docs`, `/redoc`) is disabled in production.
+
+### 4.3 Database Schema & Entity Relationships
+
+All primary keys are UUIDs.
 
 ```mermaid
 erDiagram
     USERS ||--o{ POSTS : "authors"
-    USERS ||--o{ COMMENTS : "writes"
-    USERS ||--o{ INTERACTIONS : "performs"
+    USERS ||--o{ OAUTH_ACCOUNTS : "links"
+    USERS |o--o{ COMMENTS : "writes"
+    USERS |o--o{ UPVOTES : "casts"
+    USERS |o--o{ BOOKMARKS : "saves"
     POSTS ||--o{ COMMENTS : "contains"
-    POSTS ||--o{ INTERACTIONS : "receives"
-    POSTS }o--o{ TAGS : "categorized_by"
+    POSTS ||--o{ UPVOTES : "receives"
+    POSTS ||--o{ BOOKMARKS : "receives"
+    POSTS }o--o{ TAGS : "post_tags"
 
     USERS {
-        int id PK
+        uuid id PK
         string email UK
-        string hashed_password
+        string hashed_password "null for OAuth-only accounts"
         string full_name
         string avatar_url
         enum role "ADMIN, AUTHOR, READER"
@@ -137,285 +173,333 @@ erDiagram
         datetime updated_at
     }
 
+    OAUTH_ACCOUNTS {
+        uuid id PK
+        uuid user_id FK
+        string provider
+        string provider_user_id
+        string email_at_provider
+        datetime created_at
+    }
+
     POSTS {
-        int id PK
-        int author_id FK
+        uuid id PK
+        uuid author_id FK
         string slug UK
         string title
+        string language "es, en, pt, fr"
         string summary
         text content_markdown
         string cover_image_url
         int reading_time_minutes
-        string original_language
-        bool is_published
-        int views_count
         int upvotes_count
+        int views_count
+        bool is_published
+        datetime published_at
         datetime created_at
         datetime updated_at
     }
 
     TAGS {
-        int id PK
+        uuid id PK
         string name UK
         string slug UK
         string color_hex
     }
 
     COMMENTS {
-        int id PK
-        int post_id FK
-        int author_id FK
+        uuid id PK
+        uuid post_id FK
+        uuid user_id FK "null for anonymous"
         string author_name
         text content
+        bool is_approved
         datetime created_at
     }
 
-    INTERACTIONS {
-        int id PK
-        int user_id FK
-        int post_id FK
-        enum interaction_type "UPVOTE, BOOKMARK, VIEW"
+    UPVOTES {
+        uuid id PK
+        uuid post_id FK
+        uuid user_id FK "null for anonymous"
+        string client_hash "SHA-256 of IP + User-Agent"
+        datetime created_at
+    }
+
+    BOOKMARKS {
+        uuid id PK
+        uuid post_id FK
+        uuid user_id FK "null for anonymous"
+        string client_hash
         datetime created_at
     }
 ```
 
-### 4.3 Security & Role-Based Access Control (RBAC)
+### 4.4 Seed Data (`seed_initial_data()` in `backend/app/main.py`)
+Runs on every startup and only fills what is missing:
+1. **Starter tags** (only when the `tags` table is empty) — 19 tags from `DEFAULT_TAGS`:
+   - *Technology:* Software Engineering, Python, JavaScript & TypeScript, React, Backend & APIs, Databases, Distributed Systems, Cloud & DevOps, Docker & Homelab, Security, AI & Machine Learning
+   - *Career & interviews:* Interview Prep, System Design, Algorithms & Data Structures, Career Growth
+   - *Wellbeing:* Mental Health, Productivity & Habits
+   - *Gaming:* Video Games, Game Development
+2. **Admin user** (only when no `ADMIN` exists) — created from `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Without a password, a random one is generated and printed once to stdout (never to `server.log`). Existing admins still using the legacy default password are rotated to `ADMIN_PASSWORD` or reported with a warning.
+3. **Demo posts** (only when `SEED_DEMO_POSTS=True` and there are no posts) — three English posts with Unsplash covers. Enabled in development, disabled in production.
 
-The application implements a 3-tier hierarchical permission model:
+### 4.5 Security & Role-Based Access Control
 
-| Role | Permissions & Capabilities |
+| Role | Capabilities |
 |---|---|
-| **`ADMIN`** | • Full system administration.<br/>• Trigger, inspect, and download database backups.<br/>• Promote or demote user roles (`PATCH /auth/users/{id}/role`).<br/>• Delete any post or comment.<br/>• View real-time hardware telemetry (CPU, RAM, Temp, Uptime). |
-| **`AUTHOR`** | • Publish new articles (`POST /api/v1/posts`).<br/>• Edit and delete owned posts.<br/>• Upload images to local media storage (`POST /api/v1/posts/upload-image`).<br/>• Upvote, bookmark, and comment on any article. |
-| **`READER`** | • Read published articles and view system latency `/status`.<br/>• Upvote and bookmark articles.<br/>• Post comments on articles.<br/>• Restricted: Cannot create or update articles. |
+| **`ADMIN`** | Everything an author can do, on any post · list users and change roles (cannot demote themselves while they are the only admin) · create, download and delete backups · hardware telemetry and system status · recent server logs |
+| **`AUTHOR`** | Create posts · edit and delete **own** posts · upload images · create tags · AI translation, tag suggestions and reading-time estimates |
+| **`READER`** | Read, upvote, bookmark and comment. Cannot publish or edit |
 
-#### Route Security Dependencies (`backend/app/api/deps.py`):
-- `get_current_user`: Validates JWT Bearer token from `Authorization` header.
-- `get_current_active_user`: Asserts `user.is_active is True`.
-- `require_author_or_admin`: Enforces `user.role in [UserRole.AUTHOR, UserRole.ADMIN]`.
-- `require_admin`: Enforces `user.role == UserRole.ADMIN`.
+The first registered account becomes `ADMIN`; every later sign-up is a `READER`. `PUT /auth/me/role` (self role switch) returns `403` unless `ALLOW_ROLE_SELF_SWITCH=True`, which is meant for local testing only.
 
-#### Anti-Spam Honeypot:
-Public comment and interaction endpoints inspect a silent `hp_website` field. Automated bots filling this field are silently rejected or discarded without triggering database writes.
+**Route dependencies (`backend/app/api/deps.py`):**
+- `get_current_user_optional` — decodes the Bearer JWT if present, otherwise `None`.
+- `get_current_user` — requires a valid token (`401`).
+- `get_current_author_or_admin` — requires `AUTHOR` or `ADMIN` (`403`).
+- `get_current_admin` — requires `ADMIN` (`403`).
+- `get_client_hash` — SHA-256 of IP + User-Agent for anonymous upvotes/bookmarks.
 
-### 4.4 Automated Database Backup Engine (`backend/app/services/backup_service.py`)
-- **Execution Mechanism:** Background coroutine scheduled via FastAPI `lifespan` executing every 24 hours (`86,400s`).
-- **Backup Generation:** Invokes PostgreSQL `pg_dump` via `asyncio.create_subprocess_exec` outputting timestamped SQL snapshots: `devblog_backup_YYYYMMDD_HHMMSS.sql`.
-- **Rolling Retention (7-Day Rotation):** Scans the backup storage volume and automatically purges any archive files older than 7 calendar days.
-- **REST Endpoints:**
-  - `GET /api/v1/backups`: Lists existing snapshots with sizes and creation dates.
-  - `POST /api/v1/backups/create`: Triggers an immediate snapshot.
-  - `GET /api/v1/backups/download/{filename}`: Authenticated file streaming with MIME `application/octet-stream`.
+**Additional controls:**
+- **Google sign-in endpoint:** tokens verified via Google `tokeninfo` and required to match `GOOGLE_CLIENT_ID` (`aud`), a Google issuer, and `email_verified`; returns `503` while no client ID is configured.
+- **Uploads:** content detected by magic bytes (JPG, PNG, GIF, WEBP; SVG rejected), 5 MB cap, random filenames.
+- **Comments:** honeypot field `hp_website`, script/iframe stripping, length limits; rendered as plain text in the UI.
+- **Client log intake:** fields truncated and newlines neutralized so clients cannot forge log lines.
 
-### 4.5 Observability & Hardware Telemetry
-- **ASGI Middleware:** Measures request processing duration down to fractional milliseconds (`ms`), appending latency headers and writing to `/app/logs/server.log`.
-- **System Telemetry Service (`backend/app/api/v1/stats.py`):**
-  - Uses `psutil.cpu_percent(interval=None)` and `psutil.virtual_memory()`.
-  - Reads hardware thermal probes via `psutil.sensors_temperatures()`.
-  - Calculates operating system uptime from `psutil.boot_time()`.
-- **Latency Diagnostics (`GET /api/v1/stats/system-status`):**
-  - Executes active `SELECT 1` ping against PostgreSQL measuring true round-trip database latency.
-  - Returns Nginx gateway status, FastAPI memory usage, and node hostname identifier.
+**Rate limits (SlowAPI, per client IP):**
+
+| Endpoint | Limit |
+|---|---|
+| `POST /auth/register` | 5/min |
+| `POST /auth/login`, `POST /auth/oauth/google` | 10/min |
+| `POST /posts/ai-suggest-tags`, `POST /posts/ai-translate` | 10/min |
+| `POST /posts/{post_id}/comments` | 5/min |
+| `POST /posts/{post_id}/upvote` | 30/min |
+| `POST /logs/client` | 20/min |
+
+### 4.6 Automated Database Backup Engine (`backend/app/services/backup_service.py`)
+- **Scheduler:** background task started in the FastAPI `lifespan`, running every 24 h.
+- **Snapshot:** `pg_dump --clean --if-exists` via `asyncio.create_subprocess_exec`, gzip-compressed to `backup_devblog_YYYYMMDD_HHMMSS.sql.gz` in `/app/backups` (host: `backend/backups/`).
+- **Retention:** keeps the 7 most recent `*.sql.gz` files and deletes older ones.
+- **Safety:** filenames are validated against path traversal; downloads are admin-only.
+
+### 4.7 Observability & Hardware Telemetry
+- **Logging:** rotating file handler at `/app/logs/server.log` (5 MB × 3) plus stdout; client errors are logged through the `devblog.client` logger.
+- **Telemetry (`GET /stats/telemetry`, admin):** CPU % (`psutil.cpu_percent`), logical/physical cores, RAM, disk, uptime (`psutil.boot_time`) and temperature (`psutil.sensors_temperatures`, estimated from CPU load when no sensor is exposed, as under WSL2).
+- **System status (`GET /stats/status`, admin):** measures a real `SELECT 1` round-trip to PostgreSQL and reports FastAPI, Nginx and Gemini status alongside the hardware snapshot.
+- **Public liveness:** `GET /stats/system` and `GET /health` return static healthy responses without host details.
 
 ---
 
 ## 5. Frontend Architecture (React 18, TypeScript & Vite)
 
 ### 5.1 Technology Stack
-- **Framework:** React 18.2 (Functional Components & Hooks).
-- **Language:** TypeScript 5.2 (Strict type checking).
-- **Bundler:** Vite 5.4 with code-splitting and chunk minification.
-- **Styling:** Tailwind CSS with custom Cyber-Homelab theme.
-- **Diagram Engine:** Mermaid.js with custom dark configuration.
-- **Icons:** Lucide React.
+- **Framework:** React 18 (function components and hooks).
+- **Language:** TypeScript 5 (strict).
+- **Bundler / dev server:** Vite 5.
+- **Styling:** Tailwind CSS 3 with a custom dark "cyber-homelab" theme.
+- **Code highlighting:** highlight.js.
+- **Diagrams:** Mermaid 12 (dark theme, `securityLevel: 'strict'`).
+- **Icons:** lucide-react.
+- **HTTP:** native `fetch` wrapped in `src/services/api.ts`.
 
-### 5.2 Component Tree & Modular Hierarchy
+### 5.2 Component Tree
 
 ```
 frontend/src/
-├── App.tsx                     # Main application container & state orchestration
-├── main.tsx                    # React DOM root bootstrapping
-├── index.css                   # Tailwind imports & custom scrollbar definitions
-├── i18n/
-│   └── index.ts                # Multilingual translation dictionaries (es, en, pt, fr)
-├── types/
-│   └── index.ts                # TypeScript domain models and API contracts
+├── App.tsx                     # App shell, state orchestration, tag filter bar, modals
+├── main.tsx                    # React root
+├── index.css                   # Tailwind layers and custom styles
+├── vite-env.d.ts               # Vite env typings (VITE_ENABLE_ROLE_TESTING)
+├── i18n/index.ts               # Typed translation dictionaries (es, en, pt, fr)
+├── types/index.ts              # Domain models and API contracts
 ├── services/
-│   └── api.ts                  # Axios/Fetch API client abstraction layer
-├── utils/                      # Helper formatting functions (dates, byte formatting)
+│   ├── api.ts                  # REST client (fetch) and ROLE_TESTING_ENABLED flag
+│   └── logger.ts               # Client error reporting to /api/v1/logs/client
+├── utils/                      # Formatting helpers
 └── components/
-    ├── Navbar.tsx              # Top navigation bar, language switcher, node status
-    ├── StreakHeader.tsx        # Homelab telemetry widget & role-adaptive header
-    ├── DigestCard.tsx          # 2-column high-density article digest card
-    ├── ArticleModal.tsx        # Full markdown reader modal with syntax highlighting
-    ├── NewPostModal.tsx        # Markdown editor, AI tag/read-time estimator, uploader
-    ├── MarkdownRenderer.tsx    # Remark/Rehype markdown parser with code highlighting
-    ├── MermaidRenderer.tsx     # Embedded Mermaid.js diagram viewer with copy & zoom
-    ├── MarkdownToolbar.tsx     # Rich formatting toolbar for authoring
-    ├── LoginModal.tsx          # Authentication & registration modal
-    ├── SystemStatusModal.tsx   # Live /status Homelab latency dashboard
-    ├── BackupsModal.tsx        # Admin control panel for snapshots & role testing
-    └── ErrorBoundary.tsx       # React fault tolerance boundary with crash reporting
+    ├── Navbar.tsx              # Top bar: search, language switcher, status, admin panel
+    ├── StreakHeader.tsx        # Writing streak + admin telemetry or LIVE/DOWN badge
+    ├── DigestCard.tsx          # Post card (cover, language badge, metadata, actions)
+    ├── ArticleModal.tsx        # Post reader with comments, upvotes and bookmarks
+    ├── NewPostModal.tsx        # Editor: cover upload, tags, AI translate/suggest/estimate
+    ├── MarkdownToolbar.tsx     # Word-style formatting toolbar and quick guide
+    ├── MarkdownRenderer.tsx    # In-house markdown renderer with sanitized links
+    ├── MermaidRenderer.tsx     # Mermaid diagram rendering with copy-source button
+    ├── LoginModal.tsx          # Sign-in and sign-up
+    ├── SystemStatusModal.tsx   # /status dashboard (admin data, notice for others)
+    ├── BackupsModal.tsx        # Admin panel: users & roles, backups
+    └── ErrorBoundary.tsx       # Crash screen with automatic error reporting
 ```
 
-### 5.3 Key UI/UX Innovations
+### 5.3 Key UI Behaviour
 
-#### Adaptive Telemetry Widget (`StreakHeader.tsx`)
-- **When user is `ADMIN`:** Displays full live telemetry pills: `LIVE | CPU: 1.2% | RAM: 8.7% | TEMP: 37.5°C | UP: 6h 7m | /status ↗`.
-- **When user is `AUTHOR` / `READER` / Visitor:** Displays a minimalist `LIVE` (pulsing green dot) or `DOWN` (red dot) badge alongside `/status ↗`.
-- **Horizontal Alignment:** The "+ New Post" button sits on the exact same row with standardized height (`h-[34px]`) preventing layout displacement.
+#### Adaptive telemetry widget (`StreakHeader.tsx`)
+- **`ADMIN`:** polls `/stats/telemetry` every 5 s with the admin token and shows `LIVE | CPU | RAM | TEMP | UP | /status ↗`.
+- **Everyone else:** polls the public `/stats/system` ping and shows a `LIVE` / `DOWN` badge only.
 
-#### Compact Tag Filter Bar with Searchable Dropdown
-- Solves vertical clutter when dozens of database tags exist.
-- Renders `[ All Topics ]`, `[ Bookmarks (N) ]`, and the top **6 primary tags**.
-- Excess tags are tucked inside a `+N more ▾` popover containing a live search input (`Buscar etiqueta...`).
-- Selecting an overflow tag dynamically pins it to the primary bar with a quick-remove `X` button.
+#### Markdown rendering (`MarkdownRenderer.tsx`)
+- In-house parser for headings, lists, quotes, tables, inline formatting and fenced code (highlight.js), with ` ```mermaid ` blocks delegated to `MermaidRenderer`.
+- All text is HTML-escaped (including quotes). Links are extracted before other inline formatting and only allow `http(s)`, `mailto` and relative URLs; anything else (e.g. `javascript:`, `data:`) becomes `#`.
 
-#### Dynamic Dark Mermaid.js Integration (`MermaidRenderer.tsx`)
-- Auto-detects ````mermaid code blocks inside markdown posts.
-- Dynamically initializes Mermaid with dark theme configuration:
-  ```typescript
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: 'dark',
-    themeVariables: {
-      background: '#07090e',
-      primaryColor: '#06b6d4',
-      primaryTextColor: '#f8fafc',
-      primaryBorderColor: '#0891b2',
-      lineColor: '#38bdf8'
-    }
-  });
-  ```
-- Supports full diagram types: Flowcharts (`flowchart TD/LR`), Sequence diagrams (`sequenceDiagram`), ER models (`erDiagram`), State diagrams, and Gantt charts.
-- Includes interactive zoom controls and raw diagram syntax viewer.
+#### Compact tag filter bar (`App.tsx`)
+- Shows `All`, `Bookmarks (N)` and the first 6 tags (`PRIMARY_TAG_LIMIT`); the rest live in a searchable `+N more` dropdown. A tag picked from the dropdown is pinned to the bar with a remove button.
 
-#### Native Multilingual Dictionary (`src/i18n/index.ts`)
-- Zero external heavy dependencies; pure TypeScript typed dictionary.
-- Seamless instant language switching across **4 languages**:
-  - 🇪🇸 Spanish (`es`)
-  - 🇺🇸 English (`en`)
-  - 🇧🇷 Portuguese (`pt`)
-  - 🇫🇷 French (`fr`)
-- Stores preference in `localStorage('devblog_lang')`.
+#### Role testing switcher
+- Hidden unless the frontend is built with `VITE_ENABLE_ROLE_TESTING=true` **and** the backend allows `ALLOW_ROLE_SELF_SWITCH=True`.
+
+#### Internationalization (`src/i18n/index.ts`)
+- Typed dictionaries for 🇪🇸 `es` (default), 🇺🇸 `en`, 🇧🇷 `pt` and 🇫🇷 `fr`, switched instantly from the navbar. The active language is kept in React state (not persisted).
+
+#### Local storage
+- `auth_token`, `current_user`, `user_email` (session) and `devblog_bookmarks` (offline bookmark cache).
 
 ---
 
-## 6. Complete API Specification (REST Contract)
+## 6. API Specification (REST Contract)
 
-Base URL: `https://anthoruiz.dev/api/v1` (or `http://localhost:8000/api/v1`)
+Base URL: `https://blog.anthoruiz.dev/api/v1` (production) · `http://localhost:8001/api/v1` (development; interactive docs at `/docs`).
 
-### 6.1 Authentication & User Management
+Auth legend: **Public** — no token · **Optional** — token used if present · **Bearer** — any signed-in user · **Author** — `AUTHOR` or `ADMIN` · **Admin** — `ADMIN` only.
+
+### 6.1 Authentication & Users
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/auth/register` | Public | Register new user account (default role: `READER`). |
-| `POST` | `/auth/login` | Public | Authenticate credentials; returns JWT `access_token`. |
-| `GET` | `/auth/me` | Bearer | Retrieve profile, permissions, and role of authenticated user. |
-| `PATCH` | `/auth/me/role` | Bearer | Switch role for testing in development/Homelab mode. |
-| `PATCH` | `/auth/users/{id}/role` | Admin | Change another user's role (`ADMIN`, `AUTHOR`, `READER`). |
+| `POST` | `/auth/register` | Public | Create an account (first user `ADMIN`, then `READER`); returns a JWT |
+| `POST` | `/auth/login` | Public | Email/password sign-in; returns a JWT |
+| `POST` | `/auth/oauth/google` | Public | Google ID-token sign-in (requires `GOOGLE_CLIENT_ID`) |
+| `GET` | `/auth/me` | Bearer | Current user profile and role |
+| `PUT` | `/auth/me/role` | Bearer | Self role switch — `403` unless `ALLOW_ROLE_SELF_SWITCH=True` |
+| `GET` | `/auth/users` | Admin | List users |
+| `PUT` | `/auth/users/{user_id}/role` | Admin | Change a user's role |
 
-### 6.2 Posts & Content Management
+### 6.2 Posts & Tags
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `GET` | `/posts/` | Public | List published articles with tag filter, search, and sort (`recent`, `top_voted`, `trending`). |
-| `GET` | `/posts/{slug}` | Public | Retrieve full article detail and increment view count. |
-| `POST` | `/posts/` | Author/Admin | Publish a new technical article. |
-| `PUT` | `/posts/{slug}` | Author/Admin | Update existing article (author ownership verified). |
-| `DELETE` | `/posts/{slug}` | Author/Admin | Delete article. |
-| `POST` | `/posts/upload-image` | Author/Admin | Upload article cover or inline image (`multipart/form-data`). |
-| `POST` | `/posts/estimate-reading-time` | Author/Admin | Gemini AI estimation of technical reading time. |
-| `POST` | `/posts/suggest-tags` | Author/Admin | Gemini AI semantic tag generator. |
+| `GET` | `/posts` | Public | List published posts (`tag`, `q`, `sort=recent\|top_voted\|trending`, `limit`, `offset`) |
+| `GET` | `/posts/{slug}` | Public | Post detail (increments views) |
+| `POST` | `/posts` | Author | Create a post |
+| `PUT` | `/posts/{post_id}` | Author | Update a post (owner or admin) |
+| `DELETE` | `/posts/{post_id}` | Author | Delete a post (owner or admin) |
+| `POST` | `/posts/upload-image` | Author | Upload an image (`multipart/form-data`, JPG/PNG/GIF/WEBP, ≤ 5 MB) |
+| `GET` | `/posts/tags/all` | Public | List all tags |
+| `POST` | `/posts/tags` | Author | Create a tag |
+| `POST` | `/posts/ai-translate` | Author | Translate title, summary and markdown (Gemini) |
+| `POST` | `/posts/ai-suggest-tags` | Author | Suggest tags (Gemini) |
+| `POST` | `/posts/ai-estimate-reading-time` | Author | Estimate reading time (Gemini) |
 
-### 6.3 Interactions & Engagement
+### 6.3 Interactions
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/posts/{id}/upvote` | Public/Bearer | Toggle upvote on article. |
-| `POST` | `/posts/{id}/bookmark` | Bearer | Toggle article bookmark. |
-| `GET` | `/posts/user/bookmarks` | Bearer | Retrieve all bookmarked articles for current user. |
-| `POST` | `/posts/{id}/comments` | Public/Bearer | Post comment (Honeypot anti-spam protected). |
-| `GET` | `/posts/{id}/comments` | Public | Retrieve discussion thread for an article. |
+| `POST` | `/posts/{post_id}/upvote` | Optional | Toggle upvote (user or anonymous client hash) |
+| `POST` | `/posts/{post_id}/bookmark` | Optional | Toggle bookmark |
+| `GET` | `/posts/bookmarks/mine` | Optional | Bookmarked posts for the current user/client |
+| `GET` | `/posts/{post_id}/comments` | Public | List comments |
+| `POST` | `/posts/{post_id}/comments` | Optional | Add a comment (honeypot-protected) |
 
-### 6.4 Homelab Telemetry, Backups & Observability
+### 6.4 Stats, Backups & Logs
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `GET` | `/stats/streak` | Public | Retrieve writing streak count and basic telemetry. |
-| `GET` | `/stats/live-telemetry` | Public | Real-time CPU %, RAM %, Temperature, Uptime via `psutil`. |
-| `GET` | `/stats/system-status` | Public | Active ping latency of PostgreSQL, FastAPI, Nginx. |
-| `GET` | `/stats/tags` | Public | List all tags ordered by usage frequency. |
-| `GET` | `/backups/` | Admin | List all database backup snapshots. |
-| `POST` | `/backups/create` | Admin | Trigger immediate database dump. |
-| `GET` | `/backups/download/{file}` | Admin | Download SQL backup snapshot. |
-| `POST` | `/logs/client` | Public | React client error boundary diagnostic collector. |
-| `GET` | `/logs/recent` | Admin | Tail last 100 lines of rotating server log. |
+| `GET` | `/stats/streak` | Public | Writing streak, post/view/upvote totals (no hardware data) |
+| `GET` | `/stats/system` | Public | Liveness ping |
+| `GET` | `/stats/telemetry` | Admin | Live CPU, RAM, disk, temperature and uptime |
+| `GET` | `/stats/status` | Admin | Per-service health and latency + hardware snapshot |
+| `GET` | `/admin/backups` | Admin | List backups and retention policy |
+| `POST` | `/admin/backups/create` | Admin | Create a backup now |
+| `GET` | `/admin/backups/{filename}/download` | Admin | Download a backup (`application/gzip`) |
+| `DELETE` | `/admin/backups/{filename}` | Admin | Delete a backup |
+| `POST` | `/logs/client` | Public | Client error report (rate limited, sanitized) |
+| `GET` | `/logs/recent` | Admin | Tail of `server.log` (`lines=1..1000`, default 100) |
+
+Outside `/api/v1`: `GET /health` (public liveness), `/uploads/*` (uploaded media).
 
 ---
 
 ## 7. Environment Variables Reference
 
-| Variable Name | Required | Default Value | Description |
-|---|---|---|---|
-| `POSTGRES_USER` | Yes | `devblog_user` | PostgreSQL database superuser username. |
-| `POSTGRES_PASSWORD` | Yes | `devblog_secure_pass_2026` | PostgreSQL database user password. |
-| `POSTGRES_DB` | Yes | `devblog` | PostgreSQL target database name. |
-| `POSTGRES_PORT` | No | `5432` | PostgreSQL host listening port. |
-| `SECRET_KEY` | Yes | *Random 64-char string* | Cryptographic salt for JWT token signing. |
-| `ENVIRONMENT` | Yes | `production` | Runtime mode (`development` / `production`). |
-| `DEBUG` | No | `False` | Enables Swagger interactive docs and verbose logs. |
-| `GEMINI_API_KEY` | No | `""` | Google AI Studio API key for AI features. |
-| `GEMINI_MODEL` | No | `gemini-1.5-flash` | Gemini model variant for tag and reading time tasks. |
-| `CLOUDFLARE_TUNNEL_TOKEN` | Yes (for WAN) | `""` | Base64 authentication token for Cloudflare Tunnel connector. |
+Production reads `.env`, development reads `.env.dev` (templates: `.env.example`, `.env.dev.example`). Both are git-ignored, as is every `.env.*` variant except the templates.
+
+| Variable | Required | Default | Description |
+|---|:---:|---|---|
+| `POSTGRES_USER` | ✅ | — | Database user |
+| `POSTGRES_PASSWORD` | ✅ | — | Database password (special characters supported) |
+| `POSTGRES_DB` | ✅ | — | Database name |
+| `POSTGRES_PORT` | | `5432` (dev `5433`) | Host port for Postgres |
+| `SECRET_KEY` | ✅ | — | JWT signing key, ≥ 32 characters in production |
+| `ENVIRONMENT` | ✅ | — | `production` or `development` |
+| `DEBUG` | | `False` (dev `True`) | SQLAlchemy echo / debug output |
+| `CLOUDFLARE_TUNNEL_TOKEN` | ✅ prod | — | Cloudflare Tunnel connector token |
+| `ADMIN_EMAIL` | | `admin@devblog.local` | Initial admin email |
+| `ADMIN_PASSWORD` | | random, printed once | Initial admin password |
+| `ALLOW_ROLE_SELF_SWITCH` | | `False` | Enables `PUT /auth/me/role` (testing only; blocked in production) |
+| `SEED_DEMO_POSTS` | | `False` (dev `True`) | Seeds the demo posts into an empty database |
+| `GEMINI_API_KEY` | | empty | Google AI Studio key; offline fallbacks when empty |
+| `GEMINI_MODEL` | | `gemini-1.5-flash` | Gemini model |
+| `BACKEND_PORT` | | `8001` | Dev backend host port (`.env.dev` only) |
+| `VITE_API_PROXY_TARGET` | | `http://localhost:8001` | Vite dev proxy target (shell env when running `npm run dev`) |
+| `VITE_ENABLE_ROLE_TESTING` | | unset | Shows the role testing UI (frontend build/dev env) |
+
+> `POSTGRES_PASSWORD` is only applied when the database volume is first initialized. To rotate it: `ALTER USER ... WITH PASSWORD ...` in Postgres, then update `.env` and recreate the backend.
 
 ---
 
-## 8. Operational Playbook & Maintenance
+## 8. Operational Playbook
 
-### 8.1 Starting the Entire Homelab Stack
+### 8.1 Production
 ```bash
-# Enter Ubuntu WSL2
 wsl -d Ubuntu
-
-# Navigate to project directory
 cd /mnt/c/Users/14076/OneDrive/Desktop/Blog
 
-# Launch all 4 microservices detached
-docker compose up -d
+./deploy.sh            # build, deploy and verify
+./deploy.sh --check    # verify only
+docker compose ps
 ```
 
-### 8.2 Live Observability & Log Streaming
+### 8.2 Development
 ```bash
-# Stream logs from all containers
-docker compose logs -f
+docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build   # backend + db
+cd frontend && npm run dev                                                   # http://localhost:5173
+docker compose -f docker-compose.dev.yml --env-file .env.dev down -v         # wipe dev data
+```
 
-# Stream only Cloudflare Tunnel logs
-docker logs -f devblog_tunnel
-
-# Stream only FastAPI application logs
+### 8.3 Logs
+```bash
+docker compose logs -f                 # production stack
 docker logs -f devblog_backend
+docker logs --tail 50 devblog_tunnel   # look for "Registered tunnel connection"
+docker logs -f devblog_dev_backend     # development backend
 ```
 
-### 8.3 Rebuilding After Source Code Modifications
+### 8.4 Backup & Restore
 ```bash
-# Clean rebuild of frontend and backend
-docker compose build --no-cache frontend backend
-docker compose up -d frontend backend
+# Create a backup now (or use the admin panel)
+docker exec -w /app devblog_backend python -c "import asyncio; from app.services.backup_service import create_backup; print(asyncio.run(create_backup(keep=7)))"
+
+# Restore (the dump drops and recreates objects, replacing current data)
+set -a; source <(grep -E '^POSTGRES_(USER|DB)=' .env); set +a
+gunzip -c backend/backups/backup_devblog_YYYYMMDD_HHMMSS.sql.gz \
+  | docker exec -i devblog_postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
 ```
+Files that must survive rotation should be renamed so they no longer end in `.sql.gz` (e.g. `*.sql.gz.bak`).
 
-### 8.4 Disaster Recovery & Database Restoration
-In the event of database corruption or hardware migration:
+### 8.5 Database Shell
 ```bash
-# Copy snapshot into the database container
-docker cp devblog_backup_YYYYMMDD_HHMMSS.sql devblog_postgres:/tmp/restore.sql
-
-# Execute restore via psql inside the container
-docker exec -i devblog_postgres psql -U devblog_user -d devblog -f /tmp/restore.sql
+docker exec -it devblog_postgres psql -U devblog_user -d devblog
+docker exec -it devblog_dev_postgres psql -U devblog_dev -d devblog_dev
 ```
 
 ---
 
 ## 9. AI Agent Guidance & Ingestion Index
 
-When reading, analyzing, or extending this repository:
-1. **Routing Changes:** Modify `frontend/nginx.conf` and `frontend/src/App.tsx`. Remember that Nginx proxies `/api/` directly to `backend:8000/api/`.
-2. **Database Schema Migrations:** Declarative models reside in `backend/app/models/`. During development, `seed_initial_data()` in `backend/app/main.py` bootstraps required seed tags and admin credentials.
-3. **CORS Invariants:** In `backend/app/core/config.py`, any new public hostname must be appended to `BACKEND_CORS_ORIGINS`.
-4. **OneDrive File System Invariant:** If editing files on the Windows host mapped to OneDrive, immediately stage modified files with `git add` to prevent background cloud sync from creating race conditions.
+When reading, analyzing or extending this repository:
+1. **Language:** all code, comments, messages, commits and docs are in English. User-facing strings belong in `frontend/src/i18n/index.ts` (es/en/pt/fr). Spanish strings in `backend/app/services/gemini.py` are intentional matching data.
+2. **Environments:** never point development tooling at production. Use `docker-compose.dev.yml` + `.env.dev`; Vite already proxies to port 8001.
+3. **Secrets:** never add defaults for secrets in `docker-compose*.yml` or `config.py`; required values use `${VAR:?...}`. Never commit `.env*` files (other than the templates) or anything in `backend/backups/`.
+4. **Routing:** Nginx proxies `/api/` to `backend:8000/api/`; client routes live in `frontend/src/App.tsx` (hash routes `#/status`, `#/backups`).
+5. **Schema changes:** models live in `backend/app/models/`. There are no migrations: `create_all` only creates missing tables, so column changes on an existing database need a manual `ALTER TABLE` (or introducing Alembic, already in `requirements.txt`).
+6. **Seed data:** starter tags and demo posts are defined in `backend/app/main.py`; anything that must exist in a fresh database belongs there, not only in a live database.
+7. **CORS:** add new public hostnames to `BACKEND_CORS_ORIGINS` in `backend/app/core/config.py`.
+8. **Deploying:** use `./deploy.sh` from WSL; it refuses unsafe configurations and verifies security regressions after deploying.
+9. **OneDrive:** the working copy lives in a OneDrive-synced folder, which has restored stale file versions before. Commit promptly, and prefer moving the repository outside OneDrive.
