@@ -124,7 +124,7 @@ export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose,
                   ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
                   : 'border-[#1e293b] text-slate-500 hover:text-slate-300'
               }`}
-              title="Alternar actualización automática cada 5 segundos"
+              title="Toggle auto-refresh every 5 seconds"
             >
               <div className={`w-1.5 h-1.5 rounded-full ${autoRefresh ? 'bg-emerald-400' : 'bg-slate-600'}`} />
               <span>{t.autoRefreshLive}</span>
@@ -157,11 +157,11 @@ export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose,
           {isLoading && !data ? (
             <div className="py-16 text-center text-slate-500 font-mono text-xs flex flex-col items-center gap-2">
               <RefreshCw className="w-5 h-5 animate-spin text-cyan-400" />
-              <span>Conectando con la telemetría del Homelab...</span>
+              <span>Connecting to Homelab telemetry...</span>
             </div>
           ) : !data ? (
             <div className="py-16 text-center text-slate-500 font-mono text-xs">
-              La telemetría detallada del sistema solo está disponible para administradores.
+              Detailed system telemetry is only available to administrators.
             </div>
           ) : (
             <>
@@ -174,7 +174,7 @@ export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose,
                       {isHealthy ? t.systemOperational : t.systemDegraded}
                     </span>
                     <div className="text-[11px] font-mono text-slate-400">
-                      Latencia de respuesta general: <strong className="text-cyan-400">{data?.overall_latency_ms} ms</strong>
+                      Overall response latency: <strong className="text-cyan-400">{data?.overall_latency_ms} ms</strong>
                     </div>
                   </div>
                 </div>
@@ -259,7 +259,7 @@ export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose,
                       />
                     </div>
                     <div className="text-[10px] font-mono text-slate-500">
-                      {hw?.cpu_cores_logical} cores ({hw?.cpu_cores_physical} físicos)
+                      {hw?.cpu_cores_logical} cores ({hw?.cpu_cores_physical} physical)
                     </div>
                   </div>
 
@@ -299,7 +299,7 @@ export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose,
                       />
                     </div>
                     <div className="text-[10px] font-mono text-slate-500">
-                      {hw?.temperature_c && hw.temperature_c < 65 ? '🟢 Óptima' : '🟡 Carga alta'}
+                      {hw?.temperature_c && hw.temperature_c < 65 ? '🟢 Optimal' : '🟡 High load'}
                     </div>
                   </div>
 
@@ -377,7 +377,7 @@ export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose,
                       className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded bg-[#1e293b] hover:bg-slate-700 text-slate-300 text-[10px] font-mono transition-colors"
                     >
                       {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                      <span>{copied ? 'Copiado' : 'Copiar'}</span>
+                      <span>{copied ? 'Copied' : 'Copy'}</span>
                     </button>
                     <pre className="text-[11px] font-mono text-cyan-300/90 overflow-x-auto max-h-56 p-2 leading-tight">
                       {JSON.stringify(data, null, 2)}
@@ -399,7 +399,7 @@ export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose,
             onClick={onClose}
             className="px-4 py-1.5 rounded-xl text-xs font-mono bg-[#121622] hover:bg-[#1a2030] border border-[#1e293b] text-slate-300 hover:text-white transition-colors"
           >
-            Cerrar
+            Close
           </button>
         </div>
       </div>

@@ -12,7 +12,7 @@ const escapeHtml = (value: string) =>
     .replace(/'/g, '&#39;')
     .replace(/\u0000/g, '');
 
-// Solo http(s), mailto y rutas relativas; bloquea javascript:, data:, vbscript:, etc.
+// Only http(s), mailto and relative URLs; blocks javascript:, data:, vbscript:, etc.
 const safeUrl = (escapedUrl: string) => {
   const url = escapedUrl.trim();
   if (/[\u0000-\u001f\u007f]/.test(url)) return '#';
@@ -28,7 +28,7 @@ interface MarkdownRendererProps {
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
-  emptyMessage = 'No hay contenido para mostrar.',
+  emptyMessage = 'No content to display.',
 }) => {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
@@ -46,21 +46,21 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
-  // Helper para renderizar texto con formato inline básico (negrita, cursiva, links, código)
+  // Render text with basic inline formatting (bold, italic, links, code)
   const renderInline = (text: string) => {
-    // Reemplazar enlaces [texto](url)
+    // Links [text](url)
     const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-    // Reemplazar código en línea `codigo`
+    // Inline code `code`
     const codeRegex = /`([^`]+)`/g;
-    // Reemplazar negrita **texto**
+    // Bold **text**
     const boldRegex = /\*\*([^*]+)\*\*/g;
-    // Reemplazar cursiva *texto*
+    // Italic *text*
     const italicRegex = /\*([^*]+)\*/g;
 
     let html = escapeHtml(text);
 
-    // Los enlaces se extraen antes del resto del formato para que negrita/cursiva no inserten
-    // marcado dentro del atributo href
+    // Links are extracted before other formatting so bold/italic can never inject
+    // markup inside the href attribute
     const links: string[] = [];
     html = html.replace(linkRegex, (_, label: string, url: string) => {
       links.push(
@@ -84,13 +84,13 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       {paragraphs.map((block, idx) => {
         const trimmed = block.trim();
 
-        // Bloque de código con Highlight.js
+        // Code block with Highlight.js
         if (trimmed.startsWith('```')) {
           const lines = trimmed.split('\n');
           const lang = lines[0].replace('```', '').trim().toLowerCase();
           const codeBody = lines.slice(1).join('\n').replace(/```$/, '').trim();
 
-          // Renderizar Diagramas Mermaid si el bloque es ```mermaid
+          // Render Mermaid diagrams for ```mermaid blocks
           if (lang === 'mermaid') {
             return <MermaidRenderer key={idx} chart={codeBody} />;
           }
@@ -135,12 +135,12 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                   {isCopied ? (
                     <>
                       <Check className="w-3 h-3 text-emerald-400" />
-                      <span>Copiado</span>
+                      <span>Copied</span>
                     </>
                   ) : (
                     <>
                       <Copy className="w-3 h-3" />
-                      <span>Copiar</span>
+                      <span>Copy</span>
                     </>
                   )}
                 </button>
@@ -155,7 +155,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           );
         }
 
-        // Título H2
+        // H2 heading
         if (trimmed.startsWith('## ')) {
           return (
             <h2
@@ -168,7 +168,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           );
         }
 
-        // Título H3
+        // H3 heading
         if (trimmed.startsWith('### ')) {
           return (
             <h3 key={idx} className="text-base font-bold text-cyan-300 mt-4 mb-1">
@@ -177,7 +177,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           );
         }
 
-        // Título H1 (si alguien usa #)
+        // H1 heading (if someone uses #)
         if (trimmed.startsWith('# ')) {
           return (
             <h1 key={idx} className="text-xl sm:text-2xl font-extrabold text-white mt-4 mb-2">
@@ -186,12 +186,12 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           );
         }
 
-        // Línea divisoria
+        // Horizontal rule
         if (trimmed === '---' || trimmed === '***') {
           return <hr key={idx} className="my-6 border-[#1e293b]" />;
         }
 
-        // Citas / Callouts (> )
+        // Blockquotes / callouts (> )
         if (trimmed.startsWith('>')) {
           const quoteLines = trimmed
             .split('\n')
@@ -207,12 +207,12 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           );
         }
 
-        // Tablas Markdown (| Col1 | Col2 |)
+        // Markdown tables (| Col1 | Col2 |)
         if (trimmed.includes('|') && trimmed.includes('\n')) {
           const lines = trimmed.split('\n').filter((l) => l.trim().startsWith('|'));
           if (lines.length >= 2) {
             const headerCells = lines[0].split('|').map((c) => c.trim()).filter(Boolean);
-            const dataRows = lines.slice(2); // Omitir línea de alineación |--|--|
+            const dataRows = lines.slice(2); // Skip the alignment row |--|--|
 
             return (
               <div key={idx} className="my-4 overflow-x-auto rounded-xl border border-[#1e293b]">
@@ -246,7 +246,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           }
         }
 
-        // Listas con viñetas (- )
+        // Bullet lists (- )
         if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
           const items = trimmed.split('\n').filter(Boolean);
           return (
@@ -260,7 +260,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           );
         }
 
-        // Listas numeradas (1. )
+        // Numbered lists (1. )
         if (/^\d+\.\s/.test(trimmed)) {
           const items = trimmed.split('\n').filter(Boolean);
           return (
@@ -274,7 +274,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           );
         }
 
-        // Párrafo general
+        // Plain paragraph
         return (
           <p key={idx} className="leading-relaxed">
             {renderInline(block)}

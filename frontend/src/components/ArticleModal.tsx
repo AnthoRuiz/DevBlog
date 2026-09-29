@@ -37,7 +37,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
   const [upvotes, setUpvotes] = useState(post?.upvotes_count ?? 0);
   const [hasUpvoted, setHasUpvoted] = useState(false);
 
-  // Comentarios
+  // Comments
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentContent, setCommentContent] = useState('');
   const [authorName, setAuthorName] = useState('');
@@ -85,7 +85,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
       setComments((prev) => [newComment, ...prev]);
       setCommentContent('');
     } catch (err: any) {
-      setCommentError(err.message || 'Error al publicar comentario');
+      setCommentError(err.message || 'Failed to post comment');
     } finally {
       setIsSubmittingComment(false);
     }
@@ -113,7 +113,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex justify-center p-4 sm:p-6 animate-fadeIn">
       <div className="relative w-full max-w-4xl bg-[#0b0f19] border border-[#1e293b] rounded-2xl shadow-2xl my-auto overflow-hidden">
         
-        {/* Cabecera del Modal */}
+        {/* Modal header */}
         <div className="sticky top-0 bg-[#0b0f19]/95 backdrop-blur border-b border-[#1e293b] p-4 flex items-center justify-between z-20">
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-md border border-cyan-500/20">
@@ -169,9 +169,9 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
           </div>
         </div>
 
-        {/* Contenido del Artículo */}
+        {/* Post content */}
         <div className="p-6 sm:p-10 max-w-3xl mx-auto">
-          {/* Tags interactivos */}
+          {/* Interactive tags */}
           <div className="flex flex-wrap gap-2 mb-4">
             {post.tags.map((tag) => (
               <button
@@ -190,12 +190,12 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
             ))}
           </div>
 
-          {/* Título Principal */}
+          {/* Main title */}
           <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
             {post.title}
           </h1>
 
-          {/* Metadatos */}
+          {/* Metadata */}
           <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-slate-400 border-b border-[#1e293b] pb-6 mt-4 mb-8">
             <span>{t.byAuthor}</span>
             <span>&bull;</span>
@@ -210,7 +210,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
             </span>
           </div>
 
-          {/* Portada si existe */}
+          {/* Cover image, if any */}
           {post.cover_image_url && (
             <div className="mb-8 rounded-2xl overflow-hidden border border-[#1e293b] max-h-96">
               <img
@@ -221,17 +221,17 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
             </div>
           )}
 
-          {/* Resumen Destacado */}
+          {/* Highlighted summary */}
           <div className="p-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 text-slate-300 text-sm leading-relaxed mb-8">
             <strong>{t.summaryLabel}</strong> {post.summary}
           </div>
 
-          {/* Cuerpo en Markdown renderizado */}
+          {/* Rendered markdown body */}
           <div className="prose prose-invert max-w-none text-slate-300">
             <MarkdownRenderer content={post.content_markdown} />
           </div>
 
-          {/* Barra de Reacción Inferior */}
+          {/* Bottom reaction bar */}
           <div className="flex items-center justify-between border-t border-[#1e293b] pt-6 mt-12">
             <button
               type="button"
@@ -259,7 +259,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
             </button>
           </div>
 
-          {/* SECCIÓN DE COMENTARIOS */}
+          {/* COMMENTS SECTION */}
           <section className="mt-14 pt-8 border-t border-[#1e293b]">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
@@ -271,7 +271,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
               </span>
             </div>
 
-            {/* Formulario para publicar comentario */}
+            {/* Comment form */}
             <form onSubmit={handleAddComment} className="bg-[#07090e] border border-[#1e293b] rounded-2xl p-4 sm:p-5 mb-8">
               <h4 className="text-xs font-mono text-slate-400 uppercase tracking-wider mb-3">
                 {t.leaveCommentTitle}
@@ -314,7 +314,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
               </div>
             </form>
 
-            {/* Lista de Comentarios */}
+            {/* Comment list */}
             <div className="space-y-4">
               {comments.length === 0 ? (
                 <div className="text-center py-8 px-4 rounded-xl border border-[#1e293b]/60 bg-[#07090e]/40 text-xs font-mono text-slate-500">

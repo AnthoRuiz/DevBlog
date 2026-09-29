@@ -1,4 +1,4 @@
-# Etapa 1: Build de React con Vite
+# Stage 1: build the React app with Vite
 FROM node:20-alpine AS build
 
 WORKDIR /app
@@ -9,7 +9,7 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Etapa 2: Servidor de producción ultra ligero Nginx
+# Stage 2: lightweight Nginx production server
 FROM nginx:alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html

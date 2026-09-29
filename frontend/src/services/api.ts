@@ -2,37 +2,37 @@ import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemS
 
 const API_BASE = '/api/v1';
 
-// Selector de roles para pruebas locales. Requiere también ALLOW_ROLE_SELF_SWITCH=True en el backend.
+// Role switcher for local testing. Also requires ALLOW_ROLE_SELF_SWITCH=True on the backend.
 export const ROLE_TESTING_ENABLED = import.meta.env.VITE_ENABLE_ROLE_TESTING === 'true';
 
 export async function fetchStreakStats(): Promise<StreakStats> {
   const res = await fetch(`${API_BASE}/stats/streak`);
-  if (!res.ok) throw new Error('Error al obtener estadísticas de racha');
+  if (!res.ok) throw new Error('Failed to load streak stats');
   return res.json();
 }
 
-// Solo ADMIN
+// ADMIN only
 export async function fetchLiveTelemetry(token: string): Promise<HardwareTelemetry> {
   const res = await fetch(`${API_BASE}/stats/telemetry`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('Error al obtener telemetría de hardware');
+  if (!res.ok) throw new Error('Failed to load hardware telemetry');
   return res.json();
 }
 
-// Solo ADMIN
+// ADMIN only
 export async function fetchSystemStatus(token: string): Promise<SystemStatusResponse> {
   const res = await fetch(`${API_BASE}/stats/status`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('Error al obtener estado del sistema');
+  if (!res.ok) throw new Error('Failed to load system status');
   return res.json();
 }
 
-// Ping público de disponibilidad (sin métricas de hardware)
+// Public availability ping (no hardware metrics)
 export async function pingSystemHealth(): Promise<void> {
   const res = await fetch(`${API_BASE}/stats/system`);
-  if (!res.ok) throw new Error('Servidor no disponible');
+  if (!res.ok) throw new Error('Server unavailable');
 }
 
 export async function fetchPosts(tag?: string, sort: string = 'recent', query?: string): Promise<Post[]> {
@@ -42,7 +42,7 @@ export async function fetchPosts(tag?: string, sort: string = 'recent', query?: 
   if (query) params.append('q', query);
 
   const res = await fetch(`${API_BASE}/posts?${params.toString()}`);
-  if (!res.ok) throw new Error('Error al obtener artículos');
+  if (!res.ok) throw new Error('Failed to load posts');
   return res.json();
 }
 
@@ -52,13 +52,13 @@ export async function fetchBookmarkedPosts(): Promise<Post[]> {
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE}/posts/bookmarks/mine`, { headers });
-  if (!res.ok) throw new Error('Error al obtener artículos guardados');
+  if (!res.ok) throw new Error('Failed to load bookmarked posts');
   return res.json();
 }
 
 export async function fetchPostBySlug(slug: string): Promise<PostDetail> {
   const res = await fetch(`${API_BASE}/posts/${slug}`);
-  if (!res.ok) throw new Error('Artículo no encontrado');
+  if (!res.ok) throw new Error('Post not found');
   return res.json();
 }
 
@@ -71,7 +71,7 @@ export async function toggleUpvote(postId: string): Promise<{ upvoted: boolean; 
     method: 'POST',
     headers,
   });
-  if (!res.ok) throw new Error('Error al registrar upvote');
+  if (!res.ok) throw new Error('Failed to register upvote');
   return res.json();
 }
 
@@ -84,7 +84,7 @@ export async function toggleBookmark(postId: string): Promise<{ post_id: string;
     method: 'POST',
     headers,
   });
-  if (!res.ok) throw new Error('Error al guardar marcador');
+  if (!res.ok) throw new Error('Failed to save bookmark');
   return res.json();
 }
 
@@ -116,8 +116,8 @@ export async function createComment(
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error al publicar comentario' }));
-    throw new Error(err.detail || 'Error al publicar comentario');
+    const err = await res.json().catch(() => ({ detail: 'Failed to post comment' }));
+    throw new Error(err.detail || 'Failed to post comment');
   }
 
   return res.json();
@@ -136,8 +136,8 @@ export async function uploadImage(file: File, token: string): Promise<string> {
   });
 
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({ detail: 'Error al subir la imagen' }));
-    throw new Error(errorData.detail || 'Error al subir la imagen');
+    const errorData = await res.json().catch(() => ({ detail: 'Failed to upload image' }));
+    throw new Error(errorData.detail || 'Failed to upload image');
   }
 
   const data = await res.json();
@@ -167,8 +167,8 @@ export async function createPost(
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error creando artículo' }));
-    throw new Error(err.detail || 'Error creando artículo');
+    const err = await res.json().catch(() => ({ detail: 'Failed to create post' }));
+    throw new Error(err.detail || 'Failed to create post');
   }
 
   return res.json();
@@ -198,8 +198,8 @@ export async function updatePost(
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error actualizando artículo' }));
-    throw new Error(err.detail || 'Error actualizando artículo');
+    const err = await res.json().catch(() => ({ detail: 'Failed to update post' }));
+    throw new Error(err.detail || 'Failed to update post');
   }
 
   return res.json();
@@ -214,8 +214,8 @@ export async function deletePost(postId: string, token: string): Promise<void> {
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error eliminando artículo' }));
-    throw new Error(err.detail || 'Error eliminando artículo');
+    const err = await res.json().catch(() => ({ detail: 'Failed to delete post' }));
+    throw new Error(err.detail || 'Failed to delete post');
   }
 }
 
@@ -223,7 +223,7 @@ export async function fetchCurrentUser(token: string): Promise<User> {
   const res = await fetch(`${API_BASE}/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('Sesión inválida o expirada');
+  if (!res.ok) throw new Error('Invalid or expired session');
   return res.json();
 }
 
@@ -237,8 +237,8 @@ export async function loginUser(
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Credenciales inválidas' }));
-    throw new Error(err.detail || 'Credenciales inválidas');
+    const err = await res.json().catch(() => ({ detail: 'Invalid credentials' }));
+    throw new Error(err.detail || 'Invalid credentials');
   }
   return res.json();
 }
@@ -255,8 +255,8 @@ export async function registerUser(
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error al registrar usuario' }));
-    throw new Error(err.detail || 'Error al registrar usuario');
+    const err = await res.json().catch(() => ({ detail: 'Failed to register user' }));
+    throw new Error(err.detail || 'Failed to register user');
   }
 
   return res.json();
@@ -290,8 +290,8 @@ export async function translatePostWithAi(
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error al traducir con IA' }));
-    throw new Error(err.detail || 'Error al traducir con IA');
+    const err = await res.json().catch(() => ({ detail: 'AI translation failed' }));
+    throw new Error(err.detail || 'AI translation failed');
   }
 
   return res.json();
@@ -312,8 +312,8 @@ export async function createTag(
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error al crear la etiqueta' }));
-    throw new Error(err.detail || 'Error al crear la etiqueta');
+    const err = await res.json().catch(() => ({ detail: 'Failed to create tag' }));
+    throw new Error(err.detail || 'Failed to create tag');
   }
 
   return res.json();
@@ -339,8 +339,8 @@ export async function suggestTagsWithAi(
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error al sugerir etiquetas con IA' }));
-    throw new Error(err.detail || 'Error al sugerir etiquetas con IA');
+    const err = await res.json().catch(() => ({ detail: 'AI tag suggestion failed' }));
+    throw new Error(err.detail || 'AI tag suggestion failed');
   }
 
   const data = await res.json();
@@ -352,8 +352,8 @@ export async function fetchAdminBackups(token: string): Promise<BackupsResponse>
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error al obtener backups' }));
-    throw new Error(err.detail || 'Error al obtener backups');
+    const err = await res.json().catch(() => ({ detail: 'Failed to load backups' }));
+    throw new Error(err.detail || 'Failed to load backups');
   }
   return res.json();
 }
@@ -369,8 +369,8 @@ export async function createAdminBackup(
     },
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error al generar backup' }));
-    throw new Error(err.detail || 'Error al generar backup');
+    const err = await res.json().catch(() => ({ detail: 'Failed to create backup' }));
+    throw new Error(err.detail || 'Failed to create backup');
   }
   return res.json();
 }
@@ -380,7 +380,7 @@ export async function downloadAdminBackup(filename: string, token: string): Prom
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
-    throw new Error('Error al descargar el backup de la base de datos');
+    throw new Error('Failed to download the database backup');
   }
   const blob = await res.blob();
   const url = window.URL.createObjectURL(blob);
@@ -402,8 +402,8 @@ export async function deleteAdminBackup(
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error al eliminar backup' }));
-    throw new Error(err.detail || 'Error al eliminar backup');
+    const err = await res.json().catch(() => ({ detail: 'Failed to delete backup' }));
+    throw new Error(err.detail || 'Failed to delete backup');
   }
   return res.json();
 }
@@ -418,8 +418,8 @@ export async function updateMyRole(role: UserRole, token: string): Promise<User>
     body: JSON.stringify({ role }),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error al cambiar de rol' }));
-    throw new Error(err.detail || 'Error al cambiar de rol');
+    const err = await res.json().catch(() => ({ detail: 'Failed to change role' }));
+    throw new Error(err.detail || 'Failed to change role');
   }
   return res.json();
 }
@@ -429,8 +429,8 @@ export async function fetchUsers(token: string): Promise<User[]> {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error al obtener usuarios' }));
-    throw new Error(err.detail || 'Error al obtener usuarios');
+    const err = await res.json().catch(() => ({ detail: 'Failed to load users' }));
+    throw new Error(err.detail || 'Failed to load users');
   }
   return res.json();
 }
@@ -449,8 +449,8 @@ export async function updateUserRole(
     body: JSON.stringify({ role }),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Error al actualizar rol de usuario' }));
-    throw new Error(err.detail || 'Error al actualizar rol de usuario');
+    const err = await res.json().catch(() => ({ detail: 'Failed to update user role' }));
+    throw new Error(err.detail || 'Failed to update user role');
   }
   return res.json();
 }

@@ -117,7 +117,7 @@ export const DigestCard: React.FC<DigestCardProps> = ({
       onClick={() => onOpen(post.slug)}
       className="group bg-[#0b0f19] border border-[#1e293b] hover:border-cyan-500/50 rounded-2xl overflow-hidden flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-cyan-500/10 cursor-pointer"
     >
-      {/* Portada Gráfica */}
+      {/* Cover image */}
       <div>
         <div className="relative h-48 w-full bg-slate-950 overflow-hidden border-b border-[#1e293b]">
           {post.cover_image_url && !imageError ? (
@@ -140,7 +140,7 @@ export const DigestCard: React.FC<DigestCardProps> = ({
             </div>
           )}
 
-          {/* Badges superiores sobre la portada */}
+          {/* Badges over the cover */}
           <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between gap-2 z-10">
             {primaryTag ? (
               <button
@@ -157,7 +157,7 @@ export const DigestCard: React.FC<DigestCardProps> = ({
               </button>
             ) : <span />}
 
-            {/* Badge de Idioma Original del Post */}
+            {/* Post original language badge */}
             <span
               className="flex items-center gap-1.5 text-[11px] font-mono font-bold px-2.5 py-1 rounded-md bg-[#07090e]/90 border border-cyan-500/40 text-cyan-300 backdrop-blur-md shadow-md pointer-events-none"
               title={`${t.originalLangBadge}: ${langFullName}`}
@@ -168,9 +168,9 @@ export const DigestCard: React.FC<DigestCardProps> = ({
           </div>
         </div>
 
-        {/* Cuerpo de la Tarjeta */}
+        {/* Card body */}
         <div className="p-5">
-          {/* Metadatos superiores: Fecha de Publicación, Tiempo de Lectura y Vistas */}
+          {/* Top metadata: publish date, reading time and views */}
           <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-400 font-mono mb-2.5">
             {displayDate && (
               <>
@@ -217,7 +217,7 @@ export const DigestCard: React.FC<DigestCardProps> = ({
         </div>
       </div>
 
-      {/* Barra de Acciones Inferior */}
+      {/* Bottom action bar */}
       <div className="px-5 pb-5">
         <div className="flex items-center justify-between border-t border-[#1e293b] pt-3.5">
           <button
@@ -234,7 +234,7 @@ export const DigestCard: React.FC<DigestCardProps> = ({
           </button>
 
           <div className="flex items-center gap-2">
-            {/* Controles de Autor (Editar y Eliminar) */}
+            {/* Author controls (edit and delete) */}
             {isAuthor && (
               <div className="flex items-center gap-1 mr-2 border-r border-[#1e293b] pr-2">
                 <button
@@ -256,7 +256,7 @@ export const DigestCard: React.FC<DigestCardProps> = ({
               </div>
             )}
 
-            {/* Botón de Marcador / Favorito */}
+            {/* Bookmark button */}
             <button
               type="button"
               onClick={handleBookmark}

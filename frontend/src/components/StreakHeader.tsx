@@ -20,7 +20,7 @@ export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenSt
   const [isDown, setIsDown] = useState<boolean>(false);
 
   useEffect(() => {
-    // La telemetría de hardware es solo para ADMIN; el resto solo comprueba disponibilidad
+    // Hardware telemetry is ADMIN-only; everyone else just checks availability
     const canSeeTelemetry = isAdmin && Boolean(token);
     if (!canSeeTelemetry) setTelemetry(null);
 
@@ -69,11 +69,11 @@ export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenSt
 
         <div className="flex flex-wrap items-center gap-3">
           {isAdmin ? (
-            /* Homelab Live Hardware Telemetry Widget (Exclusivo para ADMIN) */
+            /* Homelab live hardware telemetry widget (ADMIN only) */
             <div
               onClick={onOpenStatus}
               className="flex items-center gap-2.5 sm:gap-3 bg-[#121622] hover:bg-[#181f30] border border-[#1e293b] hover:border-cyan-500/40 px-3.5 py-2 rounded-xl text-xs font-mono transition-all cursor-pointer shadow-sm group select-none"
-              title="Haz clic para ver el Estado del Sistema y Latencias (/status)"
+              title="Click to view system status and latencies (/status)"
             >
               <div className="flex items-center gap-1.5 text-emerald-400">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -119,7 +119,7 @@ export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenSt
               </span>
             </div>
           ) : (
-            /* Indicador simple LIVE / DOWN para AUTHOR, READER y visitantes */
+            /* Simple LIVE / DOWN indicator for AUTHOR, READER and visitors */
             <div
               onClick={onOpenStatus}
               className={`flex items-center gap-2 border px-3.5 py-2 rounded-xl text-xs font-mono transition-all cursor-pointer shadow-sm group select-none ${
@@ -127,7 +127,7 @@ export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenSt
                   ? 'bg-red-500/10 border-red-500/30 hover:border-red-500/50 text-red-400'
                   : 'bg-[#121622] hover:bg-[#181f30] border-[#1e293b] hover:border-emerald-500/40 text-emerald-400'
               }`}
-              title={isDown ? 'Servidor no disponible (DOWN) — Ver estado' : 'Servidor Homelab Activo (LIVE) — Ver estado (/status)'}
+              title={isDown ? 'Server unavailable (DOWN) — view status' : 'Homelab server up (LIVE) — view status (/status)'}
             >
               <span className={`w-2 h-2 rounded-full ${isDown ? 'bg-red-400' : 'bg-emerald-400 animate-pulse'}`} />
               <span className="font-extrabold text-xs tracking-wider">
@@ -140,7 +140,7 @@ export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenSt
             </div>
           )}
 
-          {/* Botón Nuevo Post alineado perfectamente en la misma fila */}
+          {/* New Post button, aligned on the same row */}
           <button
             onClick={onNewPost}
             className="flex items-center gap-1.5 bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all hover:scale-105 active:scale-95 whitespace-nowrap"

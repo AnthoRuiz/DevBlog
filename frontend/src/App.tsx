@@ -36,7 +36,7 @@ export function App() {
   const [tagSearchQuery, setTagSearchQuery] = useState<string>('');
   const tagsDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Marcadores guardados localmente y sincronizados
+  // Bookmarks stored locally and kept in sync
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('devblog_bookmarks');
@@ -46,11 +46,11 @@ export function App() {
     }
   });
 
-  // Idioma activo e i18n
+  // Active language and i18n
   const [currentLang, setCurrentLang] = useState<Language>('es');
   const t = translations[currentLang] || translations.es;
 
-  // Modales y autenticación de autor
+  // Modals and author authentication
   const [activeArticle, setActiveArticle] = useState<PostDetail | null>(null);
   const [isArticleOpen, setIsArticleOpen] = useState<boolean>(false);
   const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
@@ -59,7 +59,7 @@ export function App() {
   const [isBackupsModalOpen, setIsBackupsModalOpen] = useState<boolean>(false);
   const [editingPost, setEditingPost] = useState<Post | PostDetail | null>(null);
 
-  // Soporte directo para URL hash #/status y #/backups
+  // Direct support for #/status and #/backups URL hashes
   useEffect(() => {
     const handleHashChange = () => {
       if (window.location.hash === '#/status' || window.location.hash === '#status') {
@@ -74,7 +74,7 @@ export function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Cerrar el selector desplegable de tags al hacer clic fuera
+  // Close the tag dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (tagsDropdownRef.current && !tagsDropdownRef.current.contains(event.target as Node)) {
@@ -100,7 +100,7 @@ export function App() {
     }
   });
 
-  // Mantener actualizado el perfil y rol del usuario desde /auth/me
+  // Keep the user's profile and role in sync from /auth/me
   useEffect(() => {
     if (userToken) {
       fetchCurrentUser(userToken)
@@ -110,7 +110,7 @@ export function App() {
           localStorage.setItem('current_user', JSON.stringify(user));
         })
         .catch(() => {
-          // Token inválido o expirado
+          // Invalid or expired token
           handleLogout();
         });
     }
@@ -123,11 +123,11 @@ export function App() {
       setCurrentUser(updatedUser);
       localStorage.setItem('current_user', JSON.stringify(updatedUser));
     } catch (err: any) {
-      alert(err.message || 'Error al cambiar de rol');
+      alert(err.message || 'Failed to change role');
     }
   };
 
-  // Debounce para búsqueda en tiempo real
+  // Debounce live search
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -150,7 +150,7 @@ export function App() {
           fetchAllTags().catch(() => []),
         ]);
 
-        // Si la API devolvió vacíos pero tenemos en local, filtramos de todos los posts
+        // If the API returned nothing but we have local bookmarks, filter them from all posts
         if (bookmarkedPosts.length === 0 && bookmarkedIds.size > 0) {
           const allPosts = await fetchPosts(undefined, sortBy);
           const filtered = allPosts.filter((p) => bookmarkedIds.has(p.id));
@@ -172,7 +172,7 @@ export function App() {
         if (tagsData.length > 0) setTags(tagsData);
       }
     } catch (err) {
-      console.error('Error cargando datos de la API:', err);
+      console.error('Failed to load API data:', err);
     } finally {
       setIsLoading(false);
     }
@@ -184,7 +184,7 @@ export function App() {
       setActiveArticle(detail);
       setIsArticleOpen(true);
     } catch (err) {
-      console.error('Error abriendo artículo:', err);
+      console.error('Failed to open post:', err);
     }
   };
 
@@ -225,7 +225,7 @@ export function App() {
       await deletePost(postId, userToken);
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Error eliminando el artículo');
+      alert(err.message || 'Failed to delete post');
     }
   };
 
@@ -249,7 +249,7 @@ export function App() {
     loadData();
   };
 
-  // Permisos RBAC
+  // RBAC permissions
   const canCreatePost = currentUser?.role === 'ADMIN' || currentUser?.role === 'AUTHOR';
   const canEditPost = (post: Post | null | undefined): boolean => {
     if (!post || !currentUser) return false;
@@ -277,7 +277,7 @@ export function App() {
 
   const isFiltering = selectedTag !== undefined || Boolean(searchQuery);
 
-  // Agrupación y compactación de etiquetas para optimizar espacio en pantalla
+  // Group and compact tags to save screen space
   const PRIMARY_TAG_LIMIT = 6;
   const primaryTags = tags.slice(0, PRIMARY_TAG_LIMIT);
   const remainingTags = tags.slice(PRIMARY_TAG_LIMIT);
@@ -292,7 +292,7 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-300">
-      {/* Barra de Testing de Roles (solo con VITE_ENABLE_ROLE_TESTING=true y ALLOW_ROLE_SELF_SWITCH=True en backend) */}
+      {/* Role testing bar (only with VITE_ENABLE_ROLE_TESTING=true and ALLOW_ROLE_SELF_SWITCH=True on the backend) */}
       {ROLE_TESTING_ENABLED && (
       <div className="bg-[#0f1422] border-b border-purple-500/30 px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs font-mono shadow-md z-30">
         <div className="flex items-center gap-2">
@@ -301,15 +301,15 @@ export function App() {
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
           </span>
           <span className="text-purple-300 font-extrabold tracking-wide uppercase">
-            🧪 Selector de Roles (Testing):
+            🧪 Role Switcher (Testing):
           </span>
           {currentUser ? (
             <span className="text-slate-300 hidden sm:inline">
-              Usuario: <strong className="text-cyan-300">{currentUser.email}</strong>
+              User: <strong className="text-cyan-300">{currentUser.email}</strong>
             </span>
           ) : (
             <span className="text-amber-300 font-medium">
-              Sin sesión activa. Inicia sesión para probar roles:
+              No active session. Sign in to test roles:
             </span>
           )}
         </div>
@@ -317,7 +317,7 @@ export function App() {
         <div className="flex items-center gap-2">
           {currentUser ? (
             <>
-              <span className="text-slate-400 text-[11px] hidden md:inline">Conmutar rol:</span>
+              <span className="text-slate-400 text-[11px] hidden md:inline">Switch role:</span>
               <div className="inline-flex rounded-lg bg-[#07090e] p-0.5 border border-[#1e293b]">
                 <button
                   type="button"
@@ -327,7 +327,7 @@ export function App() {
                       ? 'bg-purple-600 text-white shadow-md shadow-purple-600/40 ring-1 ring-purple-400'
                       : 'text-slate-400 hover:text-white'
                   }`}
-                  title="Permisos totales de administrador"
+                  title="Full administrator permissions"
                 >
                   🛡️ ADMIN
                 </button>
@@ -339,7 +339,7 @@ export function App() {
                       ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/40 ring-1 ring-cyan-300'
                       : 'text-slate-400 hover:text-white'
                   }`}
-                  title="Permisos de autor: crear y editar artículos propios"
+                  title="Author permissions: create and edit own posts"
                 >
                   ✍️ AUTHOR
                 </button>
@@ -351,7 +351,7 @@ export function App() {
                       ? 'bg-slate-700 text-white shadow-md ring-1 ring-slate-500'
                       : 'text-slate-400 hover:text-white'
                   }`}
-                  title="Permisos de lector: solo lectura, upvotes y comentarios"
+                  title="Reader permissions: read, upvote and comment only"
                 >
                   👁️ READER
                 </button>
@@ -361,7 +361,7 @@ export function App() {
                 type="button"
                 onClick={() => setIsBackupsModalOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-purple-500/40 text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 text-xs font-bold transition-colors"
-                title="Abrir panel de administración y backups"
+                title="Open admin and backups panel"
               >
                 <span>⚙️ Panel Admin</span>
               </button>
@@ -372,7 +372,7 @@ export function App() {
               onClick={() => setIsLoginOpen(true)}
               className="flex items-center gap-1.5 px-3.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition-all shadow-md shadow-purple-600/30 active:scale-95"
             >
-              <span>Iniciar sesión</span>
+              <span>Sign in</span>
             </button>
           )}
         </div>
@@ -404,7 +404,7 @@ export function App() {
             if (!currentUser) {
               setIsLoginOpen(true);
             } else if (!canCreatePost) {
-              alert('Tu cuenta tiene rol de Lector (READER). Solo usuarios con rol AUTHOR o ADMIN pueden crear nuevos artículos.');
+              alert('Your account has the READER role. Only AUTHOR or ADMIN users can create new posts.');
             } else {
               setEditingPost(null);
               setIsNewPostOpen(true);
@@ -414,7 +414,7 @@ export function App() {
           t={t}
         />
 
-        {/* Barra de Filtros por Categoría, Tags y Ordenación */}
+        {/* Category, tag and sort filter bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-[#1e293b] pb-4">
           <div className="flex flex-wrap items-center gap-1.5">
             <button
@@ -428,7 +428,7 @@ export function App() {
               {t.allTopics}
             </button>
 
-            {/* Pestaña de Guardados */}
+            {/* Bookmarks tab */}
             <button
               onClick={() => setSelectedTag(selectedTag === '__bookmarks__' ? undefined : '__bookmarks__')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all border ${
@@ -441,7 +441,7 @@ export function App() {
               <span>{t.bookmarksTab} ({bookmarkedIds.size})</span>
             </button>
 
-            {/* Etiquetas Principales (Límite para ahorrar espacio en pantalla) */}
+            {/* Primary tags (capped to save screen space) */}
             {primaryTags.map((tag) => (
               <button
                 key={tag.id}
@@ -456,19 +456,19 @@ export function App() {
               </button>
             ))}
 
-            {/* Tag activo fijado si proviene de la lista desplegable */}
+            {/* Pinned active tag when picked from the dropdown */}
             {showPinnedSelectedTag && selectedTagObject && (
               <button
                 onClick={() => setSelectedTag(undefined)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all border border-cyan-400 text-cyan-300 bg-cyan-500/20 shadow-sm hover:bg-cyan-500/30"
-                title="Quitar filtro de etiqueta"
+                title="Remove tag filter"
               >
                 <span>#{selectedTagObject.name}</span>
                 <X className="w-3.5 h-3.5 text-cyan-400 hover:text-white" />
               </button>
             )}
 
-            {/* Selector desplegable compacto para el resto de etiquetas */}
+            {/* Compact dropdown for the remaining tags */}
             {remainingTags.length > 0 && (
               <div className="relative" ref={tagsDropdownRef}>
                 <button
@@ -479,10 +479,10 @@ export function App() {
                       ? 'border-cyan-400 text-cyan-300 bg-cyan-500/10'
                       : 'border-[#1e293b] text-slate-400 hover:text-white bg-[#0b0f19]'
                   }`}
-                  title="Ver más etiquetas disponibles"
+                  title="Show more tags"
                 >
                   <TagIcon className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>+{remainingTags.length} más</span>
+                  <span>+{remainingTags.length} more</span>
                   <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isTagsDropdownOpen ? 'rotate-180 text-cyan-400' : ''}`} />
                 </button>
 
@@ -492,7 +492,7 @@ export function App() {
                       <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
-                        placeholder="Buscar etiqueta..."
+                        placeholder="Search tags..."
                         value={tagSearchQuery}
                         onChange={(e) => setTagSearchQuery(e.target.value)}
                         className="w-full bg-[#070a12] border border-[#1e293b] rounded-lg pl-8 pr-7 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
@@ -512,7 +512,7 @@ export function App() {
                     <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
                       {filteredRemainingTags.length === 0 ? (
                         <div className="p-3 text-center text-xs text-slate-500 font-mono">
-                          No se encontraron tags
+                          No tags found
                         </div>
                       ) : (
                         filteredRemainingTags.map((tag) => (
@@ -532,7 +532,7 @@ export function App() {
                             <span className="truncate">#{tag.name}</span>
                             {selectedTag === tag.slug && (
                               <span className="text-[10px] bg-cyan-500 text-slate-950 font-bold px-1.5 py-0.5 rounded ml-2 shrink-0">
-                                Activo
+                                Active
                               </span>
                             )}
                           </button>
@@ -559,7 +559,7 @@ export function App() {
           </div>
         </div>
 
-        {/* Indicador de Filtro Activo con botón de Limpiar */}
+        {/* Active filter indicator with clear button */}
         {isFiltering && (
           <div className="flex items-center justify-between bg-[#0b0f19] border border-cyan-500/30 rounded-xl px-4 py-2.5 mb-6 text-xs font-mono">
             <div className="flex items-center gap-2 text-slate-300">
@@ -570,7 +570,7 @@ export function App() {
                   : selectedTag
                   ? `${t.activeTagFilter}: #${selectedTag}`
                   : ''}
-                {searchQuery ? ` • Búsqueda: "${searchQuery}"` : ''}
+                {searchQuery ? ` • Search: "${searchQuery}"` : ''}
               </span>
             </div>
             <button
@@ -583,7 +583,7 @@ export function App() {
           </div>
         )}
 
-        {/* Cuadrícula de Artículos */}
+        {/* Post grid */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[1, 2, 3, 4].map((i) => (
@@ -634,7 +634,7 @@ export function App() {
         <p>{t.footerText}</p>
       </footer>
 
-      {/* Modal Lector con Comentarios y Acciones */}
+      {/* Reader modal with comments and actions */}
       <ArticleModal
         post={activeArticle}
         isOpen={isArticleOpen}
@@ -650,7 +650,7 @@ export function App() {
         currentLang={currentLang}
       />
 
-      {/* Modal de Login / Registro de Usuario */}
+      {/* Login / sign-up modal */}
       <LoginModal
         isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
@@ -658,7 +658,7 @@ export function App() {
         t={t}
       />
 
-      {/* Modal de Crear / Editar Post */}
+      {/* Create / edit post modal */}
       <NewPostModal
         isOpen={isNewPostOpen}
         onClose={() => {
@@ -673,7 +673,7 @@ export function App() {
         defaultLang={currentLang}
       />
 
-      {/* Modal de Telemetría y Estado del Sistema Homelab (/status) */}
+      {/* Homelab telemetry and system status modal (/status) */}
       <SystemStatusModal
         isOpen={isStatusOpen}
         onClose={handleCloseStatus}
@@ -681,7 +681,7 @@ export function App() {
         t={t}
       />
 
-      {/* Modal de Backups de Base de Datos PostgreSQL y Selector de Roles */}
+      {/* PostgreSQL backups and roles modal */}
       <BackupsModal
         isOpen={isBackupsModalOpen}
         onClose={() => setIsBackupsModalOpen(false)}

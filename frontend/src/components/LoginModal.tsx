@@ -37,7 +37,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
         onClose();
       }
     } catch (err: any) {
-      setError(err.message || 'Error de conexión');
+      setError(err.message || 'Connection error');
     } finally {
       setIsLoading(false);
     }
@@ -47,12 +47,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="relative w-full max-w-md bg-[#0b0f19] border border-[#1e293b] rounded-2xl p-6 shadow-2xl overflow-hidden">
         
-        {/* Cabecera y Tabs */}
+        {/* Header and tabs */}
         <div className="flex items-center justify-between border-b border-[#1e293b] pb-4 mb-5">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-cyan-400" />
             <h3 className="font-bold text-white text-base">
-              {mode === 'login' ? (t?.loginTitle || 'Acceso Autor / Dashboard') : (t?.registerTitle || 'Crear Cuenta de Lector')}
+              {mode === 'login' ? (t?.loginTitle || 'Author Access / Dashboard') : (t?.registerTitle || 'Create Reader Account')}
             </h3>
           </div>
           <button
@@ -63,7 +63,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
           </button>
         </div>
 
-        {/* Selector de modo Login / Register */}
+        {/* Login / Register mode switch */}
         <div className="grid grid-cols-2 gap-1 bg-[#07090e] p-1 rounded-xl border border-[#1e293b] mb-5">
           <button
             type="button"
@@ -74,7 +74,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Iniciar Sesión
+            Sign In
           </button>
           <button
             type="button"
@@ -85,7 +85,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Registrarse
+            Sign Up
           </button>
         </div>
 
@@ -99,7 +99,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
           {mode === 'register' && (
             <div>
               <label className="block text-xs font-mono text-slate-400 mb-1.5">
-                {t?.fullNameLabel || 'Nombre Completo'}
+                {t?.fullNameLabel || 'Full Name'}
               </label>
               <div className="relative">
                 <UserIcon className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -116,7 +116,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
           )}
 
           <div>
-            <label className="block text-xs font-mono text-slate-400 mb-1.5">Correo Electrónico</label>
+            <label className="block text-xs font-mono text-slate-400 mb-1.5">Email</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -131,7 +131,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
           </div>
 
           <div>
-            <label className="block text-xs font-mono text-slate-400 mb-1.5">Contraseña</label>
+            <label className="block text-xs font-mono text-slate-400 mb-1.5">Password</label>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -151,8 +151,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
             className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition-colors shadow-lg shadow-cyan-500/20 disabled:opacity-50"
           >
             {isLoading
-              ? mode === 'register' ? (t?.creatingAccount || 'Creando cuenta...') : 'Iniciando sesión...'
-              : mode === 'register' ? (t?.createAccountBtn || 'Registrar Cuenta') : 'Ingresar'}
+              ? mode === 'register' ? (t?.creatingAccount || 'Creating account...') : 'Signing in...'
+              : mode === 'register' ? (t?.createAccountBtn || 'Create Account') : 'Sign In'}
           </button>
         </form>
 

@@ -25,7 +25,7 @@ export async function sendClientLog(payload: ErrorLogPayload): Promise<void> {
       body: JSON.stringify(enrichedPayload),
     }).catch(() => {});
   } catch (e) {
-    console.error('Error al enviar log al servidor:', e);
+    console.error('Failed to send log to server:', e);
   }
 }
 

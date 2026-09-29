@@ -146,7 +146,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setSelectedTagIds((prev) => [...prev, newTag.id]);
       setTagSearchQuery('');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error creando la categoría';
+      const message = err instanceof Error ? err.message : 'Failed to create category';
       setErrorMsg(message);
     } finally {
       setIsCreatingTag(false);
@@ -155,11 +155,11 @@ export const NewPostModal: FC<NewPostModalProps> = ({
 
   const handleAiSuggestTags = async () => {
     if (!token) {
-      setErrorMsg('Debes iniciar sesión para usar el asistente de IA');
+      setErrorMsg('You must sign in to use the AI assistant');
       return;
     }
     if (!title.trim() && !summary.trim() && !contentMarkdown.trim()) {
-      setErrorMsg('Escribe al menos el título o resumen para sugerir categorías con IA');
+      setErrorMsg('Enter at least a title or summary to get AI category suggestions');
       return;
     }
 
@@ -174,7 +174,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       );
       setAiTagSuggestions(suggestions);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al sugerir categorías con IA';
+      const message = err instanceof Error ? err.message : 'AI category suggestion failed';
       setErrorMsg(message);
     } finally {
       setIsSuggestingTags(false);
@@ -223,7 +223,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       const url = await uploadImage(file, token);
       setCoverImageUrl(url);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error subiendo la imagen';
+      const message = err instanceof Error ? err.message : 'Failed to upload image';
       setErrorMsg(message);
     } finally {
       setIsUploading(false);
@@ -232,11 +232,11 @@ export const NewPostModal: FC<NewPostModalProps> = ({
 
   const handleAiTranslate = async (targetLang: Language) => {
     if (!token) {
-      setErrorMsg('Debes iniciar sesión para usar el traductor con IA');
+      setErrorMsg('You must sign in to use the AI translator');
       return;
     }
     if (!title.trim() && !summary.trim() && !contentMarkdown.trim()) {
-      setErrorMsg('Escribe al menos el título o contenido para traducir');
+      setErrorMsg('Enter at least a title or content to translate');
       return;
     }
 
@@ -248,7 +248,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
     try {
       const res = await translatePostWithAi(
         {
-          title: title || 'Sin título',
+          title: title || 'Untitled',
           summary: summary || '',
           content_markdown: contentMarkdown || '',
           target_lang: targetLang,
@@ -264,7 +264,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setAiSuccessMsg(`${t.aiTranslateSuccess} (${res.provider})`);
       setTimeout(() => setAiSuccessMsg(null), 6000);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al traducir con IA';
+      const message = err instanceof Error ? err.message : 'AI translation failed';
       setErrorMsg(message);
     } finally {
       setIsTranslating(false);
@@ -274,12 +274,12 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) {
-      setErrorMsg('Debes iniciar sesión para publicar o editar un artículo');
+      setErrorMsg('You must sign in to publish or edit a post');
       return;
     }
 
     if (!title.trim() || !summary.trim()) {
-      setErrorMsg('Por favor completa el título y el resumen.');
+      setErrorMsg('Please fill in the title and summary.');
       return;
     }
 
@@ -317,7 +317,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       onPostCreated();
       onClose();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al guardar el artículo';
+      const message = err instanceof Error ? err.message : 'Failed to save post';
       setErrorMsg(message);
     } finally {
       setIsSubmitting(false);
@@ -365,7 +365,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             </div>
           )}
 
-          {/* BARRA 1-CLIC AI TRANSLATOR CON GEMINI */}
+          {/* ONE-CLICK GEMINI AI TRANSLATOR BAR */}
           <div className="p-3 bg-gradient-to-r from-cyan-950/40 via-[#0f1422] to-blue-950/30 border border-cyan-500/25 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-lg shadow-cyan-950/20">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping inline-block" />
@@ -373,7 +373,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                 Gemini AI Translator
               </span>
               <span className="text-[11px] font-mono text-slate-400 hidden sm:inline">
-                • Preserva código y markdown
+                • Preserves code and markdown
               </span>
             </div>
 
@@ -506,7 +506,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                   src={coverImageUrl}
                   alt="Preview"
                   className="w-full h-full object-cover"
-                  onError={() => setErrorMsg('La URL de imagen no es accesible')}
+                  onError={() => setErrorMsg('The image URL is not reachable')}
                 />
                 <div className="absolute top-2 right-2 bg-black/70 px-2 py-0.5 rounded text-[10px] font-mono text-cyan-300 flex items-center gap-1">
                   <ImageIcon className="w-3 h-3" />
@@ -536,7 +536,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                 onClick={handleAiSuggestTags}
                 disabled={isSuggestingTags}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/30 hover:border-cyan-400/50 text-[11px] font-mono text-cyan-300 hover:text-white transition-all disabled:opacity-50"
-                title="Analiza el post con Gemini AI y sugiere categorías relevantes"
+                title="Analyze the post with Gemini AI and suggest relevant categories"
               >
                 <Sparkles className={`w-3.5 h-3.5 text-purple-400 ${isSuggestingTags ? 'animate-spin' : ''}`} />
                 <span>{isSuggestingTags ? t.suggestingTagsAi : t.suggestTagsAiBtn}</span>
@@ -560,7 +560,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                         type="button"
                         onClick={() => handleRemoveTag(tagObj.id)}
                         className="text-slate-400 hover:text-red-400 transition-colors p-0.5 rounded"
-                        title="Remover categoría"
+                        title="Remove category"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -614,7 +614,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                     className="absolute right-1.5 px-2 py-1 rounded-lg bg-cyan-950 border border-cyan-800 text-[10px] font-mono text-cyan-300 hover:bg-cyan-900 transition-colors flex items-center gap-1"
                   >
                     <Plus className="w-3 h-3" />
-                    <span>{isCreatingTag ? '...' : 'Crear'}</span>
+                    <span>{isCreatingTag ? '...' : 'Create'}</span>
                   </button>
                 )}
               </div>
@@ -667,7 +667,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
 
                   {filteredTags.length === 0 && !tagSearchQuery.trim() && (
                     <div className="p-2 text-center text-xs text-slate-500 font-mono">
-                      Todas las categorías ya han sido agregadas.
+                      All categories have already been added.
                     </div>
                   )}
                 </div>
@@ -723,7 +723,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
               </span>
             </div>
 
-            {/* Barra de formato estilo Word con pestañas Escribir y Vista Previa */}
+            {/* Word-style formatting bar with Write and Preview tabs */}
             <MarkdownToolbar
               textareaRef={markdownTextareaRef}
               value={contentMarkdown}
@@ -733,7 +733,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
               t={t}
             />
 
-            {/* Área de edición o previsualización en vivo */}
+            {/* Editor or live preview area */}
             {editorTab === 'write' ? (
               <textarea
                 ref={markdownTextareaRef}

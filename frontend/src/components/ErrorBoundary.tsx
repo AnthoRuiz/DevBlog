@@ -57,13 +57,13 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                  <span>Diagnóstico de Error en Ejecución</span>
+                  <span>Runtime Error Diagnostics</span>
                   <span className="text-[10px] px-2 py-0.5 rounded bg-red-500/20 text-red-300 font-normal">
-                    Reportado al Servidor
+                    Reported to Server
                   </span>
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Se ha capturado una excepción en la interfaz. El reporte ha sido enviado automáticamente a los logs del servidor.
+                  An exception was caught in the UI. A report has been sent automatically to the server logs.
                 </p>
               </div>
             </div>
@@ -84,10 +84,10 @@ export class ErrorBoundary extends Component<Props, State> {
               <button
                 onClick={this.handleClearStorage}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#121622] hover:bg-[#1a2030] border border-[#1e293b] text-xs text-slate-400 hover:text-white transition-colors"
-                title="Borra tokens y preferencias guardadas en localStorage"
+                title="Clears tokens and preferences stored in localStorage"
               >
                 <Trash2 className="w-3.5 h-3.5 text-slate-500" />
-                <span>Limpiar Caché y Reiniciar</span>
+                <span>Clear Cache and Restart</span>
               </button>
 
               <button
@@ -95,7 +95,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Recargar Aplicación</span>
+                <span>Reload App</span>
               </button>
             </div>
           </div>

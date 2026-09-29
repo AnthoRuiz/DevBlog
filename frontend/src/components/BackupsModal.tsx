@@ -43,19 +43,19 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'roles' | 'backups'>('roles');
   
-  // Estado de Backups
+  // Backups state
   const [data, setData] = useState<BackupsResponse | null>(null);
   const [isLoadingBackups, setIsLoadingBackups] = useState<boolean>(false);
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
 
-  // Estado de Usuarios y Roles
+  // Users and roles state
   const [usersList, setUsersList] = useState<User[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
   const [isUpdatingRole, setIsUpdatingRole] = useState<boolean>(false);
 
-  // Notificaciones
+  // Notifications
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const loadBackups = async () => {
@@ -65,7 +65,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
       const res = await fetchAdminBackups(token);
       setData(res);
     } catch (err: any) {
-      setMessage({ text: err?.message || 'Error al cargar lista de backups', type: 'error' });
+      setMessage({ text: err?.message || 'Failed to load backups', type: 'error' });
     } finally {
       setIsLoadingBackups(false);
     }
@@ -78,7 +78,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
       const res = await fetchUsers(token);
       setUsersList(res);
     } catch (err: any) {
-      // Si el rol ya no es admin, ignorar error silencioso de users
+      // If the role is no longer admin, silently ignore the users error
       console.warn(err);
     } finally {
       setIsLoadingUsers(false);
@@ -95,7 +95,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Acción: Cambiar mi propio rol para testing
+  // Action: change my own role for testing
   const handleSwitchMyRole = async (newRole: UserRole) => {
     if (!token || isUpdatingRole) return;
     setIsUpdatingRole(true);
@@ -104,19 +104,19 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
       const updatedUser = await updateMyRole(newRole, token);
       if (onRoleChanged) onRoleChanged(updatedUser);
       setMessage({
-        text: `¡Rol actualizado a [${newRole}]! Ahora estás probando los permisos de ${newRole}.`,
+        text: `Role updated to [${newRole}]! You are now testing ${newRole} permissions.`,
         type: 'success',
       });
-      // Recargar lista de usuarios
+      // Reload the user list
       await loadUsers();
     } catch (err: any) {
-      setMessage({ text: err?.message || 'Error al cambiar de rol', type: 'error' });
+      setMessage({ text: err?.message || 'Failed to change role', type: 'error' });
     } finally {
       setIsUpdatingRole(false);
     }
   };
 
-  // Acción: Cambiar rol de otro usuario
+  // Action: change another user's role
   const handleSwitchUserRole = async (userId: string, newRole: UserRole) => {
     if (!token || isUpdatingRole) return;
     setIsUpdatingRole(true);
@@ -128,17 +128,17 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
         onRoleChanged(updated);
       }
       setMessage({
-        text: `Rol de ${updated.email} cambiado a [${newRole}].`,
+        text: `Role of ${updated.email} changed to [${newRole}].`,
         type: 'success',
       });
     } catch (err: any) {
-      setMessage({ text: err?.message || 'Error al actualizar rol del usuario', type: 'error' });
+      setMessage({ text: err?.message || 'Failed to update user role', type: 'error' });
     } finally {
       setIsUpdatingRole(false);
     }
   };
 
-  // Acción: Crear backup
+  // Action: create backup
   const handleCreateBackup = async () => {
     if (!token || isCreating) return;
     setIsCreating(true);
@@ -146,42 +146,42 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
     try {
       const res = await createAdminBackup(token);
       setMessage({
-        text: `Backup generado con éxito: ${res.backup.filename} (${res.backup.size_display})`,
+        text: `Backup created: ${res.backup.filename} (${res.backup.size_display})`,
         type: 'success',
       });
       await loadBackups();
     } catch (err: any) {
-      setMessage({ text: err?.message || 'Error al generar el backup', type: 'error' });
+      setMessage({ text: err?.message || 'Failed to create backup', type: 'error' });
     } finally {
       setIsCreating(false);
     }
   };
 
-  // Acción: Descargar backup
+  // Action: download backup
   const handleDownload = async (filename: string) => {
     if (!token || downloadingFile) return;
     setDownloadingFile(filename);
     try {
       await downloadAdminBackup(filename, token);
     } catch (err: any) {
-      setMessage({ text: err?.message || 'Error al descargar archivo', type: 'error' });
+      setMessage({ text: err?.message || 'Failed to download file', type: 'error' });
     } finally {
       setDownloadingFile(null);
     }
   };
 
-  // Acción: Eliminar backup
+  // Action: delete backup
   const handleDeleteBackup = async (filename: string) => {
     if (!token || deletingFile) return;
-    if (!window.confirm(`¿Estás seguro de eliminar el backup ${filename}?`)) return;
+    if (!window.confirm(`Are you sure you want to delete backup ${filename}?`)) return;
 
     setDeletingFile(filename);
     try {
       await deleteAdminBackup(filename, token);
-      setMessage({ text: `Backup ${filename} eliminado`, type: 'success' });
+      setMessage({ text: `Backup ${filename} deleted`, type: 'success' });
       await loadBackups();
     } catch (err: any) {
-      setMessage({ text: err?.message || 'Error al eliminar backup', type: 'error' });
+      setMessage({ text: err?.message || 'Failed to delete backup', type: 'error' });
     } finally {
       setDeletingFile(null);
     }
@@ -202,24 +202,24 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
   const rolesConfig: { role: UserRole; label: string; desc: string; color: string; border: string; bg: string }[] = [
     {
       role: 'ADMIN',
-      label: 'Administrador (ADMIN)',
-      desc: 'Acceso total: crear/editar/eliminar cualquier post, backups de BD y cambiar roles.',
+      label: 'Administrator (ADMIN)',
+      desc: 'Full access: create/edit/delete any post, database backups and role changes.',
       color: 'text-purple-300',
       border: 'border-purple-500/40',
       bg: 'bg-purple-500/10',
     },
     {
       role: 'AUTHOR',
-      label: 'Autor (AUTHOR)',
-      desc: 'Creación de posts, traducciones con IA y edición exclusiva de posts propios.',
+      label: 'Author (AUTHOR)',
+      desc: 'Create posts, AI translations, and edit only their own posts.',
       color: 'text-cyan-300',
       border: 'border-cyan-500/40',
       bg: 'bg-cyan-500/10',
     },
     {
       role: 'READER',
-      label: 'Lector (READER)',
-      desc: 'Solo lectura, comentarios y upvotes. Bloqueado para publicar o editar.',
+      label: 'Reader (READER)',
+      desc: 'Read, comment and upvote only. Cannot publish or edit.',
       color: 'text-slate-300',
       border: 'border-slate-600',
       bg: 'bg-slate-800/40',
@@ -230,7 +230,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex justify-center items-center p-4 animate-fadeIn">
       <div className="relative w-full max-w-3xl bg-[#0b0f19] border border-[#1e293b] rounded-2xl shadow-2xl overflow-hidden font-sans">
         
-        {/* Cabecera del Panel */}
+        {/* Panel header */}
         <div className="bg-[#121622] px-6 py-4 border-b border-[#1e293b] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400">
@@ -239,14 +239,14 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-white tracking-wide">
-                  Panel de Administración & Homelab
+                  Admin & Homelab Panel
                 </h3>
                 <span className="text-[10px] font-mono uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full font-bold">
                   ADMIN VIEW
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Selector de roles para testing de permisos y gestión de copias de seguridad
+                Role switcher for permission testing and backup management
               </p>
             </div>
           </div>
@@ -259,7 +259,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
           </button>
         </div>
 
-        {/* Pestañas de Navegación */}
+        {/* Navigation tabs */}
         <div className="flex border-b border-[#1e293b] bg-[#07090e] px-6">
           <button
             type="button"
@@ -271,7 +271,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Selector de Roles (Testing)</span>
+            <span>Roles (Testing)</span>
           </button>
 
           <button
@@ -288,7 +288,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
           </button>
         </div>
 
-        {/* Notificaciones */}
+        {/* Notifications */}
         {message && (
           <div
             className={`mx-6 mt-4 p-3 rounded-xl border flex items-center gap-2 text-xs font-mono ${
@@ -306,27 +306,27 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
           </div>
         )}
 
-        {/* CONTENIDO PESTAÑA: ROLES & PERMISOS */}
+        {/* TAB CONTENT: ROLES & PERMISSIONS */}
         {activeTab === 'roles' && (
           <div className="p-6 space-y-6">
-            {/* Selector de Mi Rol (solo en modo de pruebas) */}
+            {/* My role switcher (test mode only) */}
             {ROLE_TESTING_ENABLED && (
             <div className="p-4 rounded-xl bg-[#07090e] border border-[#1e293b] space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <UserCheck className="w-4 h-4 text-purple-400" />
                   <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                    Cambiar Mi Rol para Probar Permisos
+                    Switch My Role to Test Permissions
                   </span>
                 </div>
                 <span className="text-[11px] font-mono text-slate-400">
-                  Usuario actual: <strong className="text-cyan-300">{currentUser?.email}</strong>
+                  Current user: <strong className="text-cyan-300">{currentUser?.email}</strong>
                 </span>
               </div>
 
               <p className="text-xs text-slate-400">
-                Selecciona cualquier rol a continuación para transformar instantáneamente tu sesión y probar
-                cómo responde la interfaz, botones y endpoints:
+                Pick any role below to instantly switch your session and test
+                how the UI, buttons and endpoints respond:
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
@@ -350,7 +350,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                         </span>
                         {isCurrent && (
                           <span className="text-[9px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-1.5 py-0.5 rounded">
-                            ACTIVO
+                            ACTIVE
                           </span>
                         )}
                       </div>
@@ -364,12 +364,12 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
             </div>
             )}
 
-            {/* Lista de Usuarios Registrados y sus Roles */}
+            {/* Registered users and their roles */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-2">
                   <Users className="w-4 h-4 text-cyan-400" />
-                  Usuarios Registrados en el Sistema
+                  Registered Users
                 </span>
                 <button
                   type="button"
@@ -378,13 +378,13 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                   className="flex items-center gap-1 text-[11px] font-mono text-slate-400 hover:text-white"
                 >
                   <RefreshCw className={`w-3 h-3 ${isLoadingUsers ? 'animate-spin' : ''}`} />
-                  <span>Actualizar lista</span>
+                  <span>Refresh list</span>
                 </button>
               </div>
 
               {usersList.length === 0 ? (
                 <div className="p-6 text-center text-slate-500 font-mono text-xs border border-dashed border-[#1e293b] rounded-xl">
-                  {isLoadingUsers ? 'Cargando usuarios...' : 'No hay otros usuarios registrados.'}
+                  {isLoadingUsers ? 'Loading users...' : 'No other registered users.'}
                 </div>
               ) : (
                 <div className="border border-[#1e293b] rounded-xl bg-[#07090e] overflow-hidden divide-y divide-[#1e293b]">
@@ -403,7 +403,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                           </span>
                           {currentUser?.id === u.id && (
                             <span className="text-[9px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/40 px-1 rounded">
-                              TÚ
+                              YOU
                             </span>
                           )}
                         </div>
@@ -412,9 +412,9 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Selector de Rol por Usuario */}
+                      {/* Per-user role selector */}
                       <div className="flex items-center gap-2 self-end sm:self-auto">
-                        <span className="text-[11px] font-mono text-slate-400">Rol:</span>
+                        <span className="text-[11px] font-mono text-slate-400">Role:</span>
                         <select
                           value={u.role}
                           disabled={isUpdatingRole}
@@ -440,22 +440,22 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
           </div>
         )}
 
-        {/* CONTENIDO PESTAÑA: BACKUPS POSTGRESQL */}
+        {/* TAB CONTENT: POSTGRESQL BACKUPS */}
         {activeTab === 'backups' && (
           <div className="p-6 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="p-3.5 rounded-xl bg-[#07090e] border border-[#1e293b] flex items-center gap-3">
                 <ShieldCheck className="w-6 h-6 text-emerald-400 flex-shrink-0" />
                 <div>
-                  <span className="text-[10px] uppercase font-mono text-slate-500 block">Política de Retención</span>
-                  <span className="text-xs font-bold text-slate-200">Últimos 7 días (rotación diaria)</span>
+                  <span className="text-[10px] uppercase font-mono text-slate-500 block">Retention Policy</span>
+                  <span className="text-xs font-bold text-slate-200">Last 7 days (daily rotation)</span>
                 </div>
               </div>
 
               <div className="p-3.5 rounded-xl bg-[#07090e] border border-[#1e293b] flex items-center gap-3">
                 <HardDrive className="w-6 h-6 text-cyan-400 flex-shrink-0" />
                 <div>
-                  <span className="text-[10px] uppercase font-mono text-slate-500 block">Formato de Archivo</span>
+                  <span className="text-[10px] uppercase font-mono text-slate-500 block">File Format</span>
                   <span className="text-xs font-bold text-slate-200">GZIP (.sql.gz) streaming</span>
                 </div>
               </div>
@@ -463,16 +463,16 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
               <div className="p-3.5 rounded-xl bg-[#07090e] border border-[#1e293b] flex items-center gap-3">
                 <Database className="w-6 h-6 text-purple-400 flex-shrink-0" />
                 <div>
-                  <span className="text-[10px] uppercase font-mono text-slate-500 block">Motor de BD</span>
+                  <span className="text-[10px] uppercase font-mono text-slate-500 block">Database Engine</span>
                   <span className="text-xs font-bold text-slate-200">PostgreSQL 16 (devblog)</span>
                 </div>
               </div>
             </div>
 
-            {/* Barra de Acciones */}
+            {/* Action bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#1e293b]">
               <div className="text-xs font-mono text-slate-400 flex items-center gap-2">
-                <span>Backups disponibles:</span>
+                <span>Available backups:</span>
                 <span className="font-bold text-white bg-slate-800 px-2 py-0.5 rounded">
                   {data?.total_backups ?? 0}
                 </span>
@@ -486,7 +486,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#07090e] hover:bg-[#121622] border border-[#1e293b] text-slate-300 hover:text-white text-xs font-mono transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBackups ? 'animate-spin text-cyan-400' : ''}`} />
-                  <span>Refrescar</span>
+                  <span>Refresh</span>
                 </button>
 
                 <button
@@ -498,27 +498,27 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                   {isCreating ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Ejecutando pg_dump...</span>
+                      <span>Running pg_dump...</span>
                     </>
                   ) : (
                     <>
                       <Plus className="w-3.5 h-3.5" />
-                      <span>Crear Backup Ahora</span>
+                      <span>Create Backup Now</span>
                     </>
                   )}
                 </button>
               </div>
             </div>
 
-            {/* Lista de Backups */}
+            {/* Backup list */}
             <div className="space-y-2">
               {isLoadingBackups && !data ? (
                 <div className="p-8 text-center text-slate-500 font-mono text-xs">
-                  Cargando historial de backups...
+                  Loading backup history...
                 </div>
               ) : !data?.backups || data.backups.length === 0 ? (
                 <div className="p-8 text-center rounded-xl border border-dashed border-[#1e293b] text-slate-500 font-mono text-xs">
-                  No hay backups generados todavía. Haz clic en "Crear Backup Ahora".
+                  No backups yet. Click "Create Backup Now".
                 </div>
               ) : (
                 <div className="divide-y divide-[#1e293b] border border-[#1e293b] rounded-xl bg-[#07090e] overflow-hidden">
@@ -547,10 +547,10 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                           onClick={() => handleDownload(b.filename)}
                           disabled={downloadingFile === b.filename}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-mono font-bold transition-colors disabled:opacity-50"
-                          title="Descargar dump comprimido"
+                          title="Download compressed dump"
                         >
                           <Download className="w-3.5 h-3.5" />
-                          <span>{downloadingFile === b.filename ? 'Descargando...' : 'Descargar'}</span>
+                          <span>{downloadingFile === b.filename ? 'Downloading...' : 'Download'}</span>
                         </button>
 
                         <button
@@ -558,7 +558,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                           onClick={() => handleDeleteBackup(b.filename)}
                           disabled={deletingFile === b.filename}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors disabled:opacity-50"
-                          title="Eliminar este archivo de backup"
+                          title="Delete this backup file"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -579,7 +579,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
             onClick={onClose}
             className="text-slate-400 hover:text-white transition-colors"
           >
-            Cerrar
+            Close
           </button>
         </div>
 

@@ -51,7 +51,7 @@ export const Navbar: FC<NavbarProps> = ({
                 type="button"
                 onClick={onOpenStatus}
                 className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 hover:border-emerald-400 text-emerald-400 font-medium transition-all flex items-center gap-1 cursor-pointer"
-                title="Ver estado de hardware y latencias (/status)"
+                title="View hardware status and latencies (/status)"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span>{t.liveNode}</span>
@@ -63,7 +63,7 @@ export const Navbar: FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Buscador Central */}
+        {/* Central search */}
         <div className="flex-1 max-w-md hidden sm:block">
           <div className="relative">
             <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -79,7 +79,7 @@ export const Navbar: FC<NavbarProps> = ({
                 type="button"
                 onClick={() => onSearch('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                title="Limpiar búsqueda"
+                title="Clear search"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -87,39 +87,39 @@ export const Navbar: FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Botones de Acción */}
+        {/* Action buttons */}
         <div className="flex items-center gap-2.5">
-          {/* Botón de Acceso Rápido a Estado del Servidor */}
+          {/* Quick access to server status */}
           <button
             type="button"
             onClick={onOpenStatus}
             className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#0b0f19] hover:bg-[#121622] border border-[#1e293b] hover:border-cyan-500/40 text-xs font-mono text-cyan-400 transition-colors"
-            title="Ver latencias del sistema y telemetría (/status)"
+            title="View system latencies and telemetry (/status)"
           >
             <Activity className="w-3.5 h-3.5 text-cyan-400" />
             <span>/status</span>
           </button>
 
-          {/* Botón de Panel Admin */}
+          {/* Admin panel button */}
           {currentUser?.role === 'ADMIN' && onOpenBackups && (
             <button
               type="button"
               onClick={onOpenBackups}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 hover:border-purple-500/50 text-xs font-mono text-purple-300 transition-colors"
-              title="Abrir Panel de Administración y Roles"
+              title="Open admin and roles panel"
             >
               <Database className="w-3.5 h-3.5 text-purple-400" />
               <span>Panel Admin</span>
             </button>
           )}
 
-          {/* Selector de Idioma */}
+          {/* Language selector */}
           <div className="relative flex items-center bg-[#0b0f19] border border-[#1e293b] rounded-xl px-2 py-1 text-xs">
             <Globe className="w-3.5 h-3.5 text-cyan-400 mr-1.5" />
             <select
               value={currentLang}
               onChange={(e) => onSelectLanguage(e.target.value as Language)}
-              aria-label="Seleccionar idioma"
+              aria-label="Select language"
               className="bg-transparent text-slate-200 text-xs font-mono font-bold focus:outline-none cursor-pointer pr-1"
             >
               {supportedLangs.map((lang) => (
@@ -130,7 +130,7 @@ export const Navbar: FC<NavbarProps> = ({
             </select>
           </div>
 
-          {/* Botón de Acceso / Sesión Autor */}
+          {/* Sign-in / author session */}
           {userEmail ? (
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 text-xs font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2.5 py-1 rounded-lg">
@@ -139,8 +139,8 @@ export const Navbar: FC<NavbarProps> = ({
                   <select
                     value={currentUser.role}
                     onChange={(e) => onSwitchRole(e.target.value as UserRole)}
-                    aria-label="Cambiar rol para pruebas"
-                    title="Selector de rol para pruebas en homelab"
+                    aria-label="Change role for testing"
+                    title="Role switcher for local testing"
                     className={`text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded border uppercase cursor-pointer focus:outline-none transition-colors ${
                       currentUser.role === 'ADMIN'
                         ? 'bg-[#0f1422] text-purple-300 border-purple-500/50 shadow-sm shadow-purple-500/10'
@@ -190,7 +190,7 @@ export const Navbar: FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Buscador Móvil */}
+      {/* Mobile search */}
       <div className="sm:hidden px-4 pb-3">
         <div className="relative">
           <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />

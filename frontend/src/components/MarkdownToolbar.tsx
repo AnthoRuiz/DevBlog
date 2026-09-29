@@ -38,7 +38,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
 }) => {
   const [showGuide, setShowGuide] = useState(false);
 
-  // Helper para envolver texto seleccionado o insertar texto por defecto
+  // Wrap the selected text, or insert placeholder text
   const wrapSelection = (prefix: string, suffix: string, defaultText: string) => {
     const el = textareaRef.current;
     if (!el) return;
@@ -62,7 +62,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
     }, 10);
   };
 
-  // Helper para insertar prefijo de línea (títulos, listas, citas)
+  // Insert a line prefix (headings, lists, quotes)
   const insertLinePrefix = (prefix: string, defaultText: string) => {
     const el = textareaRef.current;
     if (!el) return;
@@ -98,7 +98,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
     }
   };
 
-  // Insertar bloque de código multilenguaje
+  // Insert a code block
   const insertCodeBlock = () => {
     const el = textareaRef.current;
     if (!el) return;
@@ -124,7 +124,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
     }, 10);
   };
 
-  // Insertar tabla técnica formateada
+  // Insert a formatted table
   const insertTable = () => {
     const el = textareaRef.current;
     if (!el) return;
@@ -134,7 +134,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
     const after = value.substring(start);
 
     const needsBreak = start > 0 && !before.endsWith('\n\n') ? (before.endsWith('\n') ? '\n' : '\n\n') : '';
-    const tableText = `${needsBreak}| Parámetro | Tipo | Descripción |\n| :--- | :--- | :--- |\n| host | string | Dirección IP o hostname del nodo |\n| port | int | Puerto de escucha (ej: 8000) |\n\n`;
+    const tableText = `${needsBreak}| Parameter | Type | Description |\n| :--- | :--- | :--- |\n| host | string | Node IP address or hostname |\n| port | int | Listening port (e.g. 8000) |\n\n`;
 
     const newValue = `${before}${tableText}${after}`;
     onChange(newValue);
@@ -145,7 +145,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
     }, 10);
   };
 
-  // Insertar hipervínculo
+  // Insert a link
   const insertLink = () => {
     const el = textareaRef.current;
     if (!el) return;
@@ -157,8 +157,9 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
     const before = value.substring(0, start);
     const after = value.substring(end);
 
-    const linkText = selected || 'Texto del enlace';
-    const linkSnippet = `[${linkText}](https://enlace-aqui.com)`;
+    const linkText = selected || 'Link text';
+    const linkUrl = 'https://example.com';
+    const linkSnippet = `[${linkText}](${linkUrl})`;
 
     const newValue = `${before}${linkSnippet}${after}`;
     onChange(newValue);
@@ -166,11 +167,11 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
     setTimeout(() => {
       el.focus();
       const urlStart = start + linkText.length + 3;
-      el.setSelectionRange(urlStart, urlStart + 22);
+      el.setSelectionRange(urlStart, urlStart + linkUrl.length);
     }, 10);
   };
 
-  // Insertar divisor horizontal
+  // Insert a horizontal rule
   const insertDivider = () => {
     const el = textareaRef.current;
     if (!el) return;
@@ -194,7 +195,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
   return (
     <div className="relative border border-[#1e293b] rounded-t-xl bg-[#0f1422] p-2 select-none">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {/* Selector de Pestañas: Escribir / Vista Previa */}
+        {/* Tabs: Write / Preview */}
         <div className="flex items-center bg-[#07090e] p-1 rounded-lg border border-[#1e293b]">
           <button
             type="button"
@@ -222,13 +223,13 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
           </button>
         </div>
 
-        {/* Botones de Formato estilo Word (Solo activos en modo Escribir) */}
+        {/* Word-style formatting buttons (Write mode only) */}
         {activeTab === 'write' && (
           <div className="flex flex-wrap items-center gap-1">
-            {/* Formato de texto */}
+            {/* Text formatting */}
             <button
               type="button"
-              onClick={() => wrapSelection('**', '**', 'texto en negrita')}
+              onClick={() => wrapSelection('**', '**', 'bold text')}
               className="p-1.5 rounded hover:bg-[#1a2336] text-slate-300 hover:text-cyan-300 transition-colors"
               title={t.toolbarBold}
             >
@@ -236,7 +237,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => wrapSelection('*', '*', 'texto en cursiva')}
+              onClick={() => wrapSelection('*', '*', 'italic text')}
               className="p-1.5 rounded hover:bg-[#1a2336] text-slate-300 hover:text-cyan-300 transition-colors"
               title={t.toolbarItalic}
             >
@@ -245,10 +246,10 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
 
             <span className="w-px h-4 bg-[#1e293b] mx-1" />
 
-            {/* Encabezados */}
+            {/* Headings */}
             <button
               type="button"
-              onClick={() => insertLinePrefix('##', 'Título de Sección')}
+              onClick={() => insertLinePrefix('##', 'Section Title')}
               className="p-1.5 rounded hover:bg-[#1a2336] text-slate-300 hover:text-cyan-300 transition-colors"
               title={t.toolbarHeading2}
             >
@@ -256,7 +257,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => insertLinePrefix('###', 'Subtítulo')}
+              onClick={() => insertLinePrefix('###', 'Subtitle')}
               className="p-1.5 rounded hover:bg-[#1a2336] text-slate-300 hover:text-cyan-300 transition-colors"
               title={t.toolbarHeading3}
             >
@@ -265,10 +266,10 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
 
             <span className="w-px h-4 bg-[#1e293b] mx-1" />
 
-            {/* Listas */}
+            {/* Lists */}
             <button
               type="button"
-              onClick={() => insertLinePrefix('-', 'Elemento de lista')}
+              onClick={() => insertLinePrefix('-', 'List item')}
               className="p-1.5 rounded hover:bg-[#1a2336] text-slate-300 hover:text-cyan-300 transition-colors"
               title={t.toolbarBulletList}
             >
@@ -276,7 +277,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => insertLinePrefix('1.', 'Paso numerado')}
+              onClick={() => insertLinePrefix('1.', 'Numbered step')}
               className="p-1.5 rounded hover:bg-[#1a2336] text-slate-300 hover:text-cyan-300 transition-colors"
               title={t.toolbarNumberedList}
             >
@@ -284,7 +285,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => insertLinePrefix('>', '💡 Nota o advertencia técnica...')}
+              onClick={() => insertLinePrefix('>', '💡 Technical note or warning...')}
               className="p-1.5 rounded hover:bg-[#1a2336] text-slate-300 hover:text-cyan-300 transition-colors"
               title={t.toolbarQuote}
             >
@@ -293,7 +294,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
 
             <span className="w-px h-4 bg-[#1e293b] mx-1" />
 
-            {/* Bloques técnicos */}
+            {/* Technical blocks */}
             <button
               type="button"
               onClick={insertCodeBlock}
@@ -304,7 +305,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => wrapSelection('`', '`', 'código')}
+              onClick={() => wrapSelection('`', '`', 'code')}
               className="p-1.5 rounded hover:bg-[#1a2336] text-slate-300 hover:text-cyan-300 transition-colors"
               title={t.toolbarInlineCode}
             >
@@ -337,7 +338,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
           </div>
         )}
 
-        {/* Botón de Ayuda Rápida */}
+        {/* Quick help button */}
         <button
           type="button"
           onClick={() => setShowGuide(!showGuide)}
@@ -353,7 +354,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
         </button>
       </div>
 
-      {/* Popover Educativo: Guía Rápida de Markdown */}
+      {/* Markdown quick guide popover */}
       {showGuide && (
         <div className="mt-2.5 p-3.5 bg-[#07090e] border border-cyan-500/30 rounded-xl text-xs font-mono text-slate-300 space-y-2.5 shadow-xl animate-fadeIn">
           <div className="flex items-center justify-between border-b border-[#1e293b] pb-1.5">
@@ -369,29 +370,29 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] leading-relaxed">
             <div className="bg-[#0b0f19] p-2 rounded-lg border border-[#1e293b]">
-              <span className="text-cyan-300 font-bold block mb-1">Encabezados y Secciones</span>
-              <p className="text-slate-400"><code>## Sección Principal</code></p>
-              <p className="text-slate-400"><code>### Subsección o Paso</code></p>
+              <span className="text-cyan-300 font-bold block mb-1">Headings & Sections</span>
+              <p className="text-slate-400"><code>## Main Section</code></p>
+              <p className="text-slate-400"><code>### Subsection or Step</code></p>
             </div>
 
             <div className="bg-[#0b0f19] p-2 rounded-lg border border-[#1e293b]">
-              <span className="text-cyan-300 font-bold block mb-1">Énfasis y Formato</span>
-              <p className="text-slate-400"><code>**Texto en negrita**</code></p>
-              <p className="text-slate-400"><code>*Texto en cursiva*</code></p>
+              <span className="text-cyan-300 font-bold block mb-1">Emphasis & Formatting</span>
+              <p className="text-slate-400"><code>**Bold text**</code></p>
+              <p className="text-slate-400"><code>*Italic text*</code></p>
             </div>
 
             <div className="bg-[#0b0f19] p-2 rounded-lg border border-[#1e293b]">
-              <span className="text-cyan-300 font-bold block mb-1">Bloques de Código</span>
+              <span className="text-cyan-300 font-bold block mb-1">Code Blocks</span>
               <p className="text-slate-400"><code>```python</code></p>
               <p className="text-slate-400"><code>print(&quot;Docker Homelab&quot;)</code></p>
               <p className="text-slate-400"><code>```</code></p>
             </div>
 
             <div className="bg-[#0b0f19] p-2 rounded-lg border border-[#1e293b]">
-              <span className="text-cyan-300 font-bold block mb-1">Citas, Listas y Enlaces</span>
-              <p className="text-slate-400"><code>&gt; Nota importante</code></p>
-              <p className="text-slate-400"><code>- Elemento de lista</code></p>
-              <p className="text-slate-400"><code>[Ver Docs](https://...)</code></p>
+              <span className="text-cyan-300 font-bold block mb-1">Quotes, Lists & Links</span>
+              <p className="text-slate-400"><code>&gt; Important note</code></p>
+              <p className="text-slate-400"><code>- List item</code></p>
+              <p className="text-slate-400"><code>[See Docs](https://...)</code></p>
             </div>
           </div>
         </div>
