@@ -19,7 +19,7 @@ import {
   deletePost,
   fetchCurrentUser,
   updateMyRole,
-  loginUser,
+  ROLE_TESTING_ENABLED,
 } from './services/api';
 import { Sparkles, ArrowUpDown, Bookmark, Filter, X, ChevronDown, Search, Tag as TagIcon } from 'lucide-react';
 import { Language, translations } from './i18n';
@@ -124,20 +124,6 @@ export function App() {
       localStorage.setItem('current_user', JSON.stringify(updatedUser));
     } catch (err: any) {
       alert(err.message || 'Error al cambiar de rol');
-    }
-  };
-
-  const handleQuickAdminLogin = async () => {
-    try {
-      const res = await loginUser('admin@devblog.io', 'admin123456');
-      localStorage.setItem('auth_token', res.access_token);
-      localStorage.setItem('user_email', res.user.email);
-      localStorage.setItem('current_user', JSON.stringify(res.user));
-      setUserToken(res.access_token);
-      setUserEmail(res.user.email);
-      setCurrentUser(res.user);
-    } catch {
-      setIsLoginOpen(true);
     }
   };
 
@@ -306,7 +292,8 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-300">
-      {/* Barra de Testing de Roles (Siempre visible en Homelab) */}
+      {/* Barra de Testing de Roles (solo con VITE_ENABLE_ROLE_TESTING=true y ALLOW_ROLE_SELF_SWITCH=True en backend) */}
+      {ROLE_TESTING_ENABLED && (
       <div className="bg-[#0f1422] border-b border-purple-500/30 px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs font-mono shadow-md z-30">
         <div className="flex items-center gap-2">
           <span className="flex h-2.5 w-2.5 relative">
@@ -322,7 +309,7 @@ export function App() {
             </span>
           ) : (
             <span className="text-amber-300 font-medium">
-              Sin sesión activa. Pulsa el botón para iniciar como Admin:
+              Sin sesión activa. Inicia sesión para probar roles:
             </span>
           )}
         </div>
@@ -382,14 +369,15 @@ export function App() {
           ) : (
             <button
               type="button"
-              onClick={handleQuickAdminLogin}
+              onClick={() => setIsLoginOpen(true)}
               className="flex items-center gap-1.5 px-3.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition-all shadow-md shadow-purple-600/30 active:scale-95"
             >
-              <span>⚡ Iniciar como Admin de Prueba (1-clic)</span>
+              <span>Iniciar sesión</span>
             </button>
           )}
         </div>
       </div>
+      )}
 
       <Navbar
         onSearch={setSearchQuery}
@@ -398,7 +386,7 @@ export function App() {
         onLogout={handleLogout}
         onOpenStatus={handleOpenStatus}
         onOpenBackups={() => setIsBackupsModalOpen(true)}
-        onSwitchRole={handleSwitchRole}
+        onSwitchRole={ROLE_TESTING_ENABLED ? handleSwitchRole : undefined}
         userEmail={userEmail}
         currentUser={currentUser}
         serverNode={stats?.server_node}

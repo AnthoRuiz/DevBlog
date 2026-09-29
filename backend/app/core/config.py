@@ -15,7 +15,11 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "devblog_insecure_default_secret_key_change_in_production_2026"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440 # 24 horas
-    
+
+    # Selector de rol para pruebas (PUT /auth/me/role). Nunca activar en un despliegue público:
+    # permite que cualquier usuario autenticado se asigne el rol ADMIN.
+    ALLOW_ROLE_SELF_SWITCH: bool = False
+
     # OAuth
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None

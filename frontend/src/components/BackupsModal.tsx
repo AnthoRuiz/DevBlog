@@ -23,6 +23,7 @@ import {
   updateMyRole,
   fetchUsers,
   updateUserRole,
+  ROLE_TESTING_ENABLED,
 } from '../services/api';
 
 interface BackupsModalProps {
@@ -308,7 +309,8 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
         {/* CONTENIDO PESTAÑA: ROLES & PERMISOS */}
         {activeTab === 'roles' && (
           <div className="p-6 space-y-6">
-            {/* Selector de Mi Rol */}
+            {/* Selector de Mi Rol (solo en modo de pruebas) */}
+            {ROLE_TESTING_ENABLED && (
             <div className="p-4 rounded-xl bg-[#07090e] border border-[#1e293b] space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -360,6 +362,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                 })}
               </div>
             </div>
+            )}
 
             {/* Lista de Usuarios Registrados y sus Roles */}
             <div className="space-y-3">

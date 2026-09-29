@@ -2,6 +2,9 @@ import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemS
 
 const API_BASE = '/api/v1';
 
+// Selector de roles para pruebas locales. Requiere también ALLOW_ROLE_SELF_SWITCH=True en el backend.
+export const ROLE_TESTING_ENABLED = import.meta.env.VITE_ENABLE_ROLE_TESTING === 'true';
+
 export async function fetchStreakStats(): Promise<StreakStats> {
   const res = await fetch(`${API_BASE}/stats/streak`);
   if (!res.ok) throw new Error('Error al obtener estadísticas de racha');

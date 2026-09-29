@@ -11,6 +11,7 @@ from app.schemas.user import UserCreate, UserRead, Token, LoginRequest, OAuthLog
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.api.deps import get_current_user, get_current_admin
 from app.core.limiter import limiter
+from app.core.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
 
@@ -155,7 +156,13 @@ async def update_my_role_for_testing(
     """
     Selector de rol para pruebas rápidas de permisos en homelab:
     Permite alternar el rol del usuario autenticado entre ADMIN, AUTHOR y READER.
+    Deshabilitado salvo que ALLOW_ROLE_SELF_SWITCH=True (solo entornos locales de prueba).
     """
+    if not settings.ALLOW_ROLE_SELF_SWITCH:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El cambio de rol propio está deshabilitado. Un ADMIN debe asignar los roles."
+        )
     current_user.role = role_in.role
     await db.commit()
     await db.refresh(current_user)
