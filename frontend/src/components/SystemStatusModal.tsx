@@ -23,10 +23,11 @@ import { fetchSystemStatus } from '../services/api';
 interface SystemStatusModalProps {
   isOpen: boolean;
   onClose: () => void;
+  token?: string | null;
   t: Translations;
 }
 
-export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose, t }) => {
+export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose, token, t }) => {
   const [data, setData] = useState<SystemStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -36,9 +37,13 @@ export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose,
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   const loadStatus = async (isManual = false) => {
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
     if (isManual) setIsRefreshing(true);
     try {
-      const res = await fetchSystemStatus();
+      const res = await fetchSystemStatus(token);
       setData(res);
       setLastUpdated(new Date());
     } catch (err) {
@@ -61,7 +66,7 @@ export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose,
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [isOpen, autoRefresh]);
+  }, [isOpen, autoRefresh, token]);
 
   if (!isOpen) return null;
 
@@ -153,6 +158,10 @@ export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose,
             <div className="py-16 text-center text-slate-500 font-mono text-xs flex flex-col items-center gap-2">
               <RefreshCw className="w-5 h-5 animate-spin text-cyan-400" />
               <span>Conectando con la telemetría del Homelab...</span>
+            </div>
+          ) : !data ? (
+            <div className="py-16 text-center text-slate-500 font-mono text-xs">
+              La telemetría detallada del sistema solo está disponible para administradores.
             </div>
           ) : (
             <>

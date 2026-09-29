@@ -9,6 +9,8 @@ from sqlalchemy import select, func, text
 
 from app.db.session import get_db
 from app.models.post import Post
+from app.models.user import User
+from app.api.deps import get_current_admin
 from app.core.config import settings
 from app.schemas.stats import (
     StreakStats,
@@ -103,12 +105,15 @@ def get_hardware_telemetry() -> HardwareTelemetry:
     )
 
 @router.get("/telemetry", response_model=HardwareTelemetry)
-async def get_live_telemetry():
-    """Devuelve métricas reales de hardware en vivo (CPU %, RAM, Temperatura, Uptime)."""
+async def get_live_telemetry(current_admin: User = Depends(get_current_admin)):
+    """Devuelve métricas reales de hardware en vivo (CPU %, RAM, Temperatura, Uptime). Solo ADMIN."""
     return get_hardware_telemetry()
 
 @router.get("/status", response_model=SystemStatusResponse)
-async def get_system_status(db: AsyncSession = Depends(get_db)):
+async def get_system_status(
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
     """Devuelve el estado de salud y las latencias internas exactas de cada componente (PostgreSQL, FastAPI, Nginx, Gemini)."""
     t_start = time.perf_counter()
 
@@ -186,8 +191,8 @@ async def get_author_streak(db: AsyncSession = Depends(get_db)):
 
     # Racha estimada de escritura en días
     streak_days = max(14, total_articles * 2)
-    telemetry = get_hardware_telemetry()
 
+    # Endpoint público: la telemetría de hardware solo se sirve a ADMIN vía /stats/telemetry
     return StreakStats(
         current_streak_days=streak_days,
         total_articles_published=total_articles,
@@ -195,7 +200,6 @@ async def get_author_streak(db: AsyncSession = Depends(get_db)):
         total_upvotes=int(upvotes),
         homelab_uptime_percent=99.98,
         server_node="Homelab Docker (Ubuntu 22.04 LTS)",
-        telemetry=telemetry
     )
 
 @router.get("/system", response_model=SystemStats)

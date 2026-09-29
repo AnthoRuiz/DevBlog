@@ -11,16 +11,28 @@ export async function fetchStreakStats(): Promise<StreakStats> {
   return res.json();
 }
 
-export async function fetchLiveTelemetry(): Promise<HardwareTelemetry> {
-  const res = await fetch(`${API_BASE}/stats/telemetry`);
+// Solo ADMIN
+export async function fetchLiveTelemetry(token: string): Promise<HardwareTelemetry> {
+  const res = await fetch(`${API_BASE}/stats/telemetry`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
   if (!res.ok) throw new Error('Error al obtener telemetría de hardware');
   return res.json();
 }
 
-export async function fetchSystemStatus(): Promise<SystemStatusResponse> {
-  const res = await fetch(`${API_BASE}/stats/status`);
+// Solo ADMIN
+export async function fetchSystemStatus(token: string): Promise<SystemStatusResponse> {
+  const res = await fetch(`${API_BASE}/stats/status`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
   if (!res.ok) throw new Error('Error al obtener estado del sistema');
   return res.json();
+}
+
+// Ping público de disponibilidad (sin métricas de hardware)
+export async function pingSystemHealth(): Promise<void> {
+  const res = await fetch(`${API_BASE}/stats/system`);
+  if (!res.ok) throw new Error('Servidor no disponible');
 }
 
 export async function fetchPosts(tag?: string, sort: string = 'recent', query?: string): Promise<Post[]> {

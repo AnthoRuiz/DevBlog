@@ -2,47 +2,45 @@ import { FC, useState, useEffect } from 'react';
 import { Flame, Cpu, Clock, Activity, Plus } from 'lucide-react';
 import { StreakStats, HardwareTelemetry } from '../types';
 import { Translations } from '../i18n';
-import { fetchLiveTelemetry } from '../services/api';
+import { fetchLiveTelemetry, pingSystemHealth } from '../services/api';
 
 interface StreakHeaderProps {
   stats: StreakStats | null;
   onNewPost: () => void;
   onOpenStatus?: () => void;
   isAdmin?: boolean;
+  token?: string | null;
   t: Translations;
 }
 
-export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenStatus, isAdmin = false, t }) => {
+export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenStatus, isAdmin = false, token, t }) => {
   const streak = stats?.current_streak_days ?? 14;
 
-  const [telemetry, setTelemetry] = useState<HardwareTelemetry | null>(stats?.telemetry || null);
+  const [telemetry, setTelemetry] = useState<HardwareTelemetry | null>(null);
   const [isDown, setIsDown] = useState<boolean>(false);
 
   useEffect(() => {
-    if (stats?.telemetry && !telemetry) {
-      setTelemetry(stats.telemetry);
-    }
-  }, [stats]);
+    // La telemetría de hardware es solo para ADMIN; el resto solo comprueba disponibilidad
+    const canSeeTelemetry = isAdmin && Boolean(token);
+    if (!canSeeTelemetry) setTelemetry(null);
 
-  useEffect(() => {
     const update = async () => {
       try {
-        const live = await fetchLiveTelemetry();
-        setTelemetry(live);
+        if (canSeeTelemetry) {
+          setTelemetry(await fetchLiveTelemetry(token as string));
+        } else {
+          await pingSystemHealth();
+        }
         setIsDown(false);
       } catch {
         setIsDown(true);
       }
     };
 
-    // Initial fetch if not present
-    if (!telemetry) {
-      update();
-    }
-
+    update();
     const interval = setInterval(update, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isAdmin, token]);
 
   return (
     <div className="bg-[#0b0f19] border border-[#1e293b] rounded-2xl p-5 mb-8 shadow-xl relative overflow-hidden">

@@ -399,6 +399,7 @@ export function App() {
         <StreakHeader
           stats={stats}
           isAdmin={currentUser?.role === 'ADMIN'}
+          token={userToken}
           onNewPost={() => {
             if (!currentUser) {
               setIsLoginOpen(true);
@@ -676,6 +677,7 @@ export function App() {
       <SystemStatusModal
         isOpen={isStatusOpen}
         onClose={handleCloseStatus}
+        token={currentUser?.role === 'ADMIN' ? userToken : null}
         t={t}
       />
 
