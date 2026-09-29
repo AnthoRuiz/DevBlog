@@ -1,105 +1,224 @@
 # SYS.BLOG • Developer Digest & Homelab Hub
 
-A high-performance technical engineering blog engine and Homelab observability hub self-hosted on bare-metal hardware and globally routed via Cloudflare Zero Trust.
+A self-hosted technical blog engine and Homelab observability hub, running on bare-metal hardware and published through a Cloudflare Tunnel — with zero open router ports.
 
-- 🌐 **Live Production URL:** [https://anthoruiz.dev](https://anthoruiz.dev)
-- 📖 **Comprehensive E2E Architecture Manual:** [`docs/ARCHITECTURE_E2E.md`](./docs/ARCHITECTURE_E2E.md)
+- 🌐 **Production:** [https://blog.anthoruiz.dev](https://blog.anthoruiz.dev)
+- 📖 **End-to-end architecture manual:** [`docs/ARCHITECTURE_E2E.md`](./docs/ARCHITECTURE_E2E.md)
 
----
-
-## 🌟 Key Features
-
-- **Daily Technical Digest (2 Columns):** High-density engineering feed featuring reading streak counter, view counts, bookmarks, and optimistic upvotes.
-- **Homelab Hardware Telemetry:** Real-time host metrics (CPU %, RAM %, Temperature °C, and OS uptime) powered by `psutil` with role-aware UI display (`ADMIN` vs public).
-- **Zero-Port-Forwarding Ingress:** Outbound encrypted QUIC tunnel (`cloudflared`) to Cloudflare Edge. Zero open residential router ports.
-- **Multilingual Native i18n:** Built-in 4-language support without external bloat:
-  - 🇪🇸 Español (`es`)
-  - 🇺🇸 English (`en`)
-  - 🇧🇷 Português (`pt`)
-  - 🇫🇷 Français (`fr`)
-- **Dark-Themed Mermaid.js:** Interactive code-to-diagram rendering (flowcharts, sequence diagrams, ER diagrams, class models) with dark palette matching the obsidian UI.
-- **Google Gemini AI Integration:** Automatic technical reading time estimation and semantic tag suggestions based on post content.
-- **Role-Based Access Control (RBAC):** Strict 3-tier hierarchy (`ADMIN`, `AUTHOR`, `READER`) with persistent top testing switcher.
-- **Automated Database Backups:** Daily PostgreSQL snapshots with rolling 7-day retention and one-click admin download.
-- **Security & Anti-DDoS:** Leaky-bucket Nginx rate limiting, SlowAPI per-IP limits, and anti-spam honeypot inputs on comments.
+**Stack:** React 18 + TypeScript + Vite · FastAPI + SQLAlchemy (async) · PostgreSQL 16 · Nginx · Docker Compose · Cloudflare Tunnel · Google Gemini
 
 ---
 
-## 🏗️ System Architecture
+## 🌟 Features
+
+- **Technical digest feed:** two-column post grid with reading time, views, upvotes, bookmarks and a writing-streak header.
+- **Markdown editor:** Word-style toolbar, live preview, syntax highlighting (highlight.js) and dark-themed **Mermaid.js** diagrams.
+- **Multilingual UI (i18n):** 🇪🇸 Español (`es`) · 🇺🇸 English (`en`) · 🇧🇷 Português (`pt`) · 🇫🇷 Français (`fr`), plus an original-language badge on every post.
+- **Google Gemini AI:** one-click post translation, tag suggestions and reading-time estimates (with an offline fallback when no API key is set).
+- **Starter tags:** 19 tags seeded on an empty database, covering technology, interview prep, career growth, mental health and gaming.
+- **Role-based access control:** `ADMIN`, `AUTHOR` and `READER`. The first account is `ADMIN`; after that, only an admin can assign roles.
+- **Admin panel:** user and role management, plus PostgreSQL backups (daily automatic snapshots, 7-day rotation, one-click create/download/delete).
+- **Homelab telemetry (admin only):** live CPU, RAM, temperature, disk and uptime via `psutil`, and per-service latency at `/#/status`. Other visitors only see a LIVE/DOWN indicator.
+- **Image uploads:** JPG, PNG, GIF and WEBP up to 5 MB, validated by file content.
+- **Observability:** rotating server logs and a React `ErrorBoundary` that reports client crashes to the backend.
+
+---
+
+## 🔐 Security
+
+| Area | Protection |
+|------|------------|
+| Authentication | JWT (HS256) with bcrypt hashing. `SECRET_KEY` is required; in production the backend refuses to start with a published default or a key under 32 characters |
+| Authorization | Users cannot change their own role (the test switcher is off unless `ALLOW_ROLE_SELF_SWITCH=True`); admin-only endpoints for logs, telemetry, backups and users |
+| Initial admin | Created from `ADMIN_EMAIL` / `ADMIN_PASSWORD`; if no password is set, a random one is printed once to `docker logs`. No hardcoded credentials anywhere |
+| XSS | Markdown links only allow `http(s)`, `mailto` and relative URLs, and quotes are escaped; Mermaid runs with `securityLevel: 'strict'` |
+| Uploads | File type detected from magic bytes (SVG rejected), 5 MB cap, served with `nosniff` and a sandboxing CSP |
+| Google sign-in (API) | ID tokens must match `GOOGLE_CLIENT_ID` (`aud`) and carry a verified email; the endpoint is disabled while no client ID is configured |
+| Rate limiting | Per-visitor limits in Nginx (real IP restored from `CF-Connecting-IP`) and SlowAPI on authentication, comment/interaction endpoints and client logs |
+| Network | Only the Cloudflare Tunnel is public. Postgres, the backend and the frontend listen on `127.0.0.1` only |
+| Headers | `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`; Nginx version hidden; OpenAPI docs disabled in production |
+| Secrets | Everything comes from `.env` (git-ignored). Compose aborts if a required value is missing — there are no insecure fallbacks |
+
+---
+
+## 🏗️ Architecture
 
 ```
-                                  WAN (Public Internet)
-                                            │
-                                            ▼
-                        ┌──────────────────────────────────────┐
-                        │      Cloudflare Edge Anycast         │
-                        │   SSL/TLS • WAF • DDoS Mitigation    │
-                        │       https://anthoruiz.dev          │
-                        └──────────────────┬───────────────────┘
-                                           │
-                         Encrypted Outbound QUIC Tunnel
-                                           │
-                                           ▼
-             ┌────────────────────────────────────────────────────────────┐
-             │       Homelab Host Node (Windows 11 + WSL2 Ubuntu)         │
-             │                                                            │
-             │   ┌────────────────────────────────────────────────────┐   │
-             │   │       Docker Bridge Network (devblog_net)          │   │
-             │   │                                                    │   │
-             │   │   ┌────────────────────────────────────────────┐   │   │
-             │   │   │ devblog_tunnel (cloudflare/cloudflared)    │   │   │
-             │   │   └─────────────────────┬──────────────────────┘   │   │
-             │   │                         │                          │   │
-             │   │                         ▼                          │   │
-             │   │   ┌────────────────────────────────────────────┐   │   │
-             │   │   │ devblog_frontend (Nginx Alpine + React 18) │   │   │
-             │   │   └──────────────┬─────────────────────────────┘   │   │
-             │   │                  │ Proxy /api/ & /uploads/         │   │
-             │   │                  ▼                                 │   │
-             │   │   ┌────────────────────────────────────────────┐   │   │
-             │   │   │ devblog_backend (FastAPI + SQLAlchemy)     │   │   │
-             │   │   └──────────────┬─────────────────────────────┘   │   │
-             │   │                  │ asyncpg connection pool         │   │
-             │   │                  ▼                                 │   │
-             │   │   ┌────────────────────────────────────────────┐   │   │
-             │   │   │ devblog_postgres (PostgreSQL 16 Alpine)    │   │   │
-             │   │   └────────────────────────────────────────────┘   │   │
-             │   └────────────────────────────────────────────────────┘   │
-             └────────────────────────────────────────────────────────────┘
+                         Internet
+                            │
+                            ▼
+          ┌───────────────────────────────────┐
+          │   Cloudflare Edge (TLS, WAF,      │
+          │   DDoS) · blog.anthoruiz.dev      │
+          └─────────────────┬─────────────────┘
+                            │ outbound encrypted tunnel (no open ports)
+          ┌─────────────────▼───────────────────────────────────┐
+          │ Homelab host · Windows 11 + WSL2 Ubuntu · Docker     │
+          │                                                      │
+          │   devblog_tunnel    (cloudflared)                    │
+          │         │                                            │
+          │         ▼                                            │
+          │   devblog_frontend  (Nginx + React build)  127.0.0.1:3000
+          │         │  /api/ · /uploads/                         │
+          │         ▼                                            │
+          │   devblog_backend   (FastAPI / Uvicorn)    127.0.0.1:8000
+          │         │  asyncpg                                   │
+          │         ▼                                            │
+          │   devblog_postgres  (PostgreSQL 16)        127.0.0.1:5432
+          └──────────────────────────────────────────────────────┘
 ```
+
+### Environments
+
+Production and development are fully separate Docker Compose projects, each with its own database and volumes.
+
+| | Production | Development |
+|---|---|---|
+| Compose file | `docker-compose.yml` | `docker-compose.dev.yml` (project `devblog-dev`) |
+| Config | `.env` | `.env.dev` |
+| Web | https://blog.anthoruiz.dev | http://localhost:5173 (`npm run dev`) |
+| API | `127.0.0.1:8000` | `127.0.0.1:8001` (live reload, `/docs` enabled) |
+| Database | `devblog` on `127.0.0.1:5432` | `devblog_dev` on `127.0.0.1:5433` |
+| Seed data | Starter tags + admin | Starter tags + admin + 3 demo posts |
+| Cloudflare Tunnel | Yes | No |
+| Apply changes | `./deploy.sh` | Automatic on save |
 
 ---
 
-## 🚀 Quick Start (Local & Homelab)
+## 🚀 Production Setup
 
-### 1. Requirements
-- Docker Engine & Docker Compose
-- WSL2 (if running on Windows) or native Linux (Ubuntu/Debian)
+### Requirements
+- Docker Engine with Docker Compose v2, on native Linux or **WSL2 Ubuntu** (run all Docker commands from WSL, not from Git Bash or `cmd`)
+- A Cloudflare Tunnel token (Cloudflare Zero Trust → Networks → Tunnels)
 
-### 2. Setup Environment
+### 1. Configure
 ```bash
 cp .env.example .env
-# Edit .env and supply your credentials and tokens:
-# - POSTGRES_PASSWORD
-# - SECRET_KEY
-# - GEMINI_API_KEY (optional, from https://aistudio.google.com/)
-# - CLOUDFLARE_TUNNEL_TOKEN (from Cloudflare Zero Trust)
 ```
-
-### 3. Launch Services
+Fill in at least the required values (see [Configuration](#-configuration)):
 ```bash
-docker compose up -d
+openssl rand -hex 32   # use as SECRET_KEY
 ```
 
-### 4. Endpoints & Access
-- **Production Web:** [https://anthoruiz.dev](https://anthoruiz.dev)
-- **Local Frontend:** [http://localhost:3000](http://localhost:3000)
-- **API Documentation (Swagger):** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **System Latency Status:** [http://localhost:3000/#/status](http://localhost:3000/#/status)
+### 2. Deploy
+```bash
+./deploy.sh
+```
+The script checks the environment and `.env`, warns about uncommitted changes, runs `docker compose up -d --build`, and then verifies the containers, backend health, the public site and that admin endpoints still return `401` without a session.
+
+```bash
+./deploy.sh backend    # deploy one service only (or: frontend)
+./deploy.sh --check    # run all checks without deploying
+```
+
+### 3. First sign-in
+Sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`. If you left `ADMIN_PASSWORD` empty, the generated password is printed once:
+```bash
+docker logs devblog_backend 2>&1 | grep "\[Seed\]"
+```
 
 ---
 
-## 📚 Technical Documentation
+## 🧑‍💻 Development
 
-For the complete in-depth specification, schema contracts, sequence diagrams, and operational recovery playbooks, consult:
-👉 **[E2E Technical Specification (docs/ARCHITECTURE_E2E.md)](./docs/ARCHITECTURE_E2E.md)**
+### 1. Configure (first time)
+```bash
+cp .env.dev.example .env.dev
+# Set POSTGRES_PASSWORD, SECRET_KEY and ADMIN_PASSWORD (use different values than production)
+```
+
+### 2. Start the backend and database (WSL)
+```bash
+docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
+curl http://localhost:8001/health
+```
+The backend source is mounted into the container, so saving a `.py` file reloads it.
+
+### 3. Start the frontend
+```bash
+cd frontend
+npm install     # first time or when package.json changes
+npm run dev     # http://localhost:5173
+```
+Vite proxies `/api` and `/uploads` to the **development** backend on port 8001 (override with `VITE_API_PROXY_TARGET`).
+
+Sign in as `admin@devblog.local` with the `ADMIN_PASSWORD` from `.env.dev`.
+
+### Useful commands
+```bash
+docker logs -f devblog_dev_backend                                        # backend logs
+docker compose -f docker-compose.dev.yml --env-file .env.dev down         # stop (keeps data)
+docker compose -f docker-compose.dev.yml --env-file .env.dev down -v      # wipe the dev database
+```
+
+To test permissions with the role switcher, set `ALLOW_ROLE_SELF_SWITCH=True` in `.env.dev` and run the frontend with `VITE_ENABLE_ROLE_TESTING=true`.
+
+---
+
+## ⚙️ Configuration
+
+All settings live in `.env` (production) or `.env.dev` (development). Templates: [`.env.example`](./.env.example), [`.env.dev.example`](./.env.dev.example).
+
+| Variable | Required | Description |
+|----------|:--------:|-------------|
+| `POSTGRES_USER` / `POSTGRES_DB` | ✅ | Database user and name |
+| `POSTGRES_PASSWORD` | ✅ | Database password (special characters are supported) |
+| `POSTGRES_PORT` | | Host port for Postgres (`5432` prod, `5433` dev) |
+| `SECRET_KEY` | ✅ | JWT signing key, ≥ 32 characters (`openssl rand -hex 32`) |
+| `ENVIRONMENT` | ✅ | `production` or `development` |
+| `DEBUG` | | SQL echo and debug output (default `False`) |
+| `CLOUDFLARE_TUNNEL_TOKEN` | ✅ prod | Cloudflare Tunnel token |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | | Initial admin, created only if no admin exists |
+| `ALLOW_ROLE_SELF_SWITCH` | | Test role switcher — never enable in production (default `False`) |
+| `SEED_DEMO_POSTS` | | Seed demo posts into an empty database (default `False`; `True` in dev) |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | | Google Gemini for translation, tags and reading time |
+
+> ⚠️ `POSTGRES_PASSWORD` is only applied when a database volume is first created. To change it later, run `ALTER USER` in Postgres **and** update `.env`.
+
+---
+
+## 🛠️ Operations
+
+### Logs
+```bash
+docker logs -f devblog_backend
+docker logs --tail 50 devblog_tunnel
+```
+Admins can also read the latest server log lines at `GET /api/v1/logs/recent`.
+
+### Backups
+- Automatic daily `pg_dump` (gzip) with the 7 most recent kept; admins can also create, download and delete backups from the admin panel.
+- Stored on the host in `backend/backups/` (git-ignored).
+
+Restore a backup (the dump includes `DROP ... IF EXISTS`, so it replaces the current data):
+```bash
+set -a; source <(grep -E '^POSTGRES_(USER|DB)=' .env); set +a
+gunzip -c backend/backups/<file>.sql.gz | docker exec -i devblog_postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+```
+
+### Database shell
+```bash
+docker exec -it devblog_postgres psql -U devblog_user -d devblog          # production
+docker exec -it devblog_dev_postgres psql -U devblog_dev -d devblog_dev   # development
+```
+
+---
+
+## 📁 Project Structure
+
+```
+backend/            FastAPI app (api/v1 routes, core config & security, models, schemas, services)
+frontend/           React + TypeScript app, Nginx config and Dockerfile
+docs/               Architecture manual and feature specs
+docker-compose.yml      Production stack
+docker-compose.dev.yml  Development stack
+deploy.sh           Production deployment with pre- and post-deploy checks
+```
+
+---
+
+## 📝 Conventions
+
+- **English only:** code, comments, messages, commits and docs are written in English. User-facing text goes through the i18n dictionaries in `frontend/src/i18n`.
+- **Conventional Commits:** `feat`, `fix`, `refactor`, `docs`, `chore`, with scopes such as `auth`, `backend`, `frontend`, `i18n`, `infra`, `config`, `deploy`, `env`, `seed`, `security`, `xss`, `uploads`, `nginx`, `logs`, `stats`.
+- **Line endings:** `.gitattributes` keeps shell scripts as LF so they run on WSL.
