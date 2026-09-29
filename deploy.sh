@@ -74,10 +74,13 @@ case "$(env_value ALLOW_ROLE_SELF_SWITCH | tr '[:upper:]' '[:lower:]')" in
 esac
 ok "Selector de roles de prueba desactivado"
 
-# Detecta variables que compose no encuentra (se sustituirían por valores vacíos o inseguros)
-unset_vars="$(docker compose config -q 2>&1 | grep -o 'The "[A-Z_]*" variable is not set' || true)"
+# Compose aborta si falta una variable obligatoria (${VAR:?...}) y avisa de las demás sin definir
+if ! compose_out="$(docker compose config -q 2>&1)"; then
+  fail "docker compose config falló: $compose_out"
+fi
+unset_vars="$(echo "$compose_out" | grep -o 'The "[A-Z_]*" variable is not set' || true)"
 [ -z "$unset_vars" ] || fail "Docker Compose no encuentra variables: $(echo "$unset_vars" | tr '\n' ' ')"
-ok "docker-compose.yml válido"
+ok "docker-compose.yml válido y todas las variables definidas"
 
 # ── 3. Estado de git ──────────────────────────────────────────────────────────
 step "Código a desplegar"

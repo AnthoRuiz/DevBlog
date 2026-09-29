@@ -4,9 +4,10 @@ services:
     container_name: devblog_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-devblog_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devblog_secure_pass_2026}
-      POSTGRES_DB: ${POSTGRES_DB:-devblog}
+      # Toda la configuración sensible viene de .env (sin valores por defecto: si falta, compose aborta)
+      POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB en .env}
     ports:
       # Solo accesible desde el host (el backend usa la red interna devblog_net)
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
@@ -28,12 +29,13 @@ services:
     restart: unless-stopped
     environment:
       # El backend compone DATABASE_URL escapando la contraseña (admite caracteres especiales)
-      - POSTGRES_USER=${POSTGRES_USER:-devblog_user}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devblog_secure_pass_2026}
-      - POSTGRES_DB=${POSTGRES_DB:-devblog}
+      - POSTGRES_USER=${POSTGRES_USER:?Define POSTGRES_USER en .env}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      - POSTGRES_DB=${POSTGRES_DB:?Define POSTGRES_DB en .env}
       - POSTGRES_HOST=db
-      - SECRET_KEY=${SECRET_KEY:-devblog_insecure_default_secret_key_change_in_production_2026}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - SECRET_KEY=${SECRET_KEY:?Define SECRET_KEY en .env (openssl rand -hex 32)}
+      - ENVIRONMENT=${ENVIRONMENT:?Define ENVIRONMENT en .env (production o development)}
+      # Opcionales: sus valores por defecto son los seguros
       - DEBUG=${DEBUG:-False}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
@@ -74,7 +76,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: devblog_tunnel
     restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?Define CLOUDFLARE_TUNNEL_TOKEN en .env}
     depends_on:
       - frontend
     networks:

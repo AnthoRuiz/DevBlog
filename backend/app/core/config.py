@@ -6,13 +6,14 @@ import os
 
 class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "DevBlog Homelab API"
-    
-    # Base de datos. Si POSTGRES_PASSWORD está definida, DATABASE_URL se construye a partir de
-    # los componentes escapando usuario y contraseña (admite caracteres como @ : / # %).
-    DATABASE_URL: str = "postgresql+asyncpg://devblog_user:devblog_secure_pass_2026@localhost:5432/devblog"
+
+    # Base de datos: sin credenciales por defecto. DATABASE_URL se construye a partir de los
+    # componentes escapando usuario y contraseña (admite caracteres como @ : / # %),
+    # salvo que se proporcione DATABASE_URL completa.
+    DATABASE_URL: Optional[str] = None
     POSTGRES_USER: str = "devblog_user"
     POSTGRES_PASSWORD: Optional[str] = None
     POSTGRES_HOST: str = "db"
@@ -26,10 +27,12 @@ class Settings(BaseSettings):
                 f"postgresql+asyncpg://{quote(self.POSTGRES_USER, safe='')}:{quote(self.POSTGRES_PASSWORD, safe='')}"
                 f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
             )
+        elif not self.DATABASE_URL:
+            raise ValueError("Define POSTGRES_PASSWORD (o DATABASE_URL) en el entorno / .env")
         return self
 
-    # JWT
-    SECRET_KEY: str = "devblog_insecure_default_secret_key_change_in_production_2026"
+    # JWT: obligatoria, sin valor por defecto
+    SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440 # 24 horas
 

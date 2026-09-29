@@ -23,7 +23,7 @@ def get_db_credentials() -> Dict[str, str]:
     return {
         # La URL lleva usuario y contraseña escapados (ver Settings._build_database_url)
         "user": unquote(url.username) if url.username else "devblog_user",
-        "password": unquote(url.password) if url.password else "devblog_secure_pass_2026",
+        "password": unquote(url.password) if url.password else "",
         "host": url.hostname or "db",
         "port": str(url.port or 5432),
         "name": url.path.lstrip("/") or "devblog"

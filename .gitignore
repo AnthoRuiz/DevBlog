@@ -14,7 +14,8 @@ build/
 
 # Environment and sensitive data
 .env
-.env.local
+.env.*
+!.env.example
 *.pem
 *.key
 
