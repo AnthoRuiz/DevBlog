@@ -14,13 +14,13 @@ async def list_admin_backups(
     current_user: User = Depends(get_current_admin)
 ):
     """
-    Lista todos los backups disponibles en disco y la política de retención activa.
-    Requiere rol de administrador (ADMIN).
+    List all backups on disk and the active retention policy.
+    Requires the ADMIN role.
     """
     backups = backup_service.list_backups()
     return {
         "status": "healthy",
-        "retention_policy": "Conserva las 7 copias más recientes (rotación automática diaria)",
+        "retention_policy": "Keeps the 7 most recent copies (automatic daily rotation)",
         "retention_limit": 7,
         "total_backups": len(backups),
         "backups": backups
@@ -32,19 +32,19 @@ async def create_admin_backup(
     current_user: User = Depends(get_current_admin)
 ):
     """
-    Dispara la creación inmediata de un dump comprimido en .sql.gz y ejecuta la rotación.
-    Requiere rol de administrador (ADMIN).
+    Create a compressed .sql.gz dump immediately and run rotation.
+    Requires the ADMIN role.
     """
     try:
         result = await backup_service.create_backup(keep=7)
         return {
-            "message": "Backup generado exitosamente",
+            "message": "Backup created successfully",
             "backup": result
         }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Fallo al generar el backup: {str(e)}"
+            detail=f"Failed to create backup: {str(e)}"
         )
 
 
@@ -54,14 +54,14 @@ async def download_admin_backup(
     current_user: User = Depends(get_current_admin)
 ):
     """
-    Permite descargar directamente el archivo .sql.gz seleccionado.
-    Requiere rol de administrador (ADMIN).
+    Download the selected .sql.gz file.
+    Requires the ADMIN role.
     """
     path = backup_service.get_backup_path(filename)
     if not path or not path.is_file():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Archivo de backup no encontrado o nombre inválido"
+            detail="Backup file not found or invalid name"
         )
 
     return FileResponse(
@@ -78,14 +78,14 @@ async def delete_admin_backup(
     current_user: User = Depends(get_current_admin)
 ):
     """
-    Elimina un archivo de backup específico.
-    Requiere rol de administrador (ADMIN).
+    Delete a specific backup file.
+    Requires the ADMIN role.
     """
     success = backup_service.delete_backup_file(filename)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No se pudo eliminar el backup (no existe o nombre inválido)"
+            detail="Could not delete backup (not found or invalid name)"
         )
 
-    return {"message": f"Backup {filename} eliminado correctamente"}
+    return {"message": f"Backup {filename} deleted successfully"}

@@ -20,21 +20,21 @@ from app.schemas.stats import (
     SystemStatusResponse,
 )
 
-router = APIRouter(prefix="/stats", tags=["Estadísticas & Racha"])
+router = APIRouter(prefix="/stats", tags=["Stats & Streak"])
 
 def get_hardware_telemetry() -> HardwareTelemetry:
-    """Extrae métricas reales del host/sistema usando psutil."""
+    """Collect real host/system metrics using psutil."""
     cpu_pct = psutil.cpu_percent(interval=None)
     logical_cores = psutil.cpu_count(logical=True) or 1
     physical_cores = psutil.cpu_count(logical=False) or logical_cores
 
-    # Memoria RAM
+    # RAM
     mem = psutil.virtual_memory()
     mem_used_gb = round((mem.total - mem.available) / (1024 ** 3), 2)
     mem_total_gb = round(mem.total / (1024 ** 3), 2)
     mem_pct = round(mem.percent, 1)
 
-    # Disco
+    # Disk
     try:
         disk = psutil.disk_usage("/")
         disk_used_gb = round(disk.used / (1024 ** 3), 1)
@@ -45,7 +45,7 @@ def get_hardware_telemetry() -> HardwareTelemetry:
         disk_total_gb = 128.0
         disk_pct = 11.1
 
-    # Uptime del Sistema Operativo
+    # OS uptime
     try:
         boot_ts = psutil.boot_time()
         uptime_sec = max(0.0, time.time() - boot_ts)
@@ -62,7 +62,7 @@ def get_hardware_telemetry() -> HardwareTelemetry:
     else:
         uptime_str = f"{minutes}m"
 
-    # Temperatura de CPU
+    # CPU temperature
     temp_c = 0.0
     try:
         temps = getattr(psutil, "sensors_temperatures", lambda: {})()
@@ -77,8 +77,8 @@ def get_hardware_telemetry() -> HardwareTelemetry:
     except Exception:
         pass
 
-    # Si estamos dentro de un contenedor Docker/WSL2 sin passthrough térmico,
-    # calcular temperatura reactiva proporcional a la carga de CPU
+    # Inside Docker/WSL2 without thermal sensor passthrough,
+    # estimate a temperature proportional to CPU load
     if temp_c <= 0:
         temp_c = round(37.0 + (cpu_pct * 0.38), 1)
     else:
@@ -106,7 +106,7 @@ def get_hardware_telemetry() -> HardwareTelemetry:
 
 @router.get("/telemetry", response_model=HardwareTelemetry)
 async def get_live_telemetry(current_admin: User = Depends(get_current_admin)):
-    """Devuelve métricas reales de hardware en vivo (CPU %, RAM, Temperatura, Uptime). Solo ADMIN."""
+    """Return live hardware metrics (CPU %, RAM, temperature, uptime). ADMIN only."""
     return get_hardware_telemetry()
 
 @router.get("/status", response_model=SystemStatusResponse)
@@ -114,10 +114,10 @@ async def get_system_status(
     db: AsyncSession = Depends(get_db),
     current_admin: User = Depends(get_current_admin),
 ):
-    """Devuelve el estado de salud y las latencias internas exactas de cada componente (PostgreSQL, FastAPI, Nginx, Gemini)."""
+    """Return health status and internal latency of each component (PostgreSQL, FastAPI, Nginx, Gemini)."""
     t_start = time.perf_counter()
 
-    # 1. Medir latencia de PostgreSQL en milisegundos reales
+    # 1. Measure PostgreSQL latency in milliseconds
     pg_status = "operational"
     pg_latency = 0.0
     pg_details = "AsyncPG Pool (PostgreSQL 16 Alpine)"
@@ -127,9 +127,9 @@ async def get_system_status(
         pg_latency = round((time.perf_counter() - t0) * 1000, 2)
     except Exception as e:
         pg_status = "down"
-        pg_details = f"Error de conexión: {str(e)[:50]}"
+        pg_details = f"Connection error: {str(e)[:50]}"
 
-    # 2. Latencia interna de FastAPI
+    # 2. Internal FastAPI latency
     t_fastapi = round((time.perf_counter() - t_start) * 1000, 2)
     fastapi_service = ServiceStatus(
         name="FastAPI App Engine",
@@ -155,7 +155,7 @@ async def get_system_status(
 
     # 4. Google Gemini AI Engine
     ai_status = "operational"
-    ai_details = f"Google Gemini ({settings.GEMINI_MODEL}) Conectado" if settings.GEMINI_API_KEY else "Homelab AI Fallback Engine (Activo)"
+    ai_details = f"Google Gemini ({settings.GEMINI_MODEL}) connected" if settings.GEMINI_API_KEY else "Homelab AI fallback engine (active)"
     ai_service = ServiceStatus(
         name="Google Gemini AI Engine",
         status=ai_status,
@@ -176,11 +176,11 @@ async def get_system_status(
 
 @router.get("/streak", response_model=StreakStats)
 async def get_author_streak(db: AsyncSession = Depends(get_db)):
-    # Contar artículos publicados
+    # Count published posts
     posts_res = await db.execute(select(func.count(Post.id)).where(Post.is_published == True))
     total_articles = posts_res.scalar() or 0
 
-    # Total vistas y upvotes
+    # Total views and upvotes
     totals_res = await db.execute(
         select(
             func.coalesce(func.sum(Post.views_count), 0),
@@ -189,10 +189,10 @@ async def get_author_streak(db: AsyncSession = Depends(get_db)):
     )
     views, upvotes = totals_res.one()
 
-    # Racha estimada de escritura en días
+    # Estimated writing streak in days
     streak_days = max(14, total_articles * 2)
 
-    # Endpoint público: la telemetría de hardware solo se sirve a ADMIN vía /stats/telemetry
+    # Public endpoint: hardware telemetry is only served to ADMIN via /stats/telemetry
     return StreakStats(
         current_streak_days=streak_days,
         total_articles_published=total_articles,

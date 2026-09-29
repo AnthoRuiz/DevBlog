@@ -12,7 +12,7 @@ from app.models.user import User, UserRole
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 def get_client_hash(request: Request) -> str:
-    """Genera un hash SHA-256 de la IP y User-Agent para upvotes anónimos sin login."""
+    """Build a SHA-256 hash of IP and User-Agent to track anonymous (logged-out) upvotes."""
     client_ip = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
     raw_fingerprint = f"{client_ip}:{user_agent}"
@@ -41,7 +41,7 @@ async def get_current_user(
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Autenticación requerida para esta acción",
+            detail="Authentication required for this action",
             headers={"WWW-Authenticate": "Bearer"},
         )
     return current_user
@@ -52,7 +52,7 @@ async def get_current_admin(
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permisos insuficientes (Se requiere rol ADMIN)"
+            detail="Insufficient permissions (ADMIN role required)"
         )
     return current_user
 
@@ -62,6 +62,6 @@ async def get_current_author_or_admin(
     if current_user.role not in [UserRole.ADMIN, UserRole.AUTHOR]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permisos insuficientes: se requiere rol AUTHOR o ADMIN para gestionar artículos"
+            detail="Insufficient permissions: AUTHOR or ADMIN role required to manage posts"
         )
     return current_user

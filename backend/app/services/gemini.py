@@ -24,7 +24,7 @@ async def translate_post_content(
     target_name = LANG_NAMES.get(target_lang, target_lang)
     source_name = LANG_NAMES.get(source_lang, source_lang)
 
-    # Si se configuró GEMINI_API_KEY, usar la API oficial de Google Gemini
+    # Use the official Google Gemini API when GEMINI_API_KEY is configured
     if settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip():
         api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY.strip()}"
         prompt = f"""You are an expert technical translator specializing in software engineering, distributed systems, homelab, and DevOps blogs.
@@ -75,8 +75,9 @@ Markdown Content:
         except Exception as e:
             logger.error(f"Error calling Gemini API: {e}")
 
-    # Fallback inteligente para Homelab / Demo cuando GEMINI_API_KEY aún no está cargada
-    # Traduce encabezados estándar y adapta el contenido preservando todo el código
+    # Offline fallback (homelab/demo) when GEMINI_API_KEY is not set:
+    # translates common headings and keeps all code untouched.
+    # The source strings are Spanish on purpose: they match headings in Spanish-language posts.
     header_replacements = {
         "en": [
             ("## Arquitectura y Componentes", "## Architecture & Components"),
@@ -136,7 +137,7 @@ async def suggest_post_tags(
     content_markdown: str,
     existing_tags: list[str]
 ) -> list[str]:
-    # 1. Si GEMINI_API_KEY está configurada, consultar a Google Gemini
+    # 1. Ask Google Gemini when GEMINI_API_KEY is configured
     if settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip():
         api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY.strip()}"
         prompt = f"""You are an expert technical taxonomy analyzer for developer blogs and homelab systems.
@@ -174,8 +175,8 @@ Markdown Content:
         except Exception as e:
             logger.error(f"Error in Gemini tag suggestion: {e}")
 
-    # Fallback inteligente (Homelab / Demo Mode):
-    # Analiza texto buscando menciones de tecnologías clave y tags existentes
+    # Offline fallback (homelab/demo): scan the text for known technologies and existing tags.
+    # Some keywords are Spanish on purpose so Spanish-language posts also match.
     combined_text = f"{title} {summary} {content_markdown}".lower()
     tech_keywords = [
         "docker", "kubernetes", "fastapi", "python", "typescript", "react",
@@ -205,15 +206,15 @@ async def estimate_reading_time(
     content_markdown: str
 ) -> int:
     """
-    Estima el tiempo de lectura realista en minutos utilizando Google Gemini AI,
-    analizando el volumen de texto, la complejidad conceptual y la densidad técnica
-    (bloques de código, comandos bash, configuraciones YAML/Docker/SQL, diagramas).
+    Estimate a realistic reading time in minutes with Google Gemini AI, weighing
+    text volume, conceptual complexity and technical density
+    (code blocks, bash commands, YAML/Docker/SQL configs, diagrams).
     """
     clean_content = (content_markdown or "").strip()
     if not clean_content:
         return 1
 
-    # 1. Si GEMINI_API_KEY está configurada, consultar a Google Gemini
+    # 1. Ask Google Gemini when GEMINI_API_KEY is configured
     if settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip():
         api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY.strip()}"
         prompt = f"""You are an expert technical content analyst and speed-reading psycholinguist specializing in developer blogs.
@@ -256,21 +257,20 @@ Markdown Content:
         except Exception as e:
             logger.error(f"Error calling Gemini for reading time estimation: {e}")
 
-    # Fallback inteligente (Homelab / Demo Mode):
-    # Separa prosa de bloques de código para evaluar densidad técnica
+    # Offline fallback (homelab/demo): split prose from code blocks to gauge technical density
     code_blocks = re.findall(r"```[\s\S]*?```", clean_content)
     code_text = " ".join(code_blocks)
     non_code_text = re.sub(r"```[\s\S]*?```", "", clean_content)
 
     words_prose = len(non_code_text.split())
-    # Tiempo de prosa a 180 palabras por minuto
+    # Prose at 180 words per minute
     time_prose = words_prose / 180.0
 
-    # Tiempo de código: cada línea de código técnico toma ~3 segundos para analizar (~20 líneas/min)
+    # Code: each line takes ~3 seconds to parse (~20 lines/min)
     code_lines = len(code_text.splitlines()) if code_text else 0
     time_code = code_lines / 20.0
 
-    # Factor de densidad conceptual
+    # Conceptual density factor (includes Spanish terms for Spanish-language posts)
     dense_keywords = [
         "architecture", "arquitectura", "kubernetes", "docker", "pipeline",
         "concurrency", "distributed", "database", "postgres", "fastapi",

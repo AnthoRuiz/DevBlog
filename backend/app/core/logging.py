@@ -32,5 +32,5 @@ client_logger = logging.getLogger("devblog.client")
 client_logger.setLevel(logging.INFO)
 client_logger.addHandler(stdout_handler)
 client_logger.addHandler(file_handler)
-# Ya tiene sus propios handlers; sin esto cada entrada se escribe dos veces vía el logger "devblog"
+# It has its own handlers; without this every entry is written twice via the "devblog" logger
 client_logger.propagate = False

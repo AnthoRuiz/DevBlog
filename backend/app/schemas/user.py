@@ -33,4 +33,4 @@ class LoginRequest(BaseModel):
 
 class OAuthLoginRequest(BaseModel):
     provider: str # 'google', 'facebook'
-    id_token: str # Token JWT retornado por Google Identity Services o Facebook SDK
+    id_token: str # JWT returned by Google Identity Services or the Facebook SDK

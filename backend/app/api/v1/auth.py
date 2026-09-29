@@ -13,20 +13,20 @@ from app.api.deps import get_current_user, get_current_admin
 from app.core.limiter import limiter
 from app.core.config import settings
 
-router = APIRouter(prefix="/auth", tags=["Autenticación"])
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.post("/register", response_model=Token)
 @limiter.limit("5/minute")
 async def register(request: Request, user_in: UserCreate, db: AsyncSession = Depends(get_db)):
-    # Comprobar si el email ya existe
+    # Reject duplicate emails
     existing = await db.execute(select(User).where(User.email == user_in.email))
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Ya existe una cuenta con este correo electrónico"
+            detail="An account with this email already exists"
         )
     
-    # Comprobar si es el primer usuario de la base de datos (para hacerlo ADMIN automáticamente)
+    # The very first user in the database automatically becomes ADMIN
     users_count = await db.execute(select(func.count(User.id)))
     is_first_user = (users_count.scalar() or 0) == 0
     role = UserRole.ADMIN if is_first_user else UserRole.READER
@@ -56,13 +56,13 @@ async def login(request: Request, login_in: LoginRequest, db: AsyncSession = Dep
     if not user or not user.hashed_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Credenciales incorrectas o cuenta registrada exclusivamente mediante OAuth"
+            detail="Invalid credentials or account registered via OAuth only"
         )
     
     if not verify_password(login_in.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Credenciales incorrectas"
+            detail="Invalid credentials"
         )
     
     token = create_access_token(subject=str(user.id))
@@ -71,15 +71,15 @@ async def login(request: Request, login_in: LoginRequest, db: AsyncSession = Dep
 @router.post("/oauth/google", response_model=Token)
 @limiter.limit("10/minute")
 async def oauth_google(request: Request, oauth_in: OAuthLoginRequest, db: AsyncSession = Depends(get_db)):
-    """Verifica el token de Google y vincula/crea la cuenta del usuario."""
-    # Sin client ID no se puede comprobar para qué app se emitió el token
+    """Verify the Google ID token and link or create the user account."""
+    # Without a client ID we cannot check which app the token was issued for
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="El inicio de sesión con Google no está configurado"
+            detail="Google sign-in is not configured"
         )
 
-    # Verificar token con la API oficial de Google
+    # Verify the token with Google's official API
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(
             "https://oauth2.googleapis.com/tokeninfo",
@@ -88,13 +88,13 @@ async def oauth_google(request: Request, oauth_in: OAuthLoginRequest, db: AsyncS
         if resp.status_code != 200:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Token de Google inválido o expirado"
+                detail="Invalid or expired Google token"
             )
         google_data = resp.json()
 
-    # tokeninfo solo valida firma y caducidad: hay que exigir que el token sea para esta app
-    # (si no, un token emitido para cualquier otra app serviría aquí) y que el email esté verificado,
-    # ya que las cuentas se vinculan por email (incluidas las de ADMIN)
+    # tokeninfo only checks signature and expiry: the token must also be issued for this app
+    # (otherwise a token minted for any other app would work here) and carry a verified email,
+    # because accounts are linked by email (ADMIN accounts included)
     if (
         google_data.get("aud") != settings.GOOGLE_CLIENT_ID
         or google_data.get("iss") not in ("accounts.google.com", "https://accounts.google.com")
@@ -102,18 +102,18 @@ async def oauth_google(request: Request, oauth_in: OAuthLoginRequest, db: AsyncS
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Token de Google no válido para esta aplicación o email no verificado"
+            detail="Google token not valid for this application or email not verified"
         )
 
-    google_sub = google_data.get("sub") # ID único de Google
+    google_sub = google_data.get("sub") # Stable Google account ID
     email = google_data.get("email")
     full_name = google_data.get("name", "Google User")
     picture = google_data.get("picture")
 
     if not email or not google_sub:
-        raise HTTPException(status_code=400, detail="Datos incompletos de Google")
+        raise HTTPException(status_code=400, detail="Incomplete data from Google")
 
-    # 1. Buscar si ya existe la cuenta OAuth registrada
+    # 1. Look up an existing linked OAuth account
     oauth_res = await db.execute(
         select(OAuthAccount).where(
             OAuthAccount.provider == "google",
@@ -126,12 +126,12 @@ async def oauth_google(request: Request, oauth_in: OAuthLoginRequest, db: AsyncS
         user_res = await db.execute(select(User).where(User.id == oauth_acc.user_id))
         user = user_res.scalar_one()
     else:
-        # 2. Si no existe por OAuth, buscar si ya existe un User con ese email
+        # 2. No OAuth link yet: look for an existing user with that email
         user_res = await db.execute(select(User).where(User.email == email))
         user = user_res.scalar_one_or_none()
 
         if not user:
-            # Comprobar si es el primer usuario para darle ADMIN
+            # The very first user becomes ADMIN
             users_count = await db.execute(select(func.count(User.id)))
             role = UserRole.ADMIN if (users_count.scalar() or 0) == 0 else UserRole.READER
 
@@ -147,7 +147,7 @@ async def oauth_google(request: Request, oauth_in: OAuthLoginRequest, db: AsyncS
             db.add(user)
             await db.flush()
 
-        # Vincular cuenta OAuth
+        # Link the OAuth account
         new_oauth = OAuthAccount(
             user_id=user.id,
             provider="google",
@@ -175,14 +175,14 @@ async def update_my_role_for_testing(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Selector de rol para pruebas rápidas de permisos en homelab:
-    Permite alternar el rol del usuario autenticado entre ADMIN, AUTHOR y READER.
-    Deshabilitado salvo que ALLOW_ROLE_SELF_SWITCH=True (solo entornos locales de prueba).
+    Role switcher for quickly testing permissions locally:
+    lets the authenticated user switch between ADMIN, AUTHOR and READER.
+    Disabled unless ALLOW_ROLE_SELF_SWITCH=True (local test environments only).
     """
     if not settings.ALLOW_ROLE_SELF_SWITCH:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="El cambio de rol propio está deshabilitado. Un ADMIN debe asignar los roles."
+            detail="Changing your own role is disabled. An ADMIN must assign roles."
         )
     current_user.role = role_in.role
     await db.commit()
@@ -207,14 +207,14 @@ async def update_user_role(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        raise HTTPException(status_code=404, detail="User not found")
 
     if user.id == current_admin.id and role_in.role != UserRole.ADMIN:
         admin_count = await db.execute(select(func.count(User.id)).where(User.role == UserRole.ADMIN))
         if (admin_count.scalar() or 0) <= 1:
             raise HTTPException(
                 status_code=400,
-                detail="No puedes removerte a ti mismo de administrador si eres el único en el sistema"
+                detail="You cannot remove your own ADMIN role while you are the only admin"
             )
 
     user.role = role_in.role

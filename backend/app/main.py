@@ -14,17 +14,17 @@ from app.models.post import Tag, Post
 from app.core.security import get_password_hash, verify_password
 from app.core.logging import logger
 
-# Contraseña que versiones anteriores sembraban para el admin; se detecta para forzar su rotación
+# Password older versions seeded for the admin; detected so it can be rotated
 LEGACY_ADMIN_PASSWORD = "admin123456"
 
 async def seed_initial_data():
-    """Siembra datos iniciales (tags, usuario admin y posts de ejemplo) si la base de datos está vacía."""
+    """Seed initial data (tags, admin user and sample posts) when the database is empty."""
     async with AsyncSessionLocal() as session:
-        # 1. Tags iniciales
+        # 1. Initial tags
         existing_tags = await session.execute(select(Tag))
         if not existing_tags.scalars().first():
             default_tags = [
-                Tag(name="Sistemas Distribuidos", slug="distributed-systems", color_hex="#38bdf8"),
+                Tag(name="Distributed Systems", slug="distributed-systems", color_hex="#38bdf8"),
                 Tag(name="Python & FastAPI", slug="python-fastapi", color_hex="#10b981"),
                 Tag(name="React & TypeScript", slug="react-typescript", color_hex="#818cf8"),
                 Tag(name="Docker & Homelab", slug="docker-homelab", color_hex="#06b6d4"),
@@ -33,31 +33,31 @@ async def seed_initial_data():
             session.add_all(default_tags)
             await session.flush()
 
-        # 2. Usuario admin por defecto
+        # 2. Default admin user
         admin_res = await session.execute(select(User).where(User.role == UserRole.ADMIN))
         admins = list(admin_res.scalars().all())
         admin = admins[0] if admins else None
 
-        # Instalaciones antiguas sembraban el admin con una contraseña pública conocida
+        # Older installs seeded the admin with a publicly known password
         for existing_admin in admins:
             if existing_admin.hashed_password and verify_password(LEGACY_ADMIN_PASSWORD, existing_admin.hashed_password):
                 if settings.ADMIN_PASSWORD:
                     existing_admin.hashed_password = get_password_hash(settings.ADMIN_PASSWORD)
-                    logger.warning(f"[Seed] Contraseña por defecto del admin {existing_admin.email} rotada a ADMIN_PASSWORD")
+                    logger.warning(f"[Seed] Default password of admin {existing_admin.email} rotated to ADMIN_PASSWORD")
                 else:
                     logger.warning(
-                        f"[Seed] ¡INSEGURO! El admin {existing_admin.email} usa la contraseña por defecto. "
-                        "Define ADMIN_PASSWORD en .env y reinicia para rotarla."
+                        f"[Seed] INSECURE! Admin {existing_admin.email} still uses the default password. "
+                        "Set ADMIN_PASSWORD in .env and restart to rotate it."
                     )
 
         if not admin:
             admin_password = settings.ADMIN_PASSWORD
             if not admin_password:
                 admin_password = secrets.token_urlsafe(18)
-                # Solo stdout (docker logs): no debe quedar en server.log
+                # stdout only (docker logs): it must never end up in server.log
                 print(
-                    f"[Seed] Admin inicial creado: {settings.ADMIN_EMAIL} / contraseña generada: {admin_password}\n"
-                    "[Seed] Guárdala ahora; no se volverá a mostrar.",
+                    f"[Seed] Initial admin created: {settings.ADMIN_EMAIL} / generated password: {admin_password}\n"
+                    "[Seed] Save it now; it will not be shown again.",
                     flush=True,
                 )
             admin = User(
@@ -71,7 +71,7 @@ async def seed_initial_data():
             session.add(admin)
             await session.flush()
 
-        # 3. Posts iniciales de demostración
+        # 3. Sample demo posts
         posts_res = await session.execute(select(Post))
         if not posts_res.scalars().first():
             tag_res = await session.execute(select(Tag))
@@ -79,32 +79,33 @@ async def seed_initial_data():
 
             p1 = Post(
                 author_id=admin.id,
-                slug="disenando-cache-consistencia-eventual",
-                title="Diseñando un sistema de caching con consistencia eventual en Python y Docker",
-                summary="Cómo estructuré un cluster de microservicios en mi PC de casa reduciendo latencias de 45ms a 2ms con invalidación reactiva.",
-                content_markdown="""# Diseñando un sistema de caching con consistencia eventual
+                slug="designing-eventually-consistent-cache",
+                title="Designing an eventually consistent caching layer with Python and Docker",
+                summary="How I structured a microservice cluster on my home PC and cut latency from 45ms to 2ms with reactive invalidation.",
+                language="en",
+                content_markdown="""# Designing an eventually consistent caching layer
 
-Al desarrollar sistemas distribuidos de lectura intensiva, el cuello de botella más predecible siempre reside en la capa de persistencia en disco de PostgreSQL.
+In read-heavy distributed systems, the most predictable bottleneck is always PostgreSQL's on-disk persistence layer.
 
-## 1. La Topología Homelab
-Para resolver este desafío sin depender de servicios gestionados en la nube, implementamos un patrón de caché de lectura directa con invalidación asíncrona.
+## 1. The Homelab Topology
+To solve this without relying on managed cloud services, we implemented a read-through cache with asynchronous invalidation.
 
 ```python
 async def fetch_article(slug: str) -> PostSchema:
-    # 1. Intento de lectura en memoria
+    # 1. Try the in-memory cache first
     cached = await cache.get(f"post:{slug}")
     if cached:
         return PostSchema.model_validate_json(cached)
     
-    # 2. Fallback a PostgreSQL
+    # 2. Fall back to PostgreSQL
     post = await db.fetch_by_slug(slug)
     await cache.set(f"post:{slug}", post.model_dump_json(), ttl=3600)
     return post
 ```
 
-## 2. Lecciones Aprendidas
-* **Aislamiento de red:** La base de datos nunca debe exponer puertos hacia fuera del host.
-* **Resiliencia:** Si el servidor de caché se reinicia, la aplicación debe degradarse elegantemente hacia la base de datos sin fallar.
+## 2. Lessons Learned
+* **Network isolation:** The database must never expose ports outside the host.
+* **Resilience:** If the cache server restarts, the app must degrade gracefully to the database instead of failing.
 """,
                 reading_time_minutes=8,
                 upvotes_count=142,
@@ -115,15 +116,16 @@ async def fetch_article(slug: str) -> PostSchema:
 
             p2 = Post(
                 author_id=admin.id,
-                slug="typescript-estricto-react-19-server-actions",
-                title="TypeScript estricto en React 19: Patrones avanzados de inferencia de tipos",
-                summary="Cómo estructurar componentes, hooks personalizados y llamadas tipadas de punta a punta sin usar 'any' ni una sola vez.",
-                content_markdown="""# TypeScript estricto en React 19
+                slug="strict-typescript-react-19-type-inference",
+                title="Strict TypeScript in React 19: Advanced type inference patterns",
+                summary="How to structure components, custom hooks and end-to-end typed API calls without a single 'any'.",
+                language="en",
+                content_markdown="""# Strict TypeScript in React 19
 
-El verdadero valor de TypeScript no radica en tipear manualmente cada variable, sino en diseñar contratos genéricos donde el compilador infiera automáticamente los tipos de retorno.
+The real value of TypeScript is not annotating every variable by hand, but designing generic contracts where the compiler infers return types for you.
 
-## Contratos compartidos con el Backend
-Al utilizar esquemas Pydantic en FastAPI, generamos automáticamente las definiciones de TypeScript en React:
+## Contracts shared with the backend
+Using Pydantic schemas in FastAPI, we generate the matching TypeScript definitions for React:
 
 ```typescript
 export interface PostRead {
@@ -137,7 +139,7 @@ export interface PostRead {
 }
 ```
 
-Esto elimina discrepancias entre lo que la base de datos almacena y lo que la interfaz de usuario renderiza.
+This removes any mismatch between what the database stores and what the UI renders.
 """,
                 reading_time_minutes=6,
                 upvotes_count=98,
@@ -148,19 +150,20 @@ Esto elimina discrepancias entre lo que la base de datos almacena y lo que la in
 
             p3 = Post(
                 author_id=admin.id,
-                slug="desplegando-en-casa-tuneles-cloudflare-cero-puertos",
-                title="Desplegando en casa con Túneles de Cloudflare: Cero Puertos Abiertos",
-                summary="Guía paso a paso para configurar tu propio servidor web seguro detrás de un túnel cifrado sin exponer la IP pública de tu hogar.",
-                content_markdown="""# Desplegando en casa con Túneles de Cloudflare
+                slug="self-hosting-cloudflare-tunnels-zero-open-ports",
+                title="Self-hosting with Cloudflare Tunnels: Zero Open Ports",
+                summary="Step-by-step guide to running your own secure web server behind an encrypted tunnel without exposing your home IP.",
+                language="en",
+                content_markdown="""# Self-hosting with Cloudflare Tunnels
 
-Publicar un servidor web desde una conexión de internet residencial solía requerir abrir los puertos 80 y 443 en el router, lidiar con IP dinámica y arriesgar la seguridad de la red doméstica.
+Publishing a web server from a residential connection used to mean opening ports 80 and 443 on the router, dealing with a dynamic IP and putting the home network at risk.
 
-## El enfoque moderno: Cloudflare Tunnel (cloudflared)
-Un túnel saliente inicia la conexión desde el interior del contenedor hacia los datacenters de Cloudflare:
+## The modern approach: Cloudflare Tunnel (cloudflared)
+An outbound tunnel opens the connection from inside the container to Cloudflare's data centers:
 
-1. El router residencial no requiere ninguna regla de reenvío de puertos (*Port Forwarding*).
-2. La dirección IP pública de tu hogar permanece 100% oculta.
-3. El certificado SSL y la protección contra ataques DDoS se aplican en el Edge.
+1. The home router needs no port forwarding rules.
+2. Your home's public IP address stays 100% hidden.
+3. TLS certificates and DDoS protection are applied at the edge.
 """,
                 reading_time_minutes=5,
                 upvotes_count=114,
@@ -174,35 +177,35 @@ Un túnel saliente inicia la conexión desde el interior del contenedor hacia lo
         await session.commit()
 
 async def automated_backup_scheduler():
-    """Ejecuta un backup diario automático (cada 24 horas) en segundo plano con rotación."""
+    """Run an automatic daily backup (every 24 hours) in the background, with rotation."""
     while True:
         try:
-            # Esperar 24 horas (86400 segundos)
+            # Wait 24 hours (86400 seconds)
             await asyncio.sleep(86400)
             from app.services import backup_service
             res = await backup_service.create_backup(keep=7)
-            print(f"[AutoBackup] Backup automático exitoso: {res['filename']} ({res['size_display']})")
+            print(f"[AutoBackup] Automatic backup succeeded: {res['filename']} ({res['size_display']})")
         except asyncio.CancelledError:
             break
         except Exception as e:
-            print(f"[AutoBackup] Error en tarea de backup automático: {e}")
+            print(f"[AutoBackup] Automatic backup task failed: {e}")
             await asyncio.sleep(300)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Crear tablas automáticamente al arrancar
+    # Create tables on startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    # Sembrar datos iniciales
+    # Seed initial data
     await seed_initial_data()
-    # Iniciar programador de backups automáticos
+    # Start the automatic backup scheduler
     backup_task = asyncio.create_task(automated_backup_scheduler())
     yield
-    # Limpieza al apagar
+    # Cleanup on shutdown
     backup_task.cancel()
     await engine.dispose()
 
-# En producción no se publica el esquema OpenAPI (/api/v1/openapi.json es accesible a través de Nginx)
+# Do not publish the OpenAPI schema in production (/api/v1/openapi.json is reachable through Nginx)
 _expose_docs = settings.ENVIRONMENT != "production"
 
 app = FastAPI(
@@ -213,7 +216,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configuración de Rate Limiting (SlowAPI)
+# Rate limiting (SlowAPI)
 from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 from fastapi import Request
@@ -226,11 +229,11 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
         status_code=429,
         content={
-            "detail": "Demasiadas peticiones desde tu dirección IP. Por favor espera un momento antes de volver a intentarlo (Rate Limit Exceeded)."
+            "detail": "Too many requests from your IP address. Please wait a moment and try again (rate limit exceeded)."
         }
     )
 
-# Configuración de CORS
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
@@ -246,7 +249,7 @@ uploads_dir = "/app/uploads" if os.path.exists("/app/uploads") else os.path.absp
 os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
-# Registrar rutas
+# Routes
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/health", tags=["Health"])

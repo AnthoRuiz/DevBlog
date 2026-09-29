@@ -10,9 +10,9 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "DevBlog Homelab API"
 
-    # Base de datos: sin credenciales por defecto. DATABASE_URL se construye a partir de los
-    # componentes escapando usuario y contraseña (admite caracteres como @ : / # %),
-    # salvo que se proporcione DATABASE_URL completa.
+    # Database: no default credentials. DATABASE_URL is built from the components with the
+    # user and password percent-encoded (so characters like @ : / # % are safe),
+    # unless a full DATABASE_URL is provided.
     DATABASE_URL: Optional[str] = None
     POSTGRES_USER: str = "devblog_user"
     POSTGRES_PASSWORD: Optional[str] = None
@@ -28,20 +28,20 @@ class Settings(BaseSettings):
                 f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
             )
         elif not self.DATABASE_URL:
-            raise ValueError("Define POSTGRES_PASSWORD (o DATABASE_URL) en el entorno / .env")
+            raise ValueError("Set POSTGRES_PASSWORD (or DATABASE_URL) in the environment / .env")
         return self
 
-    # JWT: obligatoria, sin valor por defecto
+    # JWT: required, no default
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440 # 24 horas
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440 # 24 hours
 
-    # Selector de rol para pruebas (PUT /auth/me/role). Nunca activar en un despliegue público:
-    # permite que cualquier usuario autenticado se asigne el rol ADMIN.
+    # Test role switcher (PUT /auth/me/role). Never enable on a public deployment:
+    # it lets any authenticated user grant themselves the ADMIN role.
     ALLOW_ROLE_SELF_SWITCH: bool = False
 
-    # Admin inicial sembrado al arrancar con la base de datos vacía.
-    # Si ADMIN_PASSWORD no está definida se genera una aleatoria y se imprime una sola vez en stdout.
+    # Initial admin seeded on startup when no ADMIN exists.
+    # If ADMIN_PASSWORD is unset, a random password is generated and printed once to stdout.
     ADMIN_EMAIL: str = "admin@devblog.local"
     ADMIN_PASSWORD: Optional[str] = None
 
@@ -74,7 +74,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Claves publicadas en el repositorio: cualquiera podría firmar JWT válidos con ellas
+# Keys published in the repository: anyone could sign valid JWTs with them
 _PUBLIC_SECRET_KEYS = {
     "devblog_insecure_default_secret_key_change_in_production_2026",
     "change_this_to_a_secure_random_key_in_production_2026",
@@ -85,12 +85,12 @@ def _validate_security_settings(s: Settings) -> None:
     if s.ENVIRONMENT == "production":
         problems = []
         if insecure_key:
-            problems.append("SECRET_KEY es un valor por defecto o tiene menos de 32 caracteres")
+            problems.append("SECRET_KEY is a published default or shorter than 32 characters")
         if s.ALLOW_ROLE_SELF_SWITCH:
-            problems.append("ALLOW_ROLE_SELF_SWITCH=True permite escalar a ADMIN")
+            problems.append("ALLOW_ROLE_SELF_SWITCH=True allows escalating to ADMIN")
         if problems:
-            raise RuntimeError("Configuración insegura para producción: " + "; ".join(problems))
+            raise RuntimeError("Insecure configuration for production: " + "; ".join(problems))
     elif insecure_key:
-        print("[Config] AVISO: SECRET_KEY insegura. Genera una con: openssl rand -hex 32", flush=True)
+        print("[Config] WARNING: insecure SECRET_KEY. Generate one with: openssl rand -hex 32", flush=True)
 
 _validate_security_settings(settings)

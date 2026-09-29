@@ -40,12 +40,12 @@ from app.services.gemini import translate_post_content, suggest_post_tags, estim
 from app.api.deps import get_current_admin, get_current_author_or_admin, get_current_user_optional, get_client_hash
 from app.core.limiter import limiter
 
-router = APIRouter(prefix="/posts", tags=["Artículos"])
+router = APIRouter(prefix="/posts", tags=["Posts"])
 
 @router.get("", response_model=list[PostRead])
 async def list_posts(
-    tag: Optional[str] = Query(None, description="Filtrar por slug de tag"),
-    q: Optional[str] = Query(None, description="Búsqueda por título o resumen"),
+    tag: Optional[str] = Query(None, description="Filter by tag slug"),
+    q: Optional[str] = Query(None, description="Search by title or summary"),
     sort: str = Query("recent", regex="^(recent|top_voted|trending)$"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -87,9 +87,9 @@ async def create_tag(
     clean_name = tag_in.name.strip()
     clean_slug = slugify(clean_name)
     if not clean_slug:
-        raise HTTPException(status_code=400, detail="Nombre de tag inválido")
+        raise HTTPException(status_code=400, detail="Invalid tag name")
 
-    # Verificar si ya existe por nombre o slug
+    # Check whether it already exists by name or slug
     existing = await db.execute(
         select(Tag).where((Tag.name.ilike(clean_name)) | (Tag.slug == clean_slug))
     )
@@ -131,8 +131,8 @@ async def ai_estimate_reading_time(
     current_user: User = Depends(get_current_author_or_admin),
 ):
     """
-    Calcula el tiempo estimado de lectura en minutos mediante IA (Google Gemini),
-    evaluando la densidad técnica (código, terminal, diagramas) y extensión.
+    Estimate reading time in minutes with AI (Google Gemini), weighing
+    technical density (code, terminal, diagrams) and length.
     """
     minutes = await estimate_reading_time(
         title=req.title,
@@ -171,7 +171,7 @@ async def list_my_bookmarks(
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
 def _detect_image_ext(data: bytes) -> Optional[str]:
-    """Identifica JPG, PNG, GIF o WEBP por su firma binaria (magic bytes)."""
+    """Identify JPG, PNG, GIF or WEBP by their file signature (magic bytes)."""
     if data.startswith(b"\xff\xd8\xff"):
         return ".jpg"
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -190,16 +190,16 @@ async def upload_image(
     uploads_dir = "/app/uploads" if os.path.exists("/app/uploads") else os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads"))
     os.makedirs(uploads_dir, exist_ok=True)
 
-    # Leer como máximo el límite + 1 byte para detectar archivos demasiado grandes sin cargarlos enteros
+    # Read at most limit + 1 bytes to detect oversized files without loading them fully
     data = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail=f"La imagen supera el máximo de {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.")
+        raise HTTPException(status_code=413, detail=f"Image exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB limit.")
 
-    # La extensión se decide por el contenido real, no por el nombre enviado por el cliente.
-    # SVG no se admite: puede contener JavaScript y se serviría desde el mismo dominio.
+    # The extension comes from the actual content, not the client-supplied filename.
+    # SVG is not allowed: it can carry JavaScript and would be served from our own origin.
     ext = _detect_image_ext(data)
     if not ext:
-        raise HTTPException(status_code=400, detail="Formato de archivo no soportado. Usa JPG, PNG, WEBP o GIF.")
+        raise HTTPException(status_code=400, detail="Unsupported file format. Use JPG, PNG, WEBP or GIF.")
 
     filename = f"img_{uuid.uuid4().hex[:12]}{ext}"
     file_path = os.path.join(uploads_dir, filename)
@@ -217,8 +217,8 @@ async def ai_translate_post(
     current_user: User = Depends(get_current_author_or_admin),
 ):
     """
-    Traduce título, resumen y markdown a uno de los idiomas soportados (es, en, pt, fr)
-    utilizando Google Gemini AI mientras preserva bloques de código y estructura técnica.
+    Translate title, summary and markdown into a supported language (es, en, pt, fr)
+    with Google Gemini AI, preserving code blocks and technical structure.
     """
     res = await translate_post_content(
         title=req.title,
@@ -238,7 +238,7 @@ async def get_post_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
     )
     post = result.scalar_one_or_none()
     if not post:
-        raise HTTPException(status_code=404, detail="Artículo no encontrado")
+        raise HTTPException(status_code=404, detail="Post not found")
 
     post.views_count += 1
     await db.commit()
@@ -305,13 +305,13 @@ async def update_post(
     )
     post = result.scalar_one_or_none()
     if not post:
-        raise HTTPException(status_code=404, detail="Artículo no encontrado")
+        raise HTTPException(status_code=404, detail="Post not found")
 
-    # Verificación de permisos RBAC: Solo ADMIN o el autor original del post
+    # RBAC check: only ADMIN or the post's original author
     if current_user.role != UserRole.ADMIN and post.author_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permisos insuficientes: solo el autor original o un administrador pueden editar este artículo"
+            detail="Insufficient permissions: only the original author or an admin can edit this post"
         )
 
     if post_update.title is not None and post_update.title != post.title:
@@ -367,18 +367,18 @@ async def delete_post(
     result = await db.execute(select(Post).where(Post.id == post_id))
     post = result.scalar_one_or_none()
     if not post:
-        raise HTTPException(status_code=404, detail="Artículo no encontrado")
+        raise HTTPException(status_code=404, detail="Post not found")
 
-    # Verificación de permisos RBAC: Solo ADMIN o el autor original del post
+    # RBAC check: only ADMIN or the post's original author
     if current_user.role != UserRole.ADMIN and post.author_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permisos insuficientes: solo el autor original o un administrador pueden eliminar este artículo"
+            detail="Insufficient permissions: only the original author or an admin can delete this post"
         )
 
     await db.delete(post)
     await db.commit()
-    return {"status": "success", "message": "Artículo eliminado correctamente", "id": str(post_id)}
+    return {"status": "success", "message": "Post deleted successfully", "id": str(post_id)}
 
 @router.get("/{post_id}/comments", response_model=list[CommentRead])
 async def list_comments(post_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
@@ -402,20 +402,20 @@ async def create_comment(
     post_res = await db.execute(select(Post).where(Post.id == post_id))
     post = post_res.scalar_one_or_none()
     if not post:
-        raise HTTPException(status_code=404, detail="Artículo no encontrado")
+        raise HTTPException(status_code=404, detail="Post not found")
 
-    # Anti-Spam: Trampa Honeypot contra bots
+    # Anti-spam: honeypot field against bots
     if comment_in.hp_website:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Petición bloqueada por filtro anti-spam"
+            detail="Request blocked by anti-spam filter"
         )
 
-    # Sanitización de contenido contra inyecciones de scripts
+    # Strip script/iframe injections from the content
     sanitized = re.sub(r'<\s*script[^>]*>.*?<\s*/\s*script\s*>', '', comment_in.content, flags=re.IGNORECASE | re.DOTALL)
     sanitized = re.sub(r'<\s*iframe[^>]*>.*?<\s*/\s*iframe\s*>', '', sanitized, flags=re.IGNORECASE | re.DOTALL)
     if not sanitized.strip():
-        raise HTTPException(status_code=400, detail="Contenido de comentario inválido")
+        raise HTTPException(status_code=400, detail="Invalid comment content")
 
     author_name = current_user.full_name if current_user else (comment_in.author_name or "Dev Reader")
     user_id = current_user.id if current_user else None
@@ -443,7 +443,7 @@ async def toggle_upvote(
     post_res = await db.execute(select(Post).where(Post.id == post_id))
     post = post_res.scalar_one_or_none()
     if not post:
-        raise HTTPException(status_code=404, detail="Artículo no encontrado")
+        raise HTTPException(status_code=404, detail="Post not found")
 
     client_hash = get_client_hash(request)
 
@@ -485,7 +485,7 @@ async def toggle_bookmark(
     post_res = await db.execute(select(Post).where(Post.id == post_id))
     post = post_res.scalar_one_or_none()
     if not post:
-        raise HTTPException(status_code=404, detail="Artículo no encontrado")
+        raise HTTPException(status_code=404, detail="Post not found")
 
     client_hash = get_client_hash(request)
 

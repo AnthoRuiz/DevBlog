@@ -11,7 +11,7 @@ class Upvote(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     post_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
-    client_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True) # SHA-256 anónimo para lectores sin login
+    client_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True) # Anonymous SHA-256 fingerprint for logged-out readers
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     post: Mapped["Post"] = relationship("Post", back_populates="upvotes")

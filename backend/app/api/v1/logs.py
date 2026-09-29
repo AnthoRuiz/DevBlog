@@ -20,13 +20,13 @@ class ClientLogPayload(BaseModel):
     level: Literal["INFO", "WARN", "ERROR"] = "ERROR"
 
 def _single_line(value: Optional[str], max_len: int) -> str:
-    """Trunca y elimina saltos de línea para que un cliente no pueda falsificar entradas del log."""
+    """Truncate and strip newlines so a client cannot forge log entries."""
     if not value:
         return ""
     return value[:max_len].replace("\r", " ").replace("\n", " ⏎ ")
 
 def _indented_block(value: str, max_len: int) -> str:
-    """Trunca un bloque multilínea (stack traces) e indenta sus líneas para distinguirlas de entradas reales."""
+    """Truncate a multi-line block (stack traces) and indent it so it cannot pass for real entries."""
     return value[:max_len].replace("\r", "").replace("\n", "\n    ")
 
 @router.post("/client", status_code=status.HTTP_204_NO_CONTENT)
@@ -62,5 +62,5 @@ async def get_recent_logs(
                 recent.append(line)
         return {"total_lines": total, "recent_lines": list(recent)}
     except Exception:
-        client_logger.exception("Error leyendo el archivo de logs")
-        return {"error": "No se pudo leer el archivo de logs", "recent_lines": []}
+        client_logger.exception("Failed to read the log file")
+        return {"error": "Could not read the log file", "recent_lines": []}

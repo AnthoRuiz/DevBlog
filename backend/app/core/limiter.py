@@ -4,7 +4,7 @@ from fastapi import Request
 
 def get_real_client_ip(request: Request) -> str:
     """
-    Obtiene la IP real del cliente considerando cabeceras de proxy inverso
+    Resolve the real client IP, honoring reverse-proxy headers
     (Nginx, Cloudflare Tunnel CF-Connecting-IP, X-Forwarded-For).
     """
     cf_ip = request.headers.get("cf-connecting-ip")
@@ -17,5 +17,5 @@ def get_real_client_ip(request: Request) -> str:
         
     return get_remote_address(request) or "127.0.0.1"
 
-# Limiter en memoria para el servidor FastAPI
+# In-memory limiter for the FastAPI server
 limiter = Limiter(key_func=get_real_client_ip, default_limits=["120/minute"])
