@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Despliegue a producción de DevBlog.
+# DevBlog production deployment.
 #
-# Uso (desde WSL Ubuntu, en la carpeta del proyecto):
-#   ./deploy.sh                 # reconstruye y despliega todos los servicios
-#   ./deploy.sh backend         # solo el backend (o: frontend)
-#   ./deploy.sh --check         # solo comprobaciones previas y de salud, sin desplegar
-#   ./deploy.sh --yes           # no preguntar si hay cambios sin commitear
+# Usage (from WSL Ubuntu, in the project folder):
+#   ./deploy.sh                 # rebuild and deploy all services
+#   ./deploy.sh backend         # backend only (or: frontend)
+#   ./deploy.sh --check         # run preflight and health checks only, no deploy
+#   ./deploy.sh --yes           # do not prompt when there are uncommitted changes
 #
-# Variables opcionales: PUBLIC_URL (por defecto https://blog.anthoruiz.dev)
+# Optional variables: PUBLIC_URL (default https://blog.anthoruiz.dev)
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -23,7 +23,7 @@ for arg in "$@"; do
     --check) CHECK_ONLY=true ;;
     --yes|-y) ASSUME_YES=true ;;
     -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    -*) echo "Opción desconocida: $arg" >&2; exit 2 ;;
+    -*) echo "Unknown option: $arg" >&2; exit 2 ;;
     *) SERVICES+=("$arg") ;;
   esac
 done
@@ -38,122 +38,122 @@ warn() { echo "  ${YELLOW}⚠${RESET} $*"; }
 fail() { echo "  ${RED}✘${RESET} $*" >&2; exit 1; }
 step() { echo; echo "${BOLD}▸ $*${RESET}"; }
 
-# Lee una clave del .env sin hacer `source` (los valores pueden tener $, comillas, =, etc.)
+# Read a key from .env without `source` (values may contain $, quotes, =, etc.)
 env_value() {
   grep -m1 "^$1=" .env 2>/dev/null | cut -d= -f2- | tr -d '\r' || true
 }
 
-# ── 1. Entorno ────────────────────────────────────────────────────────────────
-step "Entorno"
+# ── 1. Environment ────────────────────────────────────────────────────────────
+step "Environment"
 case "$(uname -s)" in
   Linux) ok "Linux/WSL" ;;
-  *) fail "Ejecuta este script desde WSL Ubuntu (wsl -d Ubuntu), no desde Git Bash ni cmd." ;;
+  *) fail "Run this script from WSL Ubuntu (wsl -d Ubuntu), not from Git Bash or cmd." ;;
 esac
-docker info >/dev/null 2>&1 || fail "No se puede conectar con Docker. ¿Está corriendo el Docker Engine de WSL?"
-ok "Docker disponible"
+docker info >/dev/null 2>&1 || fail "Cannot connect to Docker. Is the WSL Docker Engine running?"
+ok "Docker available"
 if [ -f docker-compose.override.yml ]; then
-  warn "Existe docker-compose.override.yml: Docker Compose lo aplica automáticamente."
+  warn "docker-compose.override.yml exists: Docker Compose applies it automatically."
 fi
 
-# ── 2. Configuración (.env) ───────────────────────────────────────────────────
-step "Configuración (.env)"
-[ -f .env ] || fail "No existe .env. Copia .env.example y complétalo."
+# ── 2. Configuration (.env) ───────────────────────────────────────────────────
+step "Configuration (.env)"
+[ -f .env ] || fail ".env not found. Copy .env.example and fill it in."
 
 for key in SECRET_KEY CLOUDFLARE_TUNNEL_TOKEN POSTGRES_PASSWORD; do
-  [ -n "$(env_value "$key")" ] || fail "$key está vacía o no existe en .env"
+  [ -n "$(env_value "$key")" ] || fail "$key is empty or missing in .env"
 done
 secret="$(env_value SECRET_KEY)"
-[ "${#secret}" -ge 32 ] || fail "SECRET_KEY tiene menos de 32 caracteres (genera una con: openssl rand -hex 32)"
-ok "SECRET_KEY, CLOUDFLARE_TUNNEL_TOKEN y POSTGRES_PASSWORD definidas"
+[ "${#secret}" -ge 32 ] || fail "SECRET_KEY is shorter than 32 characters (generate one with: openssl rand -hex 32)"
+ok "SECRET_KEY, CLOUDFLARE_TUNNEL_TOKEN and POSTGRES_PASSWORD are set"
 
-[ "$(env_value ENVIRONMENT)" = "production" ] || fail "ENVIRONMENT debe ser 'production' en .env"
+[ "$(env_value ENVIRONMENT)" = "production" ] || fail "ENVIRONMENT must be 'production' in .env"
 ok "ENVIRONMENT=production"
 
 case "$(env_value ALLOW_ROLE_SELF_SWITCH | tr '[:upper:]' '[:lower:]')" in
-  true|1|yes) fail "ALLOW_ROLE_SELF_SWITCH está activado: permite que cualquier usuario se haga ADMIN." ;;
+  true|1|yes) fail "ALLOW_ROLE_SELF_SWITCH is enabled: it lets any user become ADMIN." ;;
 esac
-ok "Selector de roles de prueba desactivado"
+ok "Test role switcher disabled"
 
-# Compose aborta si falta una variable obligatoria (${VAR:?...}) y avisa de las demás sin definir
+# Compose aborts when a required variable is missing (${VAR:?...}) and warns about other unset ones
 if ! compose_out="$(docker compose config -q 2>&1)"; then
-  fail "docker compose config falló: $compose_out"
+  fail "docker compose config failed: $compose_out"
 fi
 unset_vars="$(echo "$compose_out" | grep -o 'The "[A-Z_]*" variable is not set' || true)"
-[ -z "$unset_vars" ] || fail "Docker Compose no encuentra variables: $(echo "$unset_vars" | tr '\n' ' ')"
-ok "docker-compose.yml válido y todas las variables definidas"
+[ -z "$unset_vars" ] || fail "Docker Compose cannot resolve variables: $(echo "$unset_vars" | tr '\n' ' ')"
+ok "docker-compose.yml is valid and all variables are set"
 
-# ── 3. Estado de git ──────────────────────────────────────────────────────────
-step "Código a desplegar"
+# ── 3. Git state ──────────────────────────────────────────────────────────────
+step "Code to deploy"
 if git rev-parse --git-dir >/dev/null 2>&1; then
-  echo "  Rama: $(git rev-parse --abbrev-ref HEAD) · Commit: $(git log -1 --format='%h %s')"
-  # --ignore-cr-at-eol: en Windows muchos archivos solo difieren en saltos de línea (CRLF)
+  echo "  Branch: $(git rev-parse --abbrev-ref HEAD) · Commit: $(git log -1 --format='%h %s')"
+  # --ignore-cr-at-eol: on Windows many files differ only in line endings (CRLF)
   changed="$(git diff --name-only HEAD -- backend frontend docker-compose.yml 2>/dev/null \
     | while read -r f; do [ -z "$(git diff --ignore-cr-at-eol HEAD -- "$f")" ] || echo "$f"; done)"
   untracked="$(git ls-files --others --exclude-standard -- backend frontend)"
   if [ -n "$changed$untracked" ]; then
-    warn "Hay cambios sin commitear que TAMBIÉN se desplegarán:"
+    warn "Uncommitted changes that WILL ALSO be deployed:"
     printf '%s\n%s\n' "$changed" "$untracked" | sed '/^$/d; s/^/      /'
     if ! $CHECK_ONLY && ! $ASSUME_YES; then
-      read -r -p "  ¿Desplegar de todos modos? [s/N] " answer
-      [[ "$answer" =~ ^[sSyY]$ ]] || fail "Despliegue cancelado."
+      read -r -p "  Deploy anyway? [y/N] " answer
+      [[ "$answer" =~ ^[yY]$ ]] || fail "Deployment cancelled."
     fi
   else
-    ok "Sin cambios pendientes en backend/, frontend/ ni docker-compose.yml"
+    ok "No pending changes in backend/, frontend/ or docker-compose.yml"
   fi
 fi
 
-# ── 4. Despliegue ─────────────────────────────────────────────────────────────
+# ── 4. Deploy ─────────────────────────────────────────────────────────────────
 if $CHECK_ONLY; then
-  step "Modo --check: se omite el despliegue"
+  step "--check mode: skipping deployment"
 else
-  step "Desplegando ${SERVICES[*]:-todos los servicios}"
+  step "Deploying ${SERVICES[*]:-all services}"
   docker compose up -d --build --remove-orphans "${SERVICES[@]}"
 fi
 
-# ── 5. Verificación ───────────────────────────────────────────────────────────
-step "Verificación"
+# ── 5. Verification ───────────────────────────────────────────────────────────
+step "Verification"
 show_logs_and_fail() {
-  echo; echo "  Últimas líneas del backend:"; docker logs --tail 25 devblog_backend 2>&1 | sed 's/^/      /'
+  echo; echo "  Latest backend log lines:"; docker logs --tail 25 devblog_backend 2>&1 | sed 's/^/      /'
   fail "$1"
 }
 
 for c in devblog_postgres devblog_backend devblog_frontend devblog_tunnel; do
   state="$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo missing)"
-  [ "$state" = "running" ] || show_logs_and_fail "El contenedor $c no está corriendo (estado: $state)"
+  [ "$state" = "running" ] || show_logs_and_fail "Container $c is not running (state: $state)"
 done
-ok "Los 4 contenedores están corriendo"
+ok "All 4 containers are running"
 
 for _ in $(seq 1 30); do
   code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$LOCAL_API/health" || true)"
   [ "$code" = "200" ] && break
   sleep 2
 done
-[ "$code" = "200" ] || show_logs_and_fail "El backend no responde en $LOCAL_API/health (HTTP $code)"
-ok "Backend responde (/health)"
+[ "$code" = "200" ] || show_logs_and_fail "Backend is not responding at $LOCAL_API/health (HTTP $code)"
+ok "Backend responds (/health)"
 
 if docker inspect -f '{{join .Config.Cmd " "}}' devblog_backend | grep -q -- '--reload'; then
-  warn "El backend corre con --reload (modo desarrollo). Despliega sin -f docker-compose.dev.yml."
+  warn "Backend is running with --reload (development mode). Deploy without -f docker-compose.dev.yml."
 else
-  ok "Backend en modo producción (sin --reload)"
+  ok "Backend in production mode (no --reload)"
 fi
 
 code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$PUBLIC_URL/" || true)"
-[ "$code" = "200" ] || fail "El sitio público $PUBLIC_URL no responde (HTTP $code). Revisa: docker logs devblog_tunnel"
-ok "Sitio público responde ($PUBLIC_URL)"
+[ "$code" = "200" ] || fail "Public site $PUBLIC_URL is not responding (HTTP $code). Check: docker logs devblog_tunnel"
+ok "Public site responds ($PUBLIC_URL)"
 
 code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$PUBLIC_URL/api/v1/posts" || true)"
-[ "$code" = "200" ] || fail "La API pública no responde (HTTP $code)"
-ok "API pública responde"
+[ "$code" = "200" ] || fail "Public API is not responding (HTTP $code)"
+ok "Public API responds"
 
-# Regresiones de seguridad: estos endpoints nunca deben ser accesibles sin sesión
+# Security regressions: these endpoints must never be reachable without a session
 for path in /api/v1/logs/recent /api/v1/stats/telemetry /api/v1/stats/status; do
   code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$PUBLIC_URL$path" || true)"
-  [ "$code" = "401" ] || fail "$path devolvió HTTP $code sin sesión (se esperaba 401)"
+  [ "$code" = "401" ] || fail "$path returned HTTP $code without a session (expected 401)"
 done
-ok "Endpoints de admin protegidos (401 sin sesión)"
+ok "Admin endpoints protected (401 without a session)"
 
 if $CHECK_ONLY; then
-  echo; echo "${GREEN}${BOLD}Comprobaciones superadas.${RESET}"
+  echo; echo "${GREEN}${BOLD}All checks passed.${RESET}"
 else
-  echo; echo "${GREEN}${BOLD}Despliegue verificado.${RESET}"
+  echo; echo "${GREEN}${BOLD}Deployment verified.${RESET}"
 fi

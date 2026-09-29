@@ -4,12 +4,12 @@ services:
     container_name: devblog_postgres
     restart: unless-stopped
     environment:
-      # Toda la configuración sensible viene de .env (sin valores por defecto: si falta, compose aborta)
-      POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en .env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
-      POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB en .env}
+      # All sensitive configuration comes from .env (no defaults: compose aborts if a value is missing)
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
     ports:
-      # Solo accesible desde el host (el backend usa la red interna devblog_net)
+      # Host-only access (the backend uses the internal devblog_net network)
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -28,14 +28,14 @@ services:
     container_name: devblog_backend
     restart: unless-stopped
     environment:
-      # El backend compone DATABASE_URL escapando la contraseña (admite caracteres especiales)
-      - POSTGRES_USER=${POSTGRES_USER:?Define POSTGRES_USER en .env}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
-      - POSTGRES_DB=${POSTGRES_DB:?Define POSTGRES_DB en .env}
+      # The backend builds DATABASE_URL and percent-encodes the password (special characters are safe)
+      - POSTGRES_USER=${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - POSTGRES_DB=${POSTGRES_DB:?Set POSTGRES_DB in .env}
       - POSTGRES_HOST=db
-      - SECRET_KEY=${SECRET_KEY:?Define SECRET_KEY en .env (openssl rand -hex 32)}
-      - ENVIRONMENT=${ENVIRONMENT:?Define ENVIRONMENT en .env (production o development)}
-      # Opcionales: sus valores por defecto son los seguros
+      - SECRET_KEY=${SECRET_KEY:?Set SECRET_KEY in .env (openssl rand -hex 32)}
+      - ENVIRONMENT=${ENVIRONMENT:?Set ENVIRONMENT in .env (production or development)}
+      # Optional: their defaults are the safe choice
       - DEBUG=${DEBUG:-False}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
@@ -43,10 +43,10 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ALLOW_ROLE_SELF_SWITCH=${ALLOW_ROLE_SELF_SWITCH:-False}
     ports:
-      # Solo accesible desde el host; el tráfico público entra por Nginx (frontend) y el túnel
+      # Host-only access; public traffic comes in through Nginx (frontend) and the tunnel
       - "127.0.0.1:8000:8000"
     volumes:
-      # El código va dentro de la imagen (sin montar ./backend). Para desarrollo con recarga:
+      # Code ships inside the image (./backend is not mounted). For development with live reload:
       #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
       - ./backend/backups:/app/backups
       - uploads_data:/app/uploads
@@ -64,8 +64,8 @@ services:
     container_name: devblog_frontend
     restart: unless-stopped
     ports:
-      # Solo desde este equipo: el acceso público es vía túnel (red interna devblog_net).
-      # Si necesitas verlo desde otro dispositivo de tu red local, cambia a "3000:80".
+      # This machine only: public access goes through the tunnel (internal devblog_net network).
+      # To reach it from another device on your LAN, change this to "3000:80".
       - "127.0.0.1:3000:80"
     depends_on:
       - backend
@@ -76,7 +76,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: devblog_tunnel
     restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?Define CLOUDFLARE_TUNNEL_TOKEN en .env}
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in .env}
     depends_on:
       - frontend
     networks:

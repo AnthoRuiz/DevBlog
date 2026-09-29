@@ -1,12 +1,12 @@
-# Datos de ejecución: se montan como volúmenes y nunca deben quedar dentro de la imagen
-# (los backups contienen la base de datos completa, incluidos hashes de contraseñas)
+# Runtime data: mounted as volumes and must never be baked into the image
+# (backups contain the full database, including password hashes)
 backups/
 uploads/
 logs/
 .env
 .env.*
 
-# Artefactos locales
+# Local artifacts
 __pycache__/
 *.pyc
 .venv/

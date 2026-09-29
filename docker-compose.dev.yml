@@ -1,6 +1,6 @@
-# Overrides para desarrollo local: monta el código del backend y activa la recarga automática.
-# Uso: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-# No usar en el despliegue público: cualquier cambio en ./backend se aplicaría en vivo.
+# Local development overrides: mount the backend source and enable live reload.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Never use for the public deployment: any change under ./backend would go live immediately.
 services:
   backend:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

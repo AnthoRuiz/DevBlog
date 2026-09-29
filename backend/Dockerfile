@@ -2,7 +2,7 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Instalar dependencias del sistema mínimas
+# Minimal system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
@@ -16,5 +16,5 @@ COPY . .
 
 EXPOSE 8000
 
-# Producción: sin --reload (para desarrollo con recarga usar docker-compose.dev.yml)
+# Production: no --reload (for live reload during development use docker-compose.dev.yml)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
