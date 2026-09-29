@@ -27,7 +27,11 @@ services:
     container_name: devblog_backend
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-devblog_user}:${POSTGRES_PASSWORD:-devblog_secure_pass_2026}@db:5432/${POSTGRES_DB:-devblog}
+      # El backend compone DATABASE_URL escapando la contraseña (admite caracteres especiales)
+      - POSTGRES_USER=${POSTGRES_USER:-devblog_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-devblog_secure_pass_2026}
+      - POSTGRES_DB=${POSTGRES_DB:-devblog}
+      - POSTGRES_HOST=db
       - SECRET_KEY=${SECRET_KEY:-devblog_insecure_default_secret_key_change_in_production_2026}
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - DEBUG=${DEBUG:-False}

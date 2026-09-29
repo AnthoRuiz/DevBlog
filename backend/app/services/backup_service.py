@@ -3,7 +3,7 @@ import gzip
 import asyncio
 from pathlib import Path
 from datetime import datetime, timezone
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 from typing import List, Dict, Any, Optional
 
 from app.core.config import settings
@@ -21,8 +21,9 @@ def get_db_credentials() -> Dict[str, str]:
     """Extrae las credenciales de PostgreSQL desde settings.DATABASE_URL."""
     url = urlparse(settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://"))
     return {
-        "user": url.username or "devblog_user",
-        "password": url.password or "devblog_secure_pass_2026",
+        # La URL lleva usuario y contraseña escapados (ver Settings._build_database_url)
+        "user": unquote(url.username) if url.username else "devblog_user",
+        "password": unquote(url.password) if url.password else "devblog_secure_pass_2026",
         "host": url.hostname or "db",
         "port": str(url.port or 5432),
         "name": url.path.lstrip("/") or "devblog"

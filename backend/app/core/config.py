@@ -1,5 +1,7 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 from typing import Optional
+from urllib.parse import quote
 import os
 
 class Settings(BaseSettings):
@@ -8,9 +10,24 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "DevBlog Homelab API"
     
-    # Base de datos
+    # Base de datos. Si POSTGRES_PASSWORD está definida, DATABASE_URL se construye a partir de
+    # los componentes escapando usuario y contraseña (admite caracteres como @ : / # %).
     DATABASE_URL: str = "postgresql+asyncpg://devblog_user:devblog_secure_pass_2026@localhost:5432/devblog"
-    
+    POSTGRES_USER: str = "devblog_user"
+    POSTGRES_PASSWORD: Optional[str] = None
+    POSTGRES_HOST: str = "db"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_DB: str = "devblog"
+
+    @model_validator(mode="after")
+    def _build_database_url(self) -> "Settings":
+        if self.POSTGRES_PASSWORD:
+            self.DATABASE_URL = (
+                f"postgresql+asyncpg://{quote(self.POSTGRES_USER, safe='')}:{quote(self.POSTGRES_PASSWORD, safe='')}"
+                f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            )
+        return self
+
     # JWT
     SECRET_KEY: str = "devblog_insecure_default_secret_key_change_in_production_2026"
     ALGORITHM: str = "HS256"
