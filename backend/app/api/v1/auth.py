@@ -69,10 +69,18 @@ async def login(request: Request, login_in: LoginRequest, db: AsyncSession = Dep
     return Token(access_token=token, token_type="bearer", user=UserRead.model_validate(user))
 
 @router.post("/oauth/google", response_model=Token)
-async def oauth_google(oauth_in: OAuthLoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def oauth_google(request: Request, oauth_in: OAuthLoginRequest, db: AsyncSession = Depends(get_db)):
     """Verifica el token de Google y vincula/crea la cuenta del usuario."""
+    # Sin client ID no se puede comprobar para qué app se emitió el token
+    if not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="El inicio de sesión con Google no está configurado"
+        )
+
     # Verificar token con la API oficial de Google
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(
             "https://oauth2.googleapis.com/tokeninfo",
             params={"id_token": oauth_in.id_token}
@@ -83,6 +91,19 @@ async def oauth_google(oauth_in: OAuthLoginRequest, db: AsyncSession = Depends(g
                 detail="Token de Google inválido o expirado"
             )
         google_data = resp.json()
+
+    # tokeninfo solo valida firma y caducidad: hay que exigir que el token sea para esta app
+    # (si no, un token emitido para cualquier otra app serviría aquí) y que el email esté verificado,
+    # ya que las cuentas se vinculan por email (incluidas las de ADMIN)
+    if (
+        google_data.get("aud") != settings.GOOGLE_CLIENT_ID
+        or google_data.get("iss") not in ("accounts.google.com", "https://accounts.google.com")
+        or str(google_data.get("email_verified", "")).lower() != "true"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token de Google no válido para esta aplicación o email no verificado"
+        )
 
     google_sub = google_data.get("sub") # ID único de Google
     email = google_data.get("email")

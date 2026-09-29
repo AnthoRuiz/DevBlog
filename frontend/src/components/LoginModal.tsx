@@ -43,35 +43,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
     }
   };
 
-  const handleGoogleDemoLogin = async () => {
-    setIsLoading(true);
-    setError('');
-    try {
-      // Intentar login con usuario demo o registrarlo si no existe
-      try {
-        const data = await loginUser('google.reader@devblog.local', 'google_reader_pass');
-        onLoginSuccess(data.access_token, data.user);
-        onClose();
-        return;
-      } catch {
-        // Fallback a registro
-      }
-
-      // Si no existe, crearlo
-      const regData = await registerUser(
-        'google.reader@devblog.local',
-        'google_reader_pass',
-        'Google Workspace Reader'
-      );
-      onLoginSuccess(regData.access_token, regData.user);
-      onClose();
-    } catch {
-      setError('No se pudo iniciar la sesión de demostración. Ingresa con tu cuenta.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="relative w-full max-w-md bg-[#0b0f19] border border-[#1e293b] rounded-2xl p-6 shadow-2xl overflow-hidden">
@@ -184,32 +155,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               : mode === 'register' ? (t?.createAccountBtn || 'Registrar Cuenta') : 'Ingresar'}
           </button>
         </form>
-
-        {/* Separador OAuth */}
-        <div className="relative my-5">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-[#1e293b]" />
-          </div>
-          <div className="relative flex justify-center text-[10px] uppercase font-mono">
-            <span className="bg-[#0b0f19] px-2 text-slate-500">o continuar con</span>
-          </div>
-        </div>
-
-        {/* Botón de Google Workspace */}
-        <button
-          type="button"
-          onClick={handleGoogleDemoLogin}
-          disabled={isLoading}
-          className="w-full flex items-center justify-center gap-2 border border-[#1e293b] hover:border-slate-500 bg-[#121622] py-2 rounded-xl text-xs font-medium text-slate-200 transition-colors"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24">
-            <path fill="#EA4335" d="M12 5c1.5 0 2.8.5 3.8 1.5l2.8-2.8C16.9 2.1 14.6 1.3 12 1.3 7.8 1.3 4.2 3.8 2.6 7.4l3.4 2.6C6.8 7.3 9.2 5 12 5z"/>
-            <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/>
-            <path fill="#FBBC05" d="M6 14.7c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L2.6 7.4C1.9 8.8 1.5 10.4 1.5 12s.4 3.2 1.1 4.6l3.4-1.9z"/>
-            <path fill="#34A853" d="M12 22.7c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-2.8 0-5.2-1.9-6-4.6L2.6 16c1.6 3.6 5.2 6.7 9.4 6.7z"/>
-          </svg>
-          <span>{t?.googleLoginBtn || 'Continuar con Google Workspace'}</span>
-        </button>
 
       </div>
     </div>
