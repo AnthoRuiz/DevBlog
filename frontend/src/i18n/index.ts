@@ -129,6 +129,12 @@ export interface Translations {
   aiTranslateUnavailable: string;
   keywordSuggestedTagsTitle: string;
   noTagSuggestions: string;
+  keywordSuggestedTagsQuota: string;
+  aiQuotaExhausted: string;
+  // Placeholder: {minutes}
+  aiRetryIn: string;
+  aiRetryLater: string;
+  aiTranslateFailed: string;
   editorEmptyPreview: string;
   markdownGuideTitle: string;
   systemStatusBtn: string;
@@ -278,6 +284,11 @@ export const translations: Record<Language, Translations> = {
     aiTranslateUnavailable: 'La traducción requiere un proveedor de IA configurado',
     keywordSuggestedTagsTitle: 'Sugerencias por palabras clave (sin IA)',
     noTagSuggestions: 'No se encontraron sugerencias de tags para este contenido.',
+    keywordSuggestedTagsQuota: 'Sugerencias por palabras clave (cuota de IA agotada)',
+    aiQuotaExhausted: 'No se pudo traducir: se agotó la cuota gratuita de IA.',
+    aiRetryIn: 'Vuelve a intentarlo en unos {minutes} min.',
+    aiRetryLater: 'Vuelve a intentarlo más tarde.',
+    aiTranslateFailed: 'No se pudo traducir: el servicio de IA falló. Inténtalo de nuevo.',
     editorEmptyPreview: 'El artículo aún no tiene contenido. Escribe en la pestaña "Escribir" para ver la previsualización.',
     markdownGuideTitle: 'Guía Rápida de Formato Markdown (Estilo Word)',
     systemStatusBtn: '🖥️ Estado (/status)',
@@ -425,6 +436,11 @@ export const translations: Record<Language, Translations> = {
     aiTranslateUnavailable: 'Translation requires a configured AI provider',
     keywordSuggestedTagsTitle: 'Keyword-based suggestions (no AI)',
     noTagSuggestions: 'No tag suggestions found for this content.',
+    keywordSuggestedTagsQuota: 'Keyword-based suggestions (AI quota exhausted)',
+    aiQuotaExhausted: 'Could not translate: the free AI quota has run out.',
+    aiRetryIn: 'Try again in about {minutes} min.',
+    aiRetryLater: 'Try again later.',
+    aiTranslateFailed: 'Could not translate: the AI service failed. Please try again.',
     editorEmptyPreview: 'The article does not have content yet. Write in the "Write" tab to see the live preview.',
     markdownGuideTitle: 'Quick Markdown Formatting Guide (Word-like)',
     systemStatusBtn: '🖥️ Status (/status)',
@@ -572,6 +588,11 @@ export const translations: Record<Language, Translations> = {
     aiTranslateUnavailable: 'A tradução requer um provedor de IA configurado',
     keywordSuggestedTagsTitle: 'Sugestões por palavras-chave (sem IA)',
     noTagSuggestions: 'Nenhuma sugestão de tag encontrada para este conteúdo.',
+    keywordSuggestedTagsQuota: 'Sugestões por palavras-chave (cota de IA esgotada)',
+    aiQuotaExhausted: 'Não foi possível traduzir: a cota gratuita de IA acabou.',
+    aiRetryIn: 'Tente novamente em cerca de {minutes} min.',
+    aiRetryLater: 'Tente novamente mais tarde.',
+    aiTranslateFailed: 'Não foi possível traduzir: o serviço de IA falhou. Tente novamente.',
     editorEmptyPreview: 'O artigo ainda não tem conteúdo. Escreva na aba "Escrever" para ver a pré-visualização.',
     markdownGuideTitle: 'Guia Rápido de Formatação Markdown (Estilo Word)',
     systemStatusBtn: '🖥️ Status (/status)',
@@ -719,6 +740,11 @@ export const translations: Record<Language, Translations> = {
     aiTranslateUnavailable: 'La traduction nécessite un fournisseur IA configuré',
     keywordSuggestedTagsTitle: 'Suggestions par mots-clés (sans IA)',
     noTagSuggestions: 'Aucune suggestion de tag trouvée pour ce contenu.',
+    keywordSuggestedTagsQuota: 'Suggestions par mots-clés (quota IA épuisé)',
+    aiQuotaExhausted: "Traduction impossible : le quota gratuit d'IA est épuisé.",
+    aiRetryIn: 'Réessayez dans environ {minutes} min.',
+    aiRetryLater: 'Réessayez plus tard.',
+    aiTranslateFailed: "Traduction impossible : le service d'IA a échoué. Réessayez.",
     editorEmptyPreview: 'L\'article n\'a pas encore de contenu. Écrivez dans l\'onglet "Écrire" pour voir l\'aperçu.',
     markdownGuideTitle: 'Guide Rapide de Formatage Markdown (Style Word)',
     systemStatusBtn: '🖥️ Statut (/status)',

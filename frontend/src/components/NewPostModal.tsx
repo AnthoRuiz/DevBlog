@@ -22,6 +22,7 @@ import {
   createTag,
   validateTagSection,
   fetchAIStatus,
+  AIUnavailableError,
   suggestTagsWithAi,
 } from '../services/api';
 import { MarkdownToolbar } from './MarkdownToolbar';
@@ -75,6 +76,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([]);
   // Where the last suggestions came from: an LLM provider, or 'keywords' without AI
   const [suggestionSource, setSuggestionSource] = useState<string | null>(null);
+  const [suggestionFallbackReason, setSuggestionFallbackReason] = useState<string | null>(null);
   const [aiStatus, setAiStatus] = useState<AIStatus | null>(null);
 
   const [isUploading, setIsUploading] = useState(false);
@@ -237,6 +239,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       );
       setAiTagSuggestions(suggestions.tags);
       setSuggestionSource(suggestions.provider);
+      setSuggestionFallbackReason(suggestions.fallbackReason);
       if (suggestions.tags.length === 0) setErrorMsg(t.noTagSuggestions);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'AI category suggestion failed';
@@ -338,8 +341,20 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setAiSuccessMsg(`${t.aiTranslateSuccess} (${res.provider})`);
       setTimeout(() => setAiSuccessMsg(null), 6000);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'AI translation failed';
-      setErrorMsg(message);
+      if (err instanceof AIUnavailableError) {
+        if (err.code === 'ai_quota_exhausted') {
+          const retry = err.retryAfter
+            ? t.aiRetryIn.replace('{minutes}', String(Math.max(1, Math.ceil(err.retryAfter / 60))))
+            : t.aiRetryLater;
+          setErrorMsg(`${t.aiQuotaExhausted} ${retry}`);
+        } else if (err.code === 'ai_not_configured') {
+          setErrorMsg(t.aiTranslateUnavailable);
+        } else {
+          setErrorMsg(t.aiTranslateFailed);
+        }
+      } else {
+        setErrorMsg(err instanceof Error ? err.message : 'AI translation failed');
+      }
     } finally {
       setIsTranslating(false);
     }
@@ -843,7 +858,11 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                 <div className="flex items-center justify-between text-[11px] font-mono text-purple-300">
                   <span className="flex items-center gap-1.5">
                     <Sparkles className="w-3 h-3 text-purple-400" />
-                    {suggestionSource === 'keywords' ? t.keywordSuggestedTagsTitle : t.aiSuggestedTagsTitle}
+                    {suggestionSource !== 'keywords'
+                      ? t.aiSuggestedTagsTitle
+                      : suggestionFallbackReason === 'quota_exhausted'
+                      ? t.keywordSuggestedTagsQuota
+                      : t.keywordSuggestedTagsTitle}
                   </span>
                   <button
                     type="button"

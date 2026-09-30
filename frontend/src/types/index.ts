@@ -45,6 +45,8 @@ export interface TagSuggestions {
   tags: string[];
   // e.g. 'claude:claude-opus-5-5', or 'keywords' when no AI provider was available
   provider: string;
+  // Why keywords were used: 'not_configured' | 'quota_exhausted' | 'failed'
+  fallbackReason: string | null;
 }
 
 export interface TagValidation {

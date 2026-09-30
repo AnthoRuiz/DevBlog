@@ -320,6 +320,14 @@ export async function registerUser(
   return res.json();
 }
 
+// AI feature failure with a machine-readable code (ai_quota_exhausted | ai_not_configured | ai_failed)
+export class AIUnavailableError extends Error {
+  constructor(message: string, public code: string, public retryAfter: number | null) {
+    super(message);
+    this.name = 'AIUnavailableError';
+  }
+}
+
 export interface TranslatePostResponse {
   title: string;
   summary: string;
@@ -349,6 +357,9 @@ export async function translatePostWithAi(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'AI translation failed' }));
+    if (err.detail && typeof err.detail === 'object' && err.detail.code) {
+      throw new AIUnavailableError(err.detail.message, err.detail.code, err.detail.retry_after ?? null);
+    }
     throw new Error(err.detail || 'AI translation failed');
   }
 
@@ -408,7 +419,7 @@ export async function suggestTagsWithAi(
   }
 
   const data = await res.json();
-  return { tags: data.suggested_tags || [], provider: data.provider || 'keywords' };
+  return { tags: data.suggested_tags || [], provider: data.provider || 'keywords', fallbackReason: data.fallback_reason ?? null };
 }
 
 export async function fetchAIStatus(token: string): Promise<AIStatus> {
