@@ -1,15 +1,9 @@
-import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions, ReviewItem } from '../types';
+import { Post, PostDetail, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions, ReviewItem } from '../types';
 
 const API_BASE = '/api/v1';
 
 // Role switcher for local testing. Also requires ALLOW_ROLE_SELF_SWITCH=True on the backend.
 export const ROLE_TESTING_ENABLED = import.meta.env.VITE_ENABLE_ROLE_TESTING === 'true';
-
-export async function fetchStreakStats(): Promise<StreakStats> {
-  const res = await fetch(`${API_BASE}/stats/streak`);
-  if (!res.ok) throw new Error('Failed to load streak stats');
-  return res.json();
-}
 
 // ADMIN only
 export async function fetchLiveTelemetry(token: string): Promise<HardwareTelemetry> {

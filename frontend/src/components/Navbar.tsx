@@ -1,7 +1,8 @@
 import type { FC } from 'react';
-import { Terminal, User as UserIcon, Search, Globe, LogOut, X, Activity, Database, FileText } from 'lucide-react';
+import { PenLine, User as UserIcon, Search, Globe, LogOut, X, Activity, Database, FileText } from 'lucide-react';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
 import { User, UserRole } from '../types';
+import { BrandMark } from './BrandMark';
 
 interface NavbarProps {
   onSearch: (q: string) => void;
@@ -12,11 +13,11 @@ interface NavbarProps {
   onOpenBackups?: () => void;
   onSwitchRole?: (role: UserRole) => void;
   onOpenMyPosts?: () => void;
+  onNewPost?: () => void;
   // Posts waiting for admin review (badge on the admin panel button)
   reviewPending?: number;
   userEmail?: string | null;
   currentUser?: User | null;
-  serverNode?: string;
   currentLang: Language;
   onSelectLanguage: (lang: Language) => void;
   t: Translations;
@@ -31,10 +32,10 @@ export const Navbar: FC<NavbarProps> = ({
   onOpenBackups,
   onSwitchRole,
   onOpenMyPosts,
+  onNewPost,
   reviewPending = 0,
   userEmail,
   currentUser,
-  serverNode = 'Homelab Docker',
   currentLang,
   onSelectLanguage,
   t,
@@ -44,29 +45,14 @@ export const Navbar: FC<NavbarProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-[#07090e]/90 backdrop-blur-md border-b border-[#1e293b]">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-        {/* Brand */}
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-emerald-500 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-cyan-500/20">
-            <Terminal className="w-5 h-5" />
+        {/* Brand (personal brand book: >ar_ mark + name) */}
+        <a href="/" className="flex items-center gap-3 min-w-0" aria-label={t.siteTitle}>
+          <BrandMark size={32} />
+          <div className="min-w-0">
+            <span className="block font-bold tracking-tight text-[#F8FAFC] text-[15px] leading-tight">{t.siteTitle}</span>
+            <span className="hidden md:block text-[11px] font-mono text-[#7C8AA0] truncate">{t.siteTagline}</span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold tracking-tight text-white text-base">{t.siteTitle}</span>
-              <button
-                type="button"
-                onClick={onOpenStatus}
-                className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/30 hover:border-emerald-400 text-emerald-400 font-medium transition-all flex items-center gap-1 cursor-pointer"
-                title="View hardware status and latencies (/status)"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>{t.liveNode}</span>
-              </button>
-            </div>
-            <div className="text-[11px] font-mono text-slate-500 -mt-0.5">
-              {serverNode}
-            </div>
-          </div>
-        </div>
+        </a>
 
         {/* Central search */}
         <div className="flex-1 max-w-md hidden sm:block">
@@ -175,6 +161,17 @@ export const Navbar: FC<NavbarProps> = ({
                   </span>
                 ) : null}
               </span>
+              {onNewPost && (
+                <button
+                  type="button"
+                  onClick={onNewPost}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#22D3EE] hover:bg-[#67E8F9] text-[#07090E] text-xs font-semibold transition-colors"
+                  title={t.newPostBtn}
+                >
+                  <PenLine className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{t.newPostBtn}</span>
+                </button>
+              )}
               {onOpenMyPosts && (
                 <button
                   type="button"

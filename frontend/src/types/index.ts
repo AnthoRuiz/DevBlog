@@ -149,14 +149,12 @@ export interface SystemStatusResponse {
   services: ServiceStatus[];
 }
 
-export interface StreakStats {
-  current_streak_days: number;
-  total_articles_published: number;
-  total_views: number;
-  total_upvotes: number;
-  homelab_uptime_percent: number;
-  server_node: string;
-  telemetry?: HardwareTelemetry;
+export interface SiteInfo {
+  name: string;
+  tagline: string;
+  description: string;
+  url: string;
+  total_posts: number;
 }
 
 export interface BackupItem {

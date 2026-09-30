@@ -2,7 +2,7 @@ export type Language = 'es' | 'en' | 'pt' | 'fr';
 
 export interface Translations {
   siteTitle: string;
-  liveNode: string;
+  siteTagline: string;
   searchPlaceholder: string;
   authorLogin: string;
   authorLogout: string;
@@ -20,12 +20,6 @@ export interface Translations {
   saveDraftBtn: string;
   submitForReviewBtn: string;
   reviewPendingBadge: string;
-  writingStreak: string;
-  activeStatus: string;
-  streakDescription: string;
-  postsCount: string;
-  upvotesCountBadge: string;
-  uptimeBadge: string;
   newPostBtn: string;
   allTopics: string;
   bookmarksTab: string;
@@ -173,8 +167,8 @@ export interface Translations {
 
 export const translations: Record<Language, Translations> = {
   es: {
-    siteTitle: 'SYS.BLOG',
-    liveNode: '● Live Node',
+    siteTitle: 'Anthony Ruiz',
+    siteTagline: 'Lo construyo en casa antes de confiar en ello a escala.',
     searchPlaceholder: 'Buscar por tecnología o palabra clave...',
     authorLogin: 'Acceso / Registro',
     authorLogout: 'Cerrar Sesión',
@@ -192,12 +186,6 @@ export const translations: Record<Language, Translations> = {
     saveDraftBtn: 'Guardar borrador',
     submitForReviewBtn: 'Enviar a revisión',
     reviewPendingBadge: 'Posts esperando revisión',
-    writingStreak: 'DÍAS DE RACHA DE ESCRITURA',
-    activeStatus: 'ACTIVA',
-    streakDescription: 'Publicando aprendizajes continuos sobre arquitectura, sistemas distribuidos y homelab.',
-    postsCount: 'posts',
-    upvotesCountBadge: 'upvotes',
-    uptimeBadge: 'uptime',
     newPostBtn: 'Nuevo Post',
     allTopics: 'Todos los temas',
     bookmarksTab: '📌 Guardados',
@@ -336,11 +324,11 @@ export const translations: Record<Language, Translations> = {
     autoRefreshLive: 'En vivo (5s)',
     refreshNow: 'Actualizar',
     viewSystemStatus: 'Ver Estado del Servidor',
-    footerText: '© 2026 SYS.BLOG • Diseñado para Homelab • Desplegado con Docker • React + FastAPI',
+    footerText: '© 2026 Anthony Ruiz · Las opiniones son mías y no representan a mi empleador.',
   },
   en: {
-    siteTitle: 'SYS.BLOG',
-    liveNode: '● Live Node',
+    siteTitle: 'Anthony Ruiz',
+    siteTagline: 'I build it at home before I trust it at scale.',
     searchPlaceholder: 'Search by technology or keyword...',
     authorLogin: 'Login / Register',
     authorLogout: 'Log Out',
@@ -358,12 +346,6 @@ export const translations: Record<Language, Translations> = {
     saveDraftBtn: 'Save draft',
     submitForReviewBtn: 'Submit for review',
     reviewPendingBadge: 'Posts waiting for review',
-    writingStreak: 'DAYS WRITING STREAK',
-    activeStatus: 'ACTIVE',
-    streakDescription: 'Publishing continuous learnings on systems architecture, distributed computing, and homelab.',
-    postsCount: 'posts',
-    upvotesCountBadge: 'upvotes',
-    uptimeBadge: 'uptime',
     newPostBtn: 'New Post',
     allTopics: 'All Topics',
     bookmarksTab: '📌 Saved',
@@ -502,11 +484,11 @@ export const translations: Record<Language, Translations> = {
     autoRefreshLive: 'Live (5s)',
     refreshNow: 'Refresh',
     viewSystemStatus: 'View System Status',
-    footerText: '© 2026 SYS.BLOG • Built for Homelab • Deployed with Docker • React + FastAPI',
+    footerText: '© 2026 Anthony Ruiz · Views are my own and don\'t represent my employer.',
   },
   pt: {
-    siteTitle: 'SYS.BLOG',
-    liveNode: '● Live Node',
+    siteTitle: 'Anthony Ruiz',
+    siteTagline: 'Eu construo em casa antes de confiar nisso em escala.',
     searchPlaceholder: 'Pesquisar por tecnologia ou palavra-chave...',
     authorLogin: 'Entrar / Registrar',
     authorLogout: 'Encerrar Sessão',
@@ -524,12 +506,6 @@ export const translations: Record<Language, Translations> = {
     saveDraftBtn: 'Salvar rascunho',
     submitForReviewBtn: 'Enviar para revisão',
     reviewPendingBadge: 'Posts aguardando revisão',
-    writingStreak: 'DIAS DE SEQUÊNCIA DE ESCRITA',
-    activeStatus: 'ATIVA',
-    streakDescription: 'Publicando aprendizados contínuos sobre arquitetura, sistemas distribuídos e homelab.',
-    postsCount: 'posts',
-    upvotesCountBadge: 'upvotes',
-    uptimeBadge: 'uptime',
     newPostBtn: 'Novo Post',
     allTopics: 'Todos os temas',
     bookmarksTab: '📌 Salvos',
@@ -668,11 +644,11 @@ export const translations: Record<Language, Translations> = {
     autoRefreshLive: 'Ao vivo (5s)',
     refreshNow: 'Atualizar',
     viewSystemStatus: 'Ver Status do Servidor',
-    footerText: '© 2026 SYS.BLOG • Projetado para Homelab • Implantado com Docker • React + FastAPI',
+    footerText: '© 2026 Anthony Ruiz · As opiniões são minhas e não representam meu empregador.',
   },
   fr: {
-    siteTitle: 'SYS.BLOG',
-    liveNode: '● Live Node',
+    siteTitle: 'Anthony Ruiz',
+    siteTagline: 'Je le construis chez moi avant de m\'y fier à grande échelle.',
     searchPlaceholder: 'Rechercher par technologie ou mot-clé...',
     authorLogin: 'Connexion / Inscription',
     authorLogout: 'Déconnexion',
@@ -690,12 +666,6 @@ export const translations: Record<Language, Translations> = {
     saveDraftBtn: 'Enregistrer le brouillon',
     submitForReviewBtn: 'Soumettre à révision',
     reviewPendingBadge: 'Articles en attente de révision',
-    writingStreak: 'JOURS DE SÉRIE D\'ÉCRITURE',
-    activeStatus: 'ACTIVE',
-    streakDescription: 'Partage d\'apprentissages continus sur l\'architecture, les systèmes distribués et le homelab.',
-    postsCount: 'articles',
-    upvotesCountBadge: 'votes',
-    uptimeBadge: 'disponibilité',
     newPostBtn: 'Nouvel Article',
     allTopics: 'Tous les thèmes',
     bookmarksTab: '📌 Enregistrés',
@@ -834,7 +804,7 @@ export const translations: Record<Language, Translations> = {
     autoRefreshLive: 'En direct (5s)',
     refreshNow: 'Actualiser',
     viewSystemStatus: 'Voir l\'État du Serveur',
-    footerText: '© 2026 SYS.BLOG • Conçu pour Homelab • Déployé avec Docker • React + FastAPI',
+    footerText: '© 2026 Anthony Ruiz · Les opinions exprimées sont les miennes et ne représentent pas mon employeur.',
   },
 };
 

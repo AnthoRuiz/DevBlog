@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
-import { StreakHeader } from './components/StreakHeader';
 import { SectionIcon } from './components/SectionIcon';
 import { DigestCard } from './components/DigestCard';
 import { ArticleModal } from './components/ArticleModal';
@@ -9,13 +8,12 @@ import { NewPostModal } from './components/NewPostModal';
 import { SystemStatusModal } from './components/SystemStatusModal';
 import { BackupsModal } from './components/BackupsModal';
 import { MyPostsModal } from './components/MyPostsModal';
-import { Post, PostDetail, SectionWithCount, StreakStats, Tag, User, UserRole } from './types';
+import { Post, PostDetail, SectionWithCount, Tag, User, UserRole } from './types';
 import {
   fetchReviewCount,
   fetchPosts,
   fetchSections,
   POSTS_PAGE_SIZE,
-  fetchStreakStats,
   fetchPostBySlug,
   toggleUpvote,
   fetchAllTags,
@@ -37,7 +35,6 @@ export function App() {
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   // Incremented on every fresh load so late responses from an older filter are ignored
   const feedRequestId = useRef(0);
-  const [stats, setStats] = useState<StreakStats | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
   const [sections, setSections] = useState<SectionWithCount[]>([]);
   // Section filter (slug); undefined = all sections
@@ -171,9 +168,8 @@ export function App() {
     setIsLoading(true);
     try {
       if (selectedTag === '__bookmarks__') {
-        const [bookmarkedPosts, statsData, tagsData] = await Promise.all([
+        const [bookmarkedPosts, tagsData] = await Promise.all([
           fetchBookmarkedPosts().catch(() => []),
-          fetchStreakStats().catch(() => null),
           fetchAllTags().catch(() => []),
         ]);
 
@@ -187,12 +183,10 @@ export function App() {
         }
         setHasMorePosts(false);
 
-        if (statsData) setStats(statsData);
         if (tagsData.length > 0) setTags(tagsData);
       } else {
-        const [page, statsData, tagsData, sectionsData] = await Promise.all([
+        const [page, tagsData, sectionsData] = await Promise.all([
           fetchPosts({ section: selectedSection, tag: selectedTag, sort: sortBy, query: debouncedSearch }),
-          fetchStreakStats().catch(() => null),
           fetchAllTags().catch(() => []),
           fetchSections().catch(() => []),
         ]);
@@ -201,7 +195,6 @@ export function App() {
         setPosts(page.items);
         setTotalPosts(page.total);
         setHasMorePosts(page.has_more);
-        if (statsData) setStats(statsData);
         if (tagsData.length > 0) setTags(tagsData);
       }
     } catch (err) {
@@ -451,31 +444,23 @@ export function App() {
         onOpenBackups={() => setIsBackupsModalOpen(true)}
         onSwitchRole={ROLE_TESTING_ENABLED ? handleSwitchRole : undefined}
         onOpenMyPosts={currentUser ? () => setIsMyPostsOpen(true) : undefined}
+        onNewPost={
+          currentUser
+            ? () => {
+                setEditingPost(null);
+                setIsNewPostOpen(true);
+              }
+            : undefined
+        }
         reviewPending={reviewPending}
         userEmail={userEmail}
         currentUser={currentUser}
-        serverNode={stats?.server_node}
         currentLang={currentLang}
         onSelectLanguage={setCurrentLang}
         t={t}
       />
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
-        <StreakHeader
-          stats={stats}
-          isAdmin={currentUser?.role === 'ADMIN'}
-          token={userToken}
-          onNewPost={() => {
-            if (!currentUser) {
-              setIsLoginOpen(true);
-            } else {
-              setEditingPost(null);
-              setIsNewPostOpen(true);
-            }
-          }}
-          onOpenStatus={handleOpenStatus}
-          t={t}
-        />
 
         {/* Section bar */}
         {sections.length > 0 && (
@@ -752,8 +737,21 @@ export function App() {
         )}
       </main>
 
-      <footer className="border-t border-[#1e293b] mt-16 py-8 text-center text-xs font-mono text-slate-500">
-        <p>{t.footerText}</p>
+      <footer className="border-t border-[#1e293b] mt-16 py-8 px-4 text-xs font-mono text-[#7C8AA0]">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center">
+          <p>{t.footerText}</p>
+          <nav className="flex items-center gap-4">
+            <a href="https://anthoruiz.dev" className="hover:text-[#F8FAFC] transition-colors">anthoruiz.dev</a>
+            <a
+              href="https://www.linkedin.com/in/anthoruiz/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[#F8FAFC] transition-colors"
+            >
+              LinkedIn
+            </a>
+          </nav>
+        </div>
       </footer>
 
       {/* Reader modal with comments and actions */}

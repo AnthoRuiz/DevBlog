@@ -392,7 +392,7 @@ export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose,
         {/* Modal Footer */}
         <div className="px-6 py-3 border-t border-[#1e293b] bg-[#07090e] flex items-center justify-between">
           <span className="text-[11px] font-mono text-slate-500">
-            SYS.BLOG Homelab Telemetry Engine • Powered by psutil
+            Homelab telemetry · psutil
           </span>
           <button
             type="button"

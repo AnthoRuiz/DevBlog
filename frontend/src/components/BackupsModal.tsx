@@ -720,7 +720,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
 
         {/* Footer */}
         <div className="bg-[#0b0f19] px-6 py-3 border-t border-[#1e293b] flex items-center justify-between text-[11px] font-mono text-slate-500">
-          <span>DevBlog Admin Center & RBAC Testing</span>
+          <span>Anthony Ruiz · Admin panel</span>
           <button
             type="button"
             onClick={onClose}

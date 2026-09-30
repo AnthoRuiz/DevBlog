@@ -124,7 +124,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={mode === 'login' ? 'admin@devblog.local' : 'alex@dev.local'}
+                placeholder="you@example.com"
                 className="w-full bg-[#07090e] border border-[#1e293b] rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
