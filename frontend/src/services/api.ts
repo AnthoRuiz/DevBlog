@@ -1,4 +1,4 @@
-import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation } from '../types';
+import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -91,7 +91,7 @@ export async function updateSection(
   return res.json();
 }
 
-// Checks whether a new tag name fits the selected section (Gemini or keyword classifier)
+// Checks whether a new tag name fits the selected section (AI providers or keyword classifier)
 export async function validateTagSection(name: string, sectionId: string, token: string): Promise<TagValidation> {
   const res = await fetch(`${API_BASE}/posts/tags/validate`, {
     method: 'POST',
@@ -388,7 +388,7 @@ export async function suggestTagsWithAi(
   summary: string,
   contentMarkdown: string,
   token: string
-): Promise<string[]> {
+): Promise<TagSuggestions> {
   const res = await fetch(`${API_BASE}/posts/ai-suggest-tags`, {
     method: 'POST',
     headers: {
@@ -408,7 +408,15 @@ export async function suggestTagsWithAi(
   }
 
   const data = await res.json();
-  return data.suggested_tags || [];
+  return { tags: data.suggested_tags || [], provider: data.provider || 'keywords' };
+}
+
+export async function fetchAIStatus(token: string): Promise<AIStatus> {
+  const res = await fetch(`${API_BASE}/posts/ai-status`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Failed to load AI status');
+  return res.json();
 }
 
 export async function fetchAdminBackups(token: string): Promise<BackupsResponse> {

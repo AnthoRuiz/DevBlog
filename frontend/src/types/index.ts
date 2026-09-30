@@ -35,6 +35,18 @@ export interface Tag {
   section_id: string;
 }
 
+export interface AIStatus {
+  available: boolean;
+  // Configured providers in failover order, e.g. ['claude', 'gemini']
+  providers: string[];
+}
+
+export interface TagSuggestions {
+  tags: string[];
+  // e.g. 'claude:claude-opus-5-5', or 'keywords' when no AI provider was available
+  provider: string;
+}
+
 export interface TagValidation {
   name: string;
   existing_tag: Tag | null;

@@ -12,7 +12,7 @@ import {
   Plus,
   Tag as TagIcon,
 } from 'lucide-react';
-import { Tag, Post, PostDetail, Section, TagValidation } from '../types';
+import { Tag, Post, PostDetail, Section, TagValidation, AIStatus } from '../types';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
 import {
   uploadImage,
@@ -21,6 +21,7 @@ import {
   translatePostWithAi,
   createTag,
   validateTagSection,
+  fetchAIStatus,
   suggestTagsWithAi,
 } from '../services/api';
 import { MarkdownToolbar } from './MarkdownToolbar';
@@ -72,6 +73,9 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const [isCreatingTag, setIsCreatingTag] = useState(false);
   const [isSuggestingTags, setIsSuggestingTags] = useState(false);
   const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([]);
+  // Where the last suggestions came from: an LLM provider, or 'keywords' without AI
+  const [suggestionSource, setSuggestionSource] = useState<string | null>(null);
+  const [aiStatus, setAiStatus] = useState<AIStatus | null>(null);
 
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -118,6 +122,13 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       return Array.from(map.values());
     });
   }, [tags]);
+
+  useEffect(() => {
+    if (!isOpen || !token) return;
+    fetchAIStatus(token)
+      .then(setAiStatus)
+      .catch(() => setAiStatus(null));
+  }, [isOpen, token]);
 
   useEffect(() => {
     const name = tagSearchQuery.trim();
@@ -224,7 +235,9 @@ export const NewPostModal: FC<NewPostModalProps> = ({
         contentMarkdown,
         token
       );
-      setAiTagSuggestions(suggestions);
+      setAiTagSuggestions(suggestions.tags);
+      setSuggestionSource(suggestions.provider);
+      if (suggestions.tags.length === 0) setErrorMsg(t.noTagSuggestions);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'AI category suggestion failed';
       setErrorMsg(message);
@@ -432,13 +445,23 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             </div>
           )}
 
-          {/* ONE-CLICK GEMINI AI TRANSLATOR BAR */}
+          {/* AI availability: translation needs a configured provider */}
+          {aiStatus && !aiStatus.available && (
+            <div role="status" className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 text-xs text-amber-200">
+              {t.aiUnavailableBanner}
+            </div>
+          )}
+
+          {/* ONE-CLICK AI TRANSLATOR BAR */}
           <div className="p-3 bg-gradient-to-r from-cyan-950/40 via-[#0f1422] to-blue-950/30 border border-cyan-500/25 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-lg shadow-cyan-950/20">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping inline-block" />
               <span className="text-xs font-mono font-bold text-cyan-300">
-                Gemini AI Translator
+                AI Translator
               </span>
+              {aiStatus?.available && (
+                <span className="text-[10px] font-mono text-slate-500">({aiStatus.providers.join(' → ')})</span>
+              )}
               <span className="text-[11px] font-mono text-slate-400 hidden sm:inline">
                 • Preserves code and markdown
               </span>
@@ -447,7 +470,8 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             <div className="relative">
               <button
                 type="button"
-                disabled={isTranslating || !title.trim()}
+                disabled={isTranslating || !title.trim() || aiStatus?.available === false}
+                title={aiStatus?.available === false ? t.aiTranslateUnavailable : undefined}
                 onClick={() => setShowTranslateMenu(!showTranslateMenu)}
                 className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 hover:text-white text-xs font-mono transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
               >
@@ -631,7 +655,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                 onClick={handleAiSuggestTags}
                 disabled={isSuggestingTags}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/30 hover:border-cyan-400/50 text-[11px] font-mono text-cyan-300 hover:text-white transition-all disabled:opacity-50"
-                title="Analyze the post with Gemini AI and suggest relevant categories"
+                title="Analyze the post with AI and suggest relevant tags"
               >
                 <Sparkles className={`w-3.5 h-3.5 text-purple-400 ${isSuggestingTags ? 'animate-spin' : ''}`} />
                 <span>{isSuggestingTags ? t.suggestingTagsAi : t.suggestTagsAiBtn}</span>
@@ -819,7 +843,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                 <div className="flex items-center justify-between text-[11px] font-mono text-purple-300">
                   <span className="flex items-center gap-1.5">
                     <Sparkles className="w-3 h-3 text-purple-400" />
-                    {t.aiSuggestedTagsTitle}
+                    {suggestionSource === 'keywords' ? t.keywordSuggestedTagsTitle : t.aiSuggestedTagsTitle}
                   </span>
                   <button
                     type="button"

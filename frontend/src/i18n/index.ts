@@ -125,6 +125,10 @@ export interface Translations {
   tagCreateAnyway: string;
   tagCheckingSection: string;
   tagOtherSections: string;
+  aiUnavailableBanner: string;
+  aiTranslateUnavailable: string;
+  keywordSuggestedTagsTitle: string;
+  noTagSuggestions: string;
   editorEmptyPreview: string;
   markdownGuideTitle: string;
   systemStatusBtn: string;
@@ -236,8 +240,8 @@ export const translations: Record<Language, Translations> = {
     needAccountText: '¿No tienes cuenta? Regístrate aquí',
     googleLoginBtn: 'Continuar con Google Workspace',
     tableOfContents: 'Tabla de Contenidos',
-    aiTranslateBtn: '⚡ Traducir con IA (Gemini)',
-    translatingWithAi: 'Traduciendo con Gemini...',
+    aiTranslateBtn: '⚡ Traducir con IA',
+    translatingWithAi: 'Traduciendo con IA...',
     aiTranslateSuccess: '¡Artículo traducido exitosamente!',
     aiTranslatePrompt: 'Selecciona el idioma de destino para autotraducir:',
     editorWriteTab: 'Escribir',
@@ -270,6 +274,10 @@ export const translations: Record<Language, Translations> = {
     tagCreateAnyway: 'Crear aquí de todos modos',
     tagCheckingSection: 'Comprobando sección...',
     tagOtherSections: 'Otras secciones',
+    aiUnavailableBanner: 'IA no configurada: la traducción está desactivada y las sugerencias de tags usan palabras clave. Configura ANTHROPIC_API_KEY o GEMINI_API_KEY.',
+    aiTranslateUnavailable: 'La traducción requiere un proveedor de IA configurado',
+    keywordSuggestedTagsTitle: 'Sugerencias por palabras clave (sin IA)',
+    noTagSuggestions: 'No se encontraron sugerencias de tags para este contenido.',
     editorEmptyPreview: 'El artículo aún no tiene contenido. Escribe en la pestaña "Escribir" para ver la previsualización.',
     markdownGuideTitle: 'Guía Rápida de Formato Markdown (Estilo Word)',
     systemStatusBtn: '🖥️ Estado (/status)',
@@ -379,8 +387,8 @@ export const translations: Record<Language, Translations> = {
     needAccountText: 'Need an account? Register here',
     googleLoginBtn: 'Continue with Google Workspace',
     tableOfContents: 'Table of Contents',
-    aiTranslateBtn: '⚡ Translate with AI (Gemini)',
-    translatingWithAi: 'Translating with Gemini...',
+    aiTranslateBtn: '⚡ Translate with AI',
+    translatingWithAi: 'Translating with AI...',
     aiTranslateSuccess: 'Article translated successfully!',
     aiTranslatePrompt: 'Select target language to auto-translate:',
     editorWriteTab: 'Write',
@@ -413,6 +421,10 @@ export const translations: Record<Language, Translations> = {
     tagCreateAnyway: 'Create here anyway',
     tagCheckingSection: 'Checking section...',
     tagOtherSections: 'Other sections',
+    aiUnavailableBanner: 'AI is not configured: translation is disabled and tag suggestions use keywords. Set ANTHROPIC_API_KEY or GEMINI_API_KEY.',
+    aiTranslateUnavailable: 'Translation requires a configured AI provider',
+    keywordSuggestedTagsTitle: 'Keyword-based suggestions (no AI)',
+    noTagSuggestions: 'No tag suggestions found for this content.',
     editorEmptyPreview: 'The article does not have content yet. Write in the "Write" tab to see the live preview.',
     markdownGuideTitle: 'Quick Markdown Formatting Guide (Word-like)',
     systemStatusBtn: '🖥️ Status (/status)',
@@ -522,8 +534,8 @@ export const translations: Record<Language, Translations> = {
     needAccountText: 'Não tem conta? Registre-se aqui',
     googleLoginBtn: 'Continuar com Google Workspace',
     tableOfContents: 'Índice de Conteúdo',
-    aiTranslateBtn: '⚡ Traduzir com IA (Gemini)',
-    translatingWithAi: 'Traduzindo com Gemini...',
+    aiTranslateBtn: '⚡ Traduzir com IA',
+    translatingWithAi: 'Traduzindo com IA...',
     aiTranslateSuccess: 'Artigo traduzido com sucesso!',
     aiTranslatePrompt: 'Selecione o idioma de destino para autotraducir:',
     editorWriteTab: 'Escrever',
@@ -556,6 +568,10 @@ export const translations: Record<Language, Translations> = {
     tagCreateAnyway: 'Criar aqui mesmo assim',
     tagCheckingSection: 'Verificando seção...',
     tagOtherSections: 'Outras seções',
+    aiUnavailableBanner: 'IA não configurada: a tradução está desativada e as sugestões de tags usam palavras-chave. Configure ANTHROPIC_API_KEY ou GEMINI_API_KEY.',
+    aiTranslateUnavailable: 'A tradução requer um provedor de IA configurado',
+    keywordSuggestedTagsTitle: 'Sugestões por palavras-chave (sem IA)',
+    noTagSuggestions: 'Nenhuma sugestão de tag encontrada para este conteúdo.',
     editorEmptyPreview: 'O artigo ainda não tem conteúdo. Escreva na aba "Escrever" para ver a pré-visualização.',
     markdownGuideTitle: 'Guia Rápido de Formatação Markdown (Estilo Word)',
     systemStatusBtn: '🖥️ Status (/status)',
@@ -665,8 +681,8 @@ export const translations: Record<Language, Translations> = {
     needAccountText: 'Pas encore de compte ? Inscrivez-vous ici',
     googleLoginBtn: 'Continuer avec Google Workspace',
     tableOfContents: 'Table des Matières',
-    aiTranslateBtn: '⚡ Traduire avec IA (Gemini)',
-    translatingWithAi: 'Traduction avec Gemini...',
+    aiTranslateBtn: '⚡ Traduire avec IA',
+    translatingWithAi: 'Traduction avec IA...',
     aiTranslateSuccess: 'Article traduit avec succès !',
     aiTranslatePrompt: 'Sélectionnez la langue cible à traduire :',
     editorWriteTab: 'Écrire',
@@ -699,6 +715,10 @@ export const translations: Record<Language, Translations> = {
     tagCreateAnyway: 'Créer ici quand même',
     tagCheckingSection: 'Vérification de la section...',
     tagOtherSections: 'Autres sections',
+    aiUnavailableBanner: "IA non configurée : la traduction est désactivée et les suggestions de tags utilisent des mots-clés. Configurez ANTHROPIC_API_KEY ou GEMINI_API_KEY.",
+    aiTranslateUnavailable: 'La traduction nécessite un fournisseur IA configuré',
+    keywordSuggestedTagsTitle: 'Suggestions par mots-clés (sans IA)',
+    noTagSuggestions: 'Aucune suggestion de tag trouvée pour ce contenu.',
     editorEmptyPreview: 'L\'article n\'a pas encore de contenu. Écrivez dans l\'onglet "Écrire" pour voir l\'aperçu.',
     markdownGuideTitle: 'Guide Rapide de Formatage Markdown (Style Word)',
     systemStatusBtn: '🖥️ Statut (/status)',
