@@ -34,6 +34,23 @@ class TagCreate(BaseModel):
     color_hex: Optional[str] = "#38bdf8"
     # Section the tag belongs to; validated against the tag name (see services/tag_classifier.py)
     section_id: uuid.UUID
+    # ADMIN only: create even if the classifier suggests another section
+    force: bool = False
+
+class TagValidateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50)
+    section_id: uuid.UUID
+
+class TagValidateResponse(BaseModel):
+    name: str
+    # A tag with this name already exists and will simply be reused
+    existing_tag: Optional[TagRead] = None
+    suggested_section: Optional[SectionRead] = None
+    matches_selected: bool
+    blocked: bool
+    confidence: float
+    reason: str
+    source: str
 
 class PostBase(BaseModel):
     title: str = Field(..., max_length=255)

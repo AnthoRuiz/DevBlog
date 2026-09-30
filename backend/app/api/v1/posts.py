@@ -26,6 +26,9 @@ from app.schemas.post import (
     PostCreate,
     PostUpdate,
     TagRead,
+    TagValidateRequest,
+    TagValidateResponse,
+    SectionRead,
     UpvoteResponse,
     CommentRead,
     CommentCreate,
@@ -37,7 +40,7 @@ from app.schemas.post import (
     TagSuggestResponse,
 )
 from app.services.gemini import translate_post_content, suggest_post_tags, estimate_reading_time
-from app.services import media_service
+from app.services import media_service, tag_classifier
 from app.api.deps import get_current_admin, get_current_author_or_admin, get_current_user_optional, get_client_hash
 from app.core.limiter import limiter
 
@@ -111,7 +114,6 @@ async def create_tag(
     clean_slug = slugify(clean_name)
     if not clean_slug:
         raise HTTPException(status_code=400, detail="Invalid tag name")
-    await _get_section_or_400(db, tag_in.section_id)
 
     # Check whether it already exists by name or slug
     existing = await db.execute(
@@ -124,11 +126,54 @@ async def create_tag(
     tag_colors = ["#38bdf8", "#10b981", "#818cf8", "#06b6d4", "#f59e0b", "#ec4899", "#a855f7", "#14b8a6"]
     assigned_color = tag_in.color_hex if tag_in.color_hex and tag_in.color_hex != "#38bdf8" else tag_colors[abs(hash(clean_slug)) % len(tag_colors)]
 
+    # Reject tags that clearly belong to another section (e.g. "WoW" in Tech & Coding)
+    section = await _get_section_or_400(db, tag_in.section_id)
+    all_sections = (await db.execute(select(Section).order_by(Section.sort_order))).scalars().all()
+    verdict = await tag_classifier.classify_tag(clean_name, all_sections)
+    admin_override = tag_in.force and current_user.role == UserRole.ADMIN
+    if tag_classifier.blocks(verdict, section.slug) and not admin_override:
+        suggested = next(s for s in all_sections if s.slug == verdict.section_slug)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f'"{clean_name}" looks like a {suggested.name} tag, not {section.name}. Create it in {suggested.name} instead.',
+        )
+
     new_tag = Tag(name=clean_name, slug=clean_slug, color_hex=assigned_color, section_id=tag_in.section_id)
     db.add(new_tag)
     await db.commit()
     await db.refresh(new_tag)
     return TagRead.model_validate(new_tag)
+
+@router.post("/tags/validate", response_model=TagValidateResponse)
+@limiter.limit("30/minute")
+async def validate_tag_section(
+    request: Request,
+    body: TagValidateRequest,
+    current_user: User = Depends(get_current_author_or_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Check, while the author types, whether a new tag name fits the selected section.
+    Uses Gemini when configured, otherwise a keyword classifier.
+    """
+    name = body.name.strip()
+    section = await _get_section_or_400(db, body.section_id)
+    existing = (
+        await db.execute(select(Tag).where((Tag.name.ilike(name)) | (Tag.slug == slugify(name))))
+    ).scalar_one_or_none()
+    all_sections = (await db.execute(select(Section).order_by(Section.sort_order))).scalars().all()
+    verdict = await tag_classifier.classify_tag(name, all_sections)
+    suggested = next((s for s in all_sections if s.slug == verdict.section_slug), None)
+    return TagValidateResponse(
+        name=name,
+        existing_tag=TagRead.model_validate(existing) if existing else None,
+        suggested_section=SectionRead.model_validate(suggested) if suggested else None,
+        matches_selected=suggested is None or suggested.id == section.id,
+        blocked=tag_classifier.blocks(verdict, section.slug),
+        confidence=verdict.confidence,
+        reason=verdict.reason,
+        source=verdict.source,
+    )
 
 @router.post("/ai-suggest-tags", response_model=TagSuggestResponse)
 @limiter.limit("10/minute")
