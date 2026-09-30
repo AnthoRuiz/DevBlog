@@ -20,7 +20,7 @@ async def list_admin_backups(
     backups = backup_service.list_backups()
     return {
         "status": "healthy",
-        "retention_policy": "Keeps the 7 most recent copies (automatic daily rotation)",
+        "retention_policy": "Keeps the 7 most recent copies of the database and uploaded media (automatic daily rotation)",
         "retention_limit": 7,
         "total_backups": len(backups),
         "backups": backups
@@ -32,7 +32,7 @@ async def create_admin_backup(
     current_user: User = Depends(get_current_admin)
 ):
     """
-    Create a compressed .sql.gz dump immediately and run rotation.
+    Create a database dump (.sql.gz) and media archive (.media.tar.gz) now, then run rotation.
     Requires the ADMIN role.
     """
     try:
@@ -54,7 +54,7 @@ async def download_admin_backup(
     current_user: User = Depends(get_current_admin)
 ):
     """
-    Download the selected .sql.gz file.
+    Download a backup file: a database dump (.sql.gz) or a media archive (.media.tar.gz).
     Requires the ADMIN role.
     """
     path = backup_service.get_backup_path(filename)
@@ -78,7 +78,7 @@ async def delete_admin_backup(
     current_user: User = Depends(get_current_admin)
 ):
     """
-    Delete a specific backup file.
+    Delete a backup file (deleting a database dump also deletes its media archive).
     Requires the ADMIN role.
     """
     success = backup_service.delete_backup_file(filename)

@@ -456,7 +456,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                 <HardDrive className="w-6 h-6 text-cyan-400 flex-shrink-0" />
                 <div>
                   <span className="text-[10px] uppercase font-mono text-slate-500 block">File Format</span>
-                  <span className="text-xs font-bold text-slate-200">GZIP (.sql.gz) streaming</span>
+                  <span className="text-xs font-bold text-slate-200">Database (.sql.gz) + media (.tar.gz)</span>
                 </div>
               </div>
 
@@ -533,8 +533,17 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                             {b.filename}
                           </span>
                           <span className="text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.2 rounded">
-                            {b.size_display}
+                            DB {b.size_display}
                           </span>
+                          {b.media_filename ? (
+                            <span className="text-[10px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/30 px-1.5 py-0.2 rounded">
+                              Media {b.media_size_display}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono text-slate-500" title="Created before media archiving was added">
+                              no media
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] font-mono text-slate-400">
                           {formatIsoDate(b.created_at)}
@@ -547,18 +556,31 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                           onClick={() => handleDownload(b.filename)}
                           disabled={downloadingFile === b.filename}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-mono font-bold transition-colors disabled:opacity-50"
-                          title="Download compressed dump"
+                          title="Download the compressed database dump"
                         >
                           <Download className="w-3.5 h-3.5" />
-                          <span>{downloadingFile === b.filename ? 'Downloading...' : 'Download'}</span>
+                          <span>{downloadingFile === b.filename ? 'Downloading...' : 'DB'}</span>
                         </button>
+
+                        {b.media_filename && (
+                          <button
+                            type="button"
+                            onClick={() => handleDownload(b.media_filename as string)}
+                            disabled={downloadingFile === b.media_filename}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-mono font-bold transition-colors disabled:opacity-50"
+                            title="Download the uploaded media archive"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>{downloadingFile === b.media_filename ? 'Downloading...' : 'Media'}</span>
+                          </button>
+                        )}
 
                         <button
                           type="button"
                           onClick={() => handleDeleteBackup(b.filename)}
                           disabled={deletingFile === b.filename}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors disabled:opacity-50"
-                          title="Delete this backup file"
+                          title="Delete this backup (database dump and media archive)"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

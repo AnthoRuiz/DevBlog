@@ -107,6 +107,10 @@ export interface BackupItem {
   size_bytes: number;
   size_display: string;
   created_at: string;
+  // Paired archive of uploaded media (null for backups made before media archiving)
+  media_filename?: string | null;
+  media_size_bytes?: number;
+  media_size_display?: string;
 }
 
 export interface BackupsResponse {

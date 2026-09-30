@@ -380,7 +380,7 @@ export async function downloadAdminBackup(filename: string, token: string): Prom
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
-    throw new Error('Failed to download the database backup');
+    throw new Error('Failed to download the backup file');
   }
   const blob = await res.blob();
   const url = window.URL.createObjectURL(blob);
