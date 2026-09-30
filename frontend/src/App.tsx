@@ -8,8 +8,10 @@ import { LoginModal } from './components/LoginModal';
 import { NewPostModal } from './components/NewPostModal';
 import { SystemStatusModal } from './components/SystemStatusModal';
 import { BackupsModal } from './components/BackupsModal';
+import { MyPostsModal } from './components/MyPostsModal';
 import { Post, PostDetail, SectionWithCount, StreakStats, Tag, User, UserRole } from './types';
 import {
+  fetchReviewCount,
   fetchPosts,
   fetchSections,
   POSTS_PAGE_SIZE,
@@ -70,6 +72,8 @@ export function App() {
   const [isStatusOpen, setIsStatusOpen] = useState<boolean>(false);
   const [isBackupsModalOpen, setIsBackupsModalOpen] = useState<boolean>(false);
   const [editingPost, setEditingPost] = useState<Post | PostDetail | null>(null);
+  const [isMyPostsOpen, setIsMyPostsOpen] = useState<boolean>(false);
+  const [reviewPending, setReviewPending] = useState<number>(0);
 
   // Direct support for #/status and #/backups URL hashes
   useEffect(() => {
@@ -127,6 +131,16 @@ export function App() {
         });
     }
   }, [userToken]);
+
+  // Pending review counter for the admin panel badge
+  const refreshReviewCount = () => {
+    if (!userToken || currentUser?.role !== 'ADMIN') {
+      setReviewPending(0);
+      return;
+    }
+    fetchReviewCount(userToken).then(setReviewPending).catch(() => setReviewPending(0));
+  };
+  useEffect(refreshReviewCount, [userToken, currentUser?.role]);
 
   const handleSwitchRole = async (newRole: UserRole) => {
     if (!userToken) return;
@@ -297,12 +311,10 @@ export function App() {
   };
 
   // RBAC permissions
-  const canCreatePost = currentUser?.role === 'ADMIN' || currentUser?.role === 'AUTHOR';
+  // Every account can write; admins can edit any post, creators only their own
   const canEditPost = (post: Post | null | undefined): boolean => {
     if (!post || !currentUser) return false;
-    if (currentUser.role === 'ADMIN') return true;
-    if (currentUser.role === 'AUTHOR' && post.author_id === currentUser.id) return true;
-    return false;
+    return currentUser.role === 'ADMIN' || post.author_id === currentUser.id;
   };
 
   const handleOpenStatus = () => {
@@ -396,27 +408,15 @@ export function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleSwitchRole('AUTHOR')}
+                  onClick={() => handleSwitchRole('CREATOR')}
                   className={`px-3 py-1 rounded text-xs font-bold transition-all ${
-                    currentUser.role === 'AUTHOR'
+                    currentUser.role === 'CREATOR'
                       ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/40 ring-1 ring-cyan-300'
                       : 'text-slate-400 hover:text-white'
                   }`}
-                  title="Author permissions: create and edit own posts"
+                  title="Creator permissions: write own posts (reviewed unless trusted)"
                 >
-                  ✍️ AUTHOR
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSwitchRole('READER')}
-                  className={`px-3 py-1 rounded text-xs font-bold transition-all ${
-                    currentUser.role === 'READER'
-                      ? 'bg-slate-700 text-white shadow-md ring-1 ring-slate-500'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title="Reader permissions: read, upvote and comment only"
-                >
-                  👁️ READER
+                  ✍️ CREATOR
                 </button>
               </div>
 
@@ -450,6 +450,8 @@ export function App() {
         onOpenStatus={handleOpenStatus}
         onOpenBackups={() => setIsBackupsModalOpen(true)}
         onSwitchRole={ROLE_TESTING_ENABLED ? handleSwitchRole : undefined}
+        onOpenMyPosts={currentUser ? () => setIsMyPostsOpen(true) : undefined}
+        reviewPending={reviewPending}
         userEmail={userEmail}
         currentUser={currentUser}
         serverNode={stats?.server_node}
@@ -466,8 +468,6 @@ export function App() {
           onNewPost={() => {
             if (!currentUser) {
               setIsLoginOpen(true);
-            } else if (!canCreatePost) {
-              alert('Your account has the READER role. Only AUTHOR or ADMIN users can create new posts.');
             } else {
               setEditingPost(null);
               setIsNewPostOpen(true);
@@ -790,8 +790,12 @@ export function App() {
         tags={tags}
         sections={sections}
         isAdmin={currentUser?.role === 'ADMIN'}
+        canPublishDirectly={currentUser?.role === 'ADMIN' || Boolean(currentUser?.is_trusted)}
         token={userToken}
-        onPostCreated={loadData}
+        onPostCreated={() => {
+          loadData();
+          refreshReviewCount();
+        }}
         editingPost={editingPost}
         t={t}
         defaultLang={currentLang}
@@ -816,6 +820,31 @@ export function App() {
           localStorage.setItem('current_user', JSON.stringify(updatedUser));
         }}
         onSectionsUpdated={loadData}
+        reviewPending={reviewPending}
+        onReviewed={() => {
+          refreshReviewCount();
+          loadData();
+        }}
+        onPreviewPost={(item) => {
+          setIsBackupsModalOpen(false);
+          handleOpenArticle(item.slug);
+        }}
+      />
+
+      {/* The signed-in user's own posts with their review status */}
+      <MyPostsModal
+        isOpen={isMyPostsOpen}
+        onClose={() => setIsMyPostsOpen(false)}
+        token={userToken}
+        onEditPost={(post) => {
+          setIsMyPostsOpen(false);
+          handleEditPost(post);
+        }}
+        onOpenPost={(slug) => {
+          setIsMyPostsOpen(false);
+          handleOpenArticle(slug);
+        }}
+        t={t}
       />
     </div>
   );
