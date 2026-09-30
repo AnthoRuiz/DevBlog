@@ -3,16 +3,37 @@ from typing import Optional
 import uuid
 from datetime import datetime
 
+class SectionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    name: str
+    slug: str
+    description: str
+    color_hex: str
+    icon: str
+    sort_order: int
+
+class SectionWithCount(SectionRead):
+    post_count: int = 0
+
+class SectionUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=60)
+    description: Optional[str] = Field(None, max_length=255)
+    color_hex: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
+
 class TagRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     name: str
     slug: str
     color_hex: str
+    section_id: uuid.UUID
 
 class TagCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
     color_hex: Optional[str] = "#38bdf8"
+    # Section the tag belongs to; validated against the tag name (see services/tag_classifier.py)
+    section_id: uuid.UUID
 
 class PostBase(BaseModel):
     title: str = Field(..., max_length=255)
@@ -22,6 +43,7 @@ class PostBase(BaseModel):
     language: str = "es"
     reading_time_minutes: Optional[int] = Field(default=None, ge=1)
     is_published: bool = True
+    section_id: uuid.UUID
     tag_ids: list[uuid.UUID] = []
 
 class PostCreate(PostBase):
@@ -42,6 +64,7 @@ class PostRead(BaseModel):
     is_published: bool
     published_at: Optional[datetime] = None
     created_at: datetime
+    section: Optional[SectionRead] = None
     tags: list[TagRead] = []
 
 class PostPage(BaseModel):
@@ -78,6 +101,7 @@ class PostUpdate(BaseModel):
     language: Optional[str] = None
     reading_time_minutes: Optional[int] = Field(None, ge=1)
     is_published: Optional[bool] = None
+    section_id: Optional[uuid.UUID] = None
     tag_ids: Optional[list[uuid.UUID]] = None
 
 class UpvoteResponse(BaseModel):

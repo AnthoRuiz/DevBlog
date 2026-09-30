@@ -11,7 +11,7 @@ from app.api.v1.router import api_router
 from app.db.session import engine, AsyncSessionLocal
 from app.db.migrations import run_migrations
 from app.models.user import User, UserRole
-from app.models.post import Tag, Post
+from app.models.post import Tag, Post, Section
 from app.core.security import get_password_hash, verify_password
 from app.core.logging import logger
 
@@ -21,28 +21,28 @@ LEGACY_ADMIN_PASSWORD = "admin123456"
 # Starter tags seeded into an empty database: (name, slug, color)
 DEFAULT_TAGS = [
     # Technology
-    ("Software Engineering", "software-engineering", "#38bdf8"),
-    ("Python", "python", "#10b981"),
-    ("JavaScript & TypeScript", "javascript-typescript", "#facc15"),
-    ("React", "react", "#818cf8"),
-    ("Backend & APIs", "backend-apis", "#22c55e"),
-    ("Databases", "databases", "#0ea5e9"),
-    ("Distributed Systems", "distributed-systems", "#6366f1"),
-    ("Cloud & DevOps", "cloud-devops", "#f59e0b"),
-    ("Docker & Homelab", "docker-homelab", "#06b6d4"),
-    ("Security", "security", "#ef4444"),
-    ("AI & Machine Learning", "ai-machine-learning", "#a855f7"),
+    ("Software Engineering", "software-engineering", "#38bdf8", "tech"),
+    ("Python", "python", "#10b981", "tech"),
+    ("JavaScript & TypeScript", "javascript-typescript", "#facc15", "tech"),
+    ("React", "react", "#818cf8", "tech"),
+    ("Backend & APIs", "backend-apis", "#22c55e", "tech"),
+    ("Databases", "databases", "#0ea5e9", "tech"),
+    ("Distributed Systems", "distributed-systems", "#6366f1", "tech"),
+    ("Cloud & DevOps", "cloud-devops", "#f59e0b", "tech"),
+    ("Docker & Homelab", "docker-homelab", "#06b6d4", "tech"),
+    ("Security", "security", "#ef4444", "tech"),
+    ("AI & Machine Learning", "ai-machine-learning", "#a855f7", "ai"),
     # Career and interviews
-    ("Interview Prep", "interview-prep", "#f97316"),
-    ("System Design", "system-design", "#14b8a6"),
-    ("Algorithms & Data Structures", "algorithms-data-structures", "#eab308"),
-    ("Career Growth", "career-growth", "#84cc16"),
+    ("Interview Prep", "interview-prep", "#f97316", "career"),
+    ("System Design", "system-design", "#14b8a6", "career"),
+    ("Algorithms & Data Structures", "algorithms-data-structures", "#eab308", "career"),
+    ("Career Growth", "career-growth", "#84cc16", "career"),
     # Wellbeing
-    ("Mental Health", "mental-health", "#ec4899"),
-    ("Productivity & Habits", "productivity-habits", "#f472b6"),
+    ("Mental Health", "mental-health", "#ec4899", "mental-health"),
+    ("Productivity & Habits", "productivity-habits", "#f472b6", "mental-health"),
     # Gaming
-    ("Video Games", "video-games", "#8b5cf6"),
-    ("Game Development", "game-development", "#d946ef"),
+    ("Video Games", "video-games", "#8b5cf6", "gaming"),
+    ("Game Development", "game-development", "#d946ef", "gaming"),
 ]
 
 async def seed_initial_data():
@@ -51,7 +51,12 @@ async def seed_initial_data():
         # 1. Initial tags
         existing_tags = await session.execute(select(Tag))
         if not existing_tags.scalars().first():
-            session.add_all(Tag(name=name, slug=slug, color_hex=color) for name, slug, color in DEFAULT_TAGS)
+            # Sections are created by migration 0003_add_sections
+            sections = {s.slug: s for s in (await session.execute(select(Section))).scalars().all()}
+            session.add_all(
+                Tag(name=name, slug=slug, color_hex=color, section_id=sections[section].id)
+                for name, slug, color, section in DEFAULT_TAGS
+            )
             await session.flush()
 
         # 2. Default admin user
@@ -97,9 +102,11 @@ async def seed_initial_data():
         if settings.SEED_DEMO_POSTS and not posts_res.scalars().first():
             tag_res = await session.execute(select(Tag))
             all_tags = list(tag_res.scalars().all())
+            tech_section = (await session.execute(select(Section).where(Section.slug == "tech"))).scalar_one()
 
             p1 = Post(
                 author_id=admin.id,
+                section_id=tech_section.id,
                 slug="designing-eventually-consistent-cache",
                 cover_image_url="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&auto=format&fit=crop&q=80",
                 title="Designing an eventually consistent caching layer with Python and Docker",
@@ -138,6 +145,7 @@ async def fetch_article(slug: str) -> PostSchema:
 
             p2 = Post(
                 author_id=admin.id,
+                section_id=tech_section.id,
                 slug="strict-typescript-react-19-type-inference",
                 cover_image_url="https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&auto=format&fit=crop&q=80",
                 title="Strict TypeScript in React 19: Advanced type inference patterns",
@@ -173,6 +181,7 @@ This removes any mismatch between what the database stores and what the UI rende
 
             p3 = Post(
                 author_id=admin.id,
+                section_id=tech_section.id,
                 slug="self-hosting-cloudflare-tunnels-zero-open-ports",
                 cover_image_url="https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=800&auto=format&fit=crop&q=80",
                 title="Self-hosting with Cloudflare Tunnels: Zero Open Ports",

@@ -16,7 +16,7 @@ def calculate_reading_time(text: str | None) -> int:
     return max(1, math.ceil(words / 200))
 
 from app.db.session import get_db
-from app.models.post import Post, Tag, post_tags
+from app.models.post import Post, Tag, Section, post_tags
 from app.models.interaction import Upvote, Bookmark, Comment
 from app.models.user import User, UserRole
 from app.schemas.post import (
@@ -43,8 +43,15 @@ from app.core.limiter import limiter
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
 
+async def _get_section_or_400(db: AsyncSession, section_id: uuid.UUID) -> Section:
+    section = await db.get(Section, section_id)
+    if not section:
+        raise HTTPException(status_code=400, detail="Unknown section")
+    return section
+
 @router.get("", response_model=PostPage)
 async def list_posts(
+    section: Optional[str] = Query(None, description="Filter by section slug"),
     tag: Optional[str] = Query(None, description="Filter by tag slug"),
     q: Optional[str] = Query(None, description="Search by title or summary"),
     sort: str = Query("recent", regex="^(recent|top_voted|trending)$"),
@@ -53,6 +60,9 @@ async def list_posts(
     db: AsyncSession = Depends(get_db)
 ):
     query = select(Post).where(Post.is_published == True)
+
+    if section:
+        query = query.join(Post.section).where(Section.slug == section)
 
     if tag:
         query = query.join(Post.tags).where(Tag.slug == tag)
@@ -101,6 +111,7 @@ async def create_tag(
     clean_slug = slugify(clean_name)
     if not clean_slug:
         raise HTTPException(status_code=400, detail="Invalid tag name")
+    await _get_section_or_400(db, tag_in.section_id)
 
     # Check whether it already exists by name or slug
     existing = await db.execute(
@@ -113,7 +124,7 @@ async def create_tag(
     tag_colors = ["#38bdf8", "#10b981", "#818cf8", "#06b6d4", "#f59e0b", "#ec4899", "#a855f7", "#14b8a6"]
     assigned_color = tag_in.color_hex if tag_in.color_hex and tag_in.color_hex != "#38bdf8" else tag_colors[abs(hash(clean_slug)) % len(tag_colors)]
 
-    new_tag = Tag(name=clean_name, slug=clean_slug, color_hex=assigned_color)
+    new_tag = Tag(name=clean_name, slug=clean_slug, color_hex=assigned_color, section_id=tag_in.section_id)
     db.add(new_tag)
     await db.commit()
     await db.refresh(new_tag)
@@ -245,6 +256,8 @@ async def create_post(
     current_user: User = Depends(get_current_author_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
+    await _get_section_or_400(db, post_in.section_id)
+
     base_slug = slugify(post_in.title)
     slug = base_slug
     counter = 1
@@ -267,6 +280,7 @@ async def create_post(
 
     new_post = Post(
         author_id=current_user.id,
+        section_id=post_in.section_id,
         slug=slug,
         title=post_in.title,
         language=post_in.language,
@@ -320,6 +334,9 @@ async def update_post(
             counter += 1
         post.slug = slug
 
+    if post_update.section_id is not None:
+        # Assign the object too: the already-loaded relationship would otherwise keep the old section
+        post.section = await _get_section_or_400(db, post_update.section_id)
     if post_update.summary is not None:
         post.summary = post_update.summary
     if post_update.content_markdown is not None:
