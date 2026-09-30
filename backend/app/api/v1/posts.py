@@ -5,7 +5,6 @@ from sqlalchemy.orm import selectinload
 from slugify import slugify
 from typing import Optional
 import uuid
-import os
 import math
 import re
 from datetime import datetime, timezone
@@ -37,6 +36,7 @@ from app.schemas.post import (
     TagSuggestResponse,
 )
 from app.services.gemini import translate_post_content, suggest_post_tags, estimate_reading_time
+from app.services import media_service
 from app.api.deps import get_current_admin, get_current_author_or_admin, get_current_user_optional, get_client_hash
 from app.core.limiter import limiter
 
@@ -168,46 +168,26 @@ async def list_my_bookmarks(
     posts = result.scalars().all()
     return [PostRead.model_validate(p) for p in posts]
 
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024
-
-def _detect_image_ext(data: bytes) -> Optional[str]:
-    """Identify JPG, PNG, GIF or WEBP by their file signature (magic bytes)."""
-    if data.startswith(b"\xff\xd8\xff"):
-        return ".jpg"
-    if data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return ".png"
-    if data.startswith((b"GIF87a", b"GIF89a")):
-        return ".gif"
-    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return ".webp"
-    return None
-
 @router.post("/upload-image")
 async def upload_image(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_author_or_admin)
 ):
-    uploads_dir = "/app/uploads" if os.path.exists("/app/uploads") else os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads"))
-    os.makedirs(uploads_dir, exist_ok=True)
-
-    # Read at most limit + 1 bytes to detect oversized files without loading them fully
-    data = await file.read(MAX_UPLOAD_BYTES + 1)
-    if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail=f"Image exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)} MB limit.")
+    # Read at most the largest limit + 1 byte to detect oversized files without loading them fully
+    data = await file.read(media_service.MAX_UPLOAD_BYTES + 1)
 
     # The extension comes from the actual content, not the client-supplied filename.
     # SVG is not allowed: it can carry JavaScript and would be served from our own origin.
-    ext = _detect_image_ext(data)
+    ext = media_service.detect_image_ext(data)
     if not ext:
         raise HTTPException(status_code=400, detail="Unsupported file format. Use JPG, PNG, WEBP or GIF.")
 
-    filename = f"img_{uuid.uuid4().hex[:12]}{ext}"
-    file_path = os.path.join(uploads_dir, filename)
+    limit = media_service.max_bytes_for(ext)
+    if len(data) > limit:
+        kind = "GIF" if ext == ".gif" else "Image"
+        raise HTTPException(status_code=413, detail=f"{kind} exceeds the {limit // media_service.MB} MB limit.")
 
-    with open(file_path, "wb") as buffer:
-        buffer.write(data)
-
-    return {"url": f"/uploads/{filename}"}
+    return {"url": media_service.save_image(data, ext)}
 
 @router.post("/ai-translate", response_model=PostTranslateResponse)
 @limiter.limit("10/minute")

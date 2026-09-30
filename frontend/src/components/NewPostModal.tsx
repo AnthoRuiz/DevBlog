@@ -480,7 +480,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileUpload}
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/gif"
                 className="hidden"
               />
               <button

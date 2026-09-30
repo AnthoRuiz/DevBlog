@@ -265,12 +265,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-import os
 from fastapi.staticfiles import StaticFiles
 
-uploads_dir = "/app/uploads" if os.path.exists("/app/uploads") else os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
-os.makedirs(uploads_dir, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+from app.services.media_service import UPLOADS_DIR
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 # Routes
 app.include_router(api_router, prefix=settings.API_V1_STR)
