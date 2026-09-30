@@ -5,7 +5,7 @@ A self-hosted technical blog engine and Homelab observability hub, running on ba
 - 🌐 **Production:** [https://blog.anthoruiz.dev](https://blog.anthoruiz.dev)
 - 📖 **End-to-end architecture manual:** [`docs/ARCHITECTURE_E2E.md`](./docs/ARCHITECTURE_E2E.md)
 
-**Stack:** React 18 + TypeScript + Vite · FastAPI + SQLAlchemy (async) · PostgreSQL 16 · Nginx · Docker Compose · Cloudflare Tunnel · Google Gemini
+**Stack:** React 18 + TypeScript + Vite · FastAPI + SQLAlchemy (async) · PostgreSQL 16 · Nginx · Docker Compose · Cloudflare Tunnel · Claude & Gemini (AI, with failover)
 
 ---
 
@@ -14,9 +14,9 @@ A self-hosted technical blog engine and Homelab observability hub, running on ba
 - **Technical digest feed:** two-column post grid with reading time, views, upvotes, bookmarks and a writing-streak header, paginated 12 posts at a time with **Load more**.
 - **Markdown editor:** Word-style toolbar, live preview, syntax highlighting (highlight.js), dark-themed **Mermaid.js** diagrams, and one-click image upload that embeds `![alt](/uploads/...)` in the post body.
 - **Multilingual UI (i18n):** 🇪🇸 Español (`es`) · 🇺🇸 English (`en`) · 🇧🇷 Português (`pt`) · 🇫🇷 Français (`fr`), plus an original-language badge on every post.
-- **Google Gemini AI:** one-click post translation, tag suggestions and reading-time estimates (with an offline fallback when no API key is set).
+- **AI with failover (Claude + Gemini):** post translation, tag suggestions, reading-time estimates and tag-section validation. Providers are tried in order and the next one takes over if one fails. Without any provider, translation is disabled (never faked) and the other features use clearly labelled keyword/heuristic fallbacks.
 - **Sections:** Tech & Coding, AI, Interviews & Career, Mental Health and Gaming — each with its own color and icon. The home page filters by section, and every post and tag belongs to one.
-- **AI tag validation:** new tags are checked in real time against the post's section (e.g. "WoW" can only be created under Gaming) using Gemini, with a keyword fallback when no API key is set.
+- **AI tag validation:** new tags are checked in real time against the post's section (e.g. "WoW" can only be created under Gaming) using the AI providers, with a keyword fallback when none is available.
 - **Starter tags:** 19 tags seeded on an empty database, each assigned to its section.
 - **Role-based access control:** `ADMIN`, `AUTHOR` and `READER`. The first account is `ADMIN`; after that, only an admin can assign roles.
 - **Admin panel:** user and role management, backups (database + uploaded media, daily snapshots, 7-day rotation, one-click create/download/delete) and media storage usage with orphan cleanup.
@@ -173,7 +173,9 @@ All settings live in `.env` (production) or `.env.dev` (development). Templates:
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | | Initial admin, created only if no admin exists |
 | `ALLOW_ROLE_SELF_SWITCH` | | Test role switcher — never enable in production (default `False`) |
 | `SEED_DEMO_POSTS` | | Seed demo posts into an empty database (default `False`; `True` in dev) |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | | Google Gemini for translation, tags and reading time |
+| `ANTHROPIC_API_KEY` / `CLAUDE_MODEL` | | Claude (default model `claude-opus-5-5`) for the AI features |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | | Google Gemini for the AI features |
+| `LLM_PROVIDER_ORDER` | | Failover order of the configured providers (default `claude,gemini`) |
 
 > ⚠️ `POSTGRES_PASSWORD` is only applied when a database volume is first created. To change it later, run `ALTER USER` in Postgres **and** update `.env`.
 

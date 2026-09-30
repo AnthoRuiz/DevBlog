@@ -1,6 +1,6 @@
 # SYS.BLOG • End-to-End Technical Specification & Architecture Manual
 
-> **Document Version:** 3.2.0 (2026-09-30)  
+> **Document Version:** 3.3.0 (2026-09-30)  
 > **Target Audience:** Systems architects, AI agents, DevOps engineers and full-stack developers  
 > **Production URL:** `https://blog.anthoruiz.dev`  
 > **Local endpoints:** Production stack: frontend `127.0.0.1:3000`, API `127.0.0.1:8000` · Development stack: frontend `localhost:5173`, API `localhost:8001/docs`
@@ -17,7 +17,7 @@
 3. **Role-based access control (RBAC):** a 3-tier model (`ADMIN`, `AUTHOR`, `READER`) enforced through FastAPI route dependencies. Roles are assigned by admins only.
 4. **Isolated environments:** production and development are separate Docker Compose projects with their own databases, volumes, ports and configuration files.
 5. **Autonomous operations:** automatic daily database backups with 7-copy rotation, Docker restart policies, and a deployment script with pre- and post-deploy checks.
-6. **AI assistance:** Google Gemini for post translation, tag suggestions and reading-time estimation, with deterministic offline fallbacks.
+6. **AI assistance with failover:** Claude and Google Gemini behind one provider layer for translation, tag suggestions, reading time and tag-section validation. Fallbacks are honest: translation fails loudly without AI; the rest use labelled heuristics.
 
 ---
 
@@ -95,7 +95,7 @@ The Vite dev server proxies `/api` and `/uploads` to the development backend (`V
 | Container | Service | Image | Internal port | Host binding | Purpose |
 |---|---|---|---|---|---|
 | `devblog_postgres` | `db` | `postgres:16-alpine` | `5432` | `127.0.0.1:${POSTGRES_PORT}` | Relational persistence with `pg_isready` healthcheck |
-| `devblog_backend` | `backend` | Custom (`python:3.10-slim`) | `8000` | `127.0.0.1:8000` | FastAPI API, Gemini integration, backups, telemetry |
+| `devblog_backend` | `backend` | Custom (`python:3.10-slim`) | `8000` | `127.0.0.1:8000` | FastAPI API, AI providers (Claude/Gemini), backups, telemetry |
 | `devblog_frontend` | `frontend` | Multi-stage (`node:20-alpine` → `nginx:alpine`) | `80` | `127.0.0.1:3000` | Nginx reverse proxy and React SPA |
 | `devblog_tunnel` | `tunnel` | `cloudflare/cloudflared:latest` | — | — | Outbound edge tunnel connector |
 
@@ -137,7 +137,7 @@ The Vite dev server proxies `/api` and `/uploads` to the development backend (`V
 - **Security:** `passlib[bcrypt]` for password hashing, `python-jose` for JWT (HS256, 24 h expiry).
 - **Rate limiting:** SlowAPI (in-memory, keyed by `CF-Connecting-IP` / `X-Forwarded-For` / peer address).
 - **Monitoring:** `psutil` for host telemetry.
-- **HTTP client:** `httpx` for Gemini and Google token verification.
+- **AI SDKs / HTTP:** official `anthropic` SDK (1.9, async) for Claude; `httpx` for Gemini and Google token verification.
 
 ### 4.2 Configuration (`backend/app/core/config.py`)
 - `DATABASE_URL` is built from `POSTGRES_USER/PASSWORD/HOST/PORT/DB` with the user and password **percent-encoded**, so passwords may contain `@ : / # %`. A full `DATABASE_URL` can be supplied instead.
@@ -263,7 +263,7 @@ Every post and every tag belongs to exactly one section (`section_id`, required,
 Admins can edit name, description and color (`PUT /admin/sections/{id}`); slugs are fixed because they are used in URLs.
 
 **Tag-section validation (`backend/app/services/tag_classifier.py`).** A new tag must fit its section ("WoW" belongs to Gaming, never Tech & Coding):
-- With `GEMINI_API_KEY`, Gemini classifies the name against the section names and descriptions and returns `{section_slug, confidence, reason}`. Without a key, or on any Gemini error, a keyword classifier is used (games, consoles, engines, mental-health, interview and AI terms; short keywords match whole words only).
+- With an AI provider configured, the LLM layer (4.11) classifies the name against the section names and descriptions and returns `{section_slug, confidence, reason}` (the slug is an enum of the sections plus `none`). Without a provider, or when all fail, a keyword classifier is used (games, consoles, engines, mental-health, interview and AI terms; short keywords match whole words only).
 - A tag is rejected only when another section is suggested with confidence ≥ 0.7. Ambiguous or unknown names return no suggestion and never block. Results are cached in memory.
 - The editor calls `POST /posts/tags/validate` while the author types (debounced) and offers "Create in <section>"; `POST /posts/tags` enforces the same rule (HTTP 422) unless an admin sends `force: true`.
 
@@ -333,10 +333,26 @@ The first registered account becomes `ADMIN`; every later sign-up is a `READER`.
 ### 4.10 Observability & Hardware Telemetry
 - **Logging:** rotating file handler at `/app/logs/server.log` (5 MB × 3) plus stdout; client errors are logged through the `devblog.client` logger.
 - **Telemetry (`GET /stats/telemetry`, admin):** CPU % (`psutil.cpu_percent`), logical/physical cores, RAM, disk, uptime (`psutil.boot_time`) and temperature (`psutil.sensors_temperatures`, estimated from CPU load when no sensor is exposed, as under WSL2).
-- **System status (`GET /stats/status`, admin):** measures a real `SELECT 1` round-trip to PostgreSQL and reports FastAPI, Nginx and Gemini status alongside the hardware snapshot.
+- **System status (`GET /stats/status`, admin):** measures a real `SELECT 1` round-trip to PostgreSQL and reports FastAPI, Nginx and the configured AI providers (`degraded` when none) alongside the hardware snapshot. AI providers are not pinged, to avoid spending tokens on every refresh.
 - **Public liveness:** `GET /stats/system` and `GET /health` return static healthy responses without host details.
 
 ---
+
+### 4.11 AI Providers (`backend/app/services/llm.py`, `ai_features.py`)
+- **One entry point:** `generate_json(prompt, schema, task=..., max_tokens, timeout, effort, stream)` returns a JSON object matching the schema plus the provider that produced it (e.g. `claude:claude-opus-5-5`).
+- **Failover:** providers are tried in `LLM_PROVIDER_ORDER` (default `claude,gemini`), skipping those without an API key. Any exception, timeout, refusal, `max_tokens` truncation or JSON missing required keys moves on to the next provider; when all fail, `LLMUnavailable` is raised.
+- **Claude:** official SDK (`AsyncAnthropic`, one SDK retry so failover is quick), model `CLAUDE_MODEL` (default `claude-opus-5-5`), structured output via `output_config.format` (`json_schema`), `effort: low` for short tasks and `medium` for translation, streaming for translations, and the server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`).
+- **Gemini:** REST `generateContent` with `response_mime_type: application/json` and `maxOutputTokens`.
+- **Features and their non-AI behaviour:**
+
+| Feature | Timeout | Without a working provider |
+|---|---|---|
+| Translation (`POST /posts/ai-translate`) | 180 s, streamed | HTTP 503 with an explanation (no fake translation) |
+| Tag suggestions (`POST /posts/ai-suggest-tags`) | 20 s | Existing tags / known technologies found in the text; response `provider: "keywords"`; may be empty |
+| Reading time (post create/update, `POST /posts/ai-estimate-reading-time`) | 15 s | Heuristic: prose 180 wpm, code ~20 lines/min, density factor |
+| Tag-section validation | 10 s | Keyword classifier (4.4) |
+
+- `GET /posts/ai-status` tells the editor whether AI is available; the editor then disables translation and labels keyword suggestions.
 
 ## 5. Frontend Architecture (React 18, TypeScript & Vite)
 
@@ -440,9 +456,10 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 | `GET` | `/posts/tags/all` | Public | List all tags |
 | `POST` | `/posts/tags` | Author | Create a tag in a section (`section_id` required; 422 when it clearly belongs to another section, admins may `force`) |
 | `POST` | `/posts/tags/validate` | Author | Real-time check of a new tag name against a section (30/min) |
-| `POST` | `/posts/ai-translate` | Author | Translate title, summary and markdown (Gemini) |
-| `POST` | `/posts/ai-suggest-tags` | Author | Suggest tags (Gemini) |
-| `POST` | `/posts/ai-estimate-reading-time` | Author | Estimate reading time (Gemini) |
+| `GET` | `/posts/ai-status` | Author | Configured AI providers in failover order |
+| `POST` | `/posts/ai-translate` | Author | Translate title, summary and markdown (AI; 503 without a provider) |
+| `POST` | `/posts/ai-suggest-tags` | Author | Suggest tags (AI, or keywords); returns `provider` |
+| `POST` | `/posts/ai-estimate-reading-time` | Author | Estimate reading time (AI, or heuristic) |
 
 ### 6.2b Sections
 | Method | Endpoint | Auth | Description |
@@ -497,8 +514,11 @@ Production reads `.env`, development reads `.env.dev` (templates: `.env.example`
 | `ADMIN_PASSWORD` | | random, printed once | Initial admin password |
 | `ALLOW_ROLE_SELF_SWITCH` | | `False` | Enables `PUT /auth/me/role` (testing only; blocked in production) |
 | `SEED_DEMO_POSTS` | | `False` (dev `True`) | Seeds the demo posts into an empty database |
-| `GEMINI_API_KEY` | | empty | Google AI Studio key (translation, tag suggestions, reading time, tag-section validation); offline fallbacks when empty |
+| `ANTHROPIC_API_KEY` | | empty | Claude API key for the AI features |
+| `CLAUDE_MODEL` | | `claude-opus-5-5` | Claude model |
+| `GEMINI_API_KEY` | | empty | Google AI Studio key for the AI features |
 | `GEMINI_MODEL` | | `gemini-1.5-flash` | Gemini model |
+| `LLM_PROVIDER_ORDER` | | `claude,gemini` | Failover order of the configured providers |
 | `BACKEND_PORT` | | `8001` | Dev backend host port (`.env.dev` only) |
 | `VITE_API_PROXY_TARGET` | | `http://localhost:8001` | Vite dev proxy target (shell env when running `npm run dev`) |
 | `VITE_ENABLE_ROLE_TESTING` | | unset | Shows the role testing UI (frontend build/dev env) |
@@ -560,7 +580,7 @@ docker exec -it devblog_dev_postgres psql -U devblog_dev -d devblog_dev
 ## 9. AI Agent Guidance & Ingestion Index
 
 When reading, analyzing or extending this repository:
-1. **Language:** all code, comments, messages, commits and docs are in English. User-facing strings belong in `frontend/src/i18n/index.ts` (es/en/pt/fr). Spanish strings in `backend/app/services/gemini.py` are intentional matching data.
+1. **Language:** all code, comments, messages, commits and docs are in English. User-facing strings belong in `frontend/src/i18n/index.ts` (es/en/pt/fr). Spanish keywords in `backend/app/services/ai_features.py` are intentional matching data for Spanish-language posts.
 2. **Environments:** never point development tooling at production. Use `docker-compose.dev.yml` + `.env.dev`; Vite already proxies to port 8001.
 3. **Secrets:** never add defaults for secrets in `docker-compose*.yml` or `config.py`; required values use `${VAR:?...}`. Never commit `.env*` files (other than the templates) or anything in `backend/backups/`.
 4. **Routing:** Nginx proxies `/api/` to `backend:8000/api/`; client routes live in `frontend/src/App.tsx` (hash routes `#/status`, `#/backups`).
