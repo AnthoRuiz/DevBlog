@@ -109,6 +109,10 @@ export interface Translations {
   toolbarDivider: string;
   toolbarImage: string;
   toolbarImageUploading: string;
+  loadMorePosts: string;
+  loadingMorePosts: string;
+  // Placeholders: {shown}, {total}
+  showingPostsCount: string;
   editorEmptyPreview: string;
   markdownGuideTitle: string;
   systemStatusBtn: string;
@@ -241,6 +245,9 @@ export const translations: Record<Language, Translations> = {
     toolbarDivider: 'Línea divisoria (---)',
     toolbarImage: 'Subir e insertar imagen (JPG, PNG, WEBP, GIF)',
     toolbarImageUploading: 'Subiendo imagen...',
+    loadMorePosts: 'Cargar más artículos',
+    loadingMorePosts: 'Cargando...',
+    showingPostsCount: 'Mostrando {shown} de {total} artículos',
     editorEmptyPreview: 'El artículo aún no tiene contenido. Escribe en la pestaña "Escribir" para ver la previsualización.',
     markdownGuideTitle: 'Guía Rápida de Formato Markdown (Estilo Word)',
     systemStatusBtn: '🖥️ Estado (/status)',
@@ -371,6 +378,9 @@ export const translations: Record<Language, Translations> = {
     toolbarDivider: 'Divider line (---)',
     toolbarImage: 'Upload and insert image (JPG, PNG, WEBP, GIF)',
     toolbarImageUploading: 'Uploading image...',
+    loadMorePosts: 'Load more posts',
+    loadingMorePosts: 'Loading...',
+    showingPostsCount: 'Showing {shown} of {total} posts',
     editorEmptyPreview: 'The article does not have content yet. Write in the "Write" tab to see the live preview.',
     markdownGuideTitle: 'Quick Markdown Formatting Guide (Word-like)',
     systemStatusBtn: '🖥️ Status (/status)',
@@ -501,6 +511,9 @@ export const translations: Record<Language, Translations> = {
     toolbarDivider: 'Linha divisória (---)',
     toolbarImage: 'Enviar e inserir imagem (JPG, PNG, WEBP, GIF)',
     toolbarImageUploading: 'Enviando imagem...',
+    loadMorePosts: 'Carregar mais artigos',
+    loadingMorePosts: 'Carregando...',
+    showingPostsCount: 'Mostrando {shown} de {total} artigos',
     editorEmptyPreview: 'O artigo ainda não tem conteúdo. Escreva na aba "Escrever" para ver a pré-visualização.',
     markdownGuideTitle: 'Guia Rápido de Formatação Markdown (Estilo Word)',
     systemStatusBtn: '🖥️ Status (/status)',
@@ -631,6 +644,9 @@ export const translations: Record<Language, Translations> = {
     toolbarDivider: 'Ligne de séparation (---)',
     toolbarImage: 'Téléverser et insérer une image (JPG, PNG, WEBP, GIF)',
     toolbarImageUploading: "Téléversement de l'image...",
+    loadMorePosts: "Charger plus d'articles",
+    loadingMorePosts: 'Chargement...',
+    showingPostsCount: 'Affichage de {shown} sur {total} articles',
     editorEmptyPreview: 'L\'article n\'a pas encore de contenu. Écrivez dans l\'onglet "Écrire" pour voir l\'aperçu.',
     markdownGuideTitle: 'Guide Rapide de Formatage Markdown (Style Word)',
     systemStatusBtn: '🖥️ Statut (/status)',

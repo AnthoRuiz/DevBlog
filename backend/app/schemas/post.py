@@ -44,6 +44,14 @@ class PostRead(BaseModel):
     created_at: datetime
     tags: list[TagRead] = []
 
+class PostPage(BaseModel):
+    """One page of posts plus what the client needs to request the next one."""
+    items: list[PostRead]
+    total: int
+    limit: int
+    offset: int
+    has_more: bool
+
 class CommentCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=2000)
     author_name: Optional[str] = Field("Dev Reader", max_length=100)

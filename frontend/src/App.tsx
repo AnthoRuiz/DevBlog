@@ -10,6 +10,7 @@ import { BackupsModal } from './components/BackupsModal';
 import { Post, PostDetail, StreakStats, Tag, User, UserRole } from './types';
 import {
   fetchPosts,
+  POSTS_PAGE_SIZE,
   fetchStreakStats,
   fetchPostBySlug,
   toggleUpvote,
@@ -26,6 +27,12 @@ import { Language, translations } from './i18n';
 
 export function App() {
   const [posts, setPosts] = useState<Post[]>([]);
+  // Pagination of the main feed (not used by the bookmarks view)
+  const [totalPosts, setTotalPosts] = useState<number>(0);
+  const [hasMorePosts, setHasMorePosts] = useState<boolean>(false);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  // Incremented on every fresh load so late responses from an older filter are ignored
+  const feedRequestId = useRef(0);
   const [stats, setStats] = useState<StreakStats | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | undefined>(undefined);
@@ -141,6 +148,7 @@ export function App() {
   }, [selectedTag, sortBy, debouncedSearch]);
 
   const loadData = async () => {
+    const requestId = ++feedRequestId.current;
     setIsLoading(true);
     try {
       if (selectedTag === '__bookmarks__') {
@@ -152,22 +160,26 @@ export function App() {
 
         // If the API returned nothing but we have local bookmarks, filter them from all posts
         if (bookmarkedPosts.length === 0 && bookmarkedIds.size > 0) {
-          const allPosts = await fetchPosts(undefined, sortBy);
-          const filtered = allPosts.filter((p) => bookmarkedIds.has(p.id));
+          const allPosts = await fetchPosts(undefined, sortBy, undefined, 0, 100);
+          const filtered = allPosts.items.filter((p) => bookmarkedIds.has(p.id));
           setPosts(filtered);
         } else {
           setPosts(bookmarkedPosts);
         }
+        setHasMorePosts(false);
 
         if (statsData) setStats(statsData);
         if (tagsData.length > 0) setTags(tagsData);
       } else {
-        const [postsData, statsData, tagsData] = await Promise.all([
+        const [page, statsData, tagsData] = await Promise.all([
           fetchPosts(selectedTag, sortBy, debouncedSearch),
           fetchStreakStats().catch(() => null),
           fetchAllTags().catch(() => []),
         ]);
-        setPosts(postsData);
+        if (requestId !== feedRequestId.current) return;
+        setPosts(page.items);
+        setTotalPosts(page.total);
+        setHasMorePosts(page.has_more);
         if (statsData) setStats(statsData);
         if (tagsData.length > 0) setTags(tagsData);
       }
@@ -175,6 +187,27 @@ export function App() {
       console.error('Failed to load API data:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (isLoadingMore || !hasMorePosts || selectedTag === '__bookmarks__') return;
+    const requestId = feedRequestId.current;
+    setIsLoadingMore(true);
+    try {
+      const page = await fetchPosts(selectedTag, sortBy, debouncedSearch, posts.length, POSTS_PAGE_SIZE);
+      // Filters changed while this page was loading: drop it
+      if (requestId !== feedRequestId.current) return;
+      setPosts((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        return [...prev, ...page.items.filter((p) => !seen.has(p.id))];
+      });
+      setTotalPosts(page.total);
+      setHasMorePosts(page.has_more);
+    } catch (err) {
+      console.error('Failed to load more posts:', err);
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -201,7 +234,7 @@ export function App() {
     try {
       await toggleBookmark(postId);
     } catch (err) {
-      console.error('Error sincronizando marcador en backend:', err);
+      console.error('Failed to sync bookmark with the backend:', err);
     }
 
     if (selectedTag === '__bookmarks__') {
@@ -626,6 +659,25 @@ export function App() {
                 currentLang={currentLang}
               />
             ))}
+          </div>
+        )}
+
+        {/* Pagination: load the next page of the feed */}
+        {!isLoading && selectedTag !== '__bookmarks__' && posts.length > 0 && (
+          <div className="flex flex-col items-center gap-2 mt-8">
+            {hasMorePosts && (
+              <button
+                type="button"
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                className="px-6 py-2.5 rounded-xl border border-cyan-500/50 text-cyan-300 bg-[#0b0f19] hover:bg-cyan-500/10 text-sm font-bold transition-colors disabled:opacity-50"
+              >
+                {isLoadingMore ? t.loadingMorePosts : t.loadMorePosts}
+              </button>
+            )}
+            <span className="text-xs font-mono text-slate-400">
+              {t.showingPostsCount.replace('{shown}', String(posts.length)).replace('{total}', String(totalPosts))}
+            </span>
           </div>
         )}
       </main>

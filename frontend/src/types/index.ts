@@ -113,6 +113,14 @@ export interface BackupItem {
   media_size_display?: string;
 }
 
+export interface PostPage {
+  items: Post[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+}
+
 export interface MediaStats {
   total_files: number;
   total_size_display: string;

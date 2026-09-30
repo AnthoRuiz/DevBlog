@@ -1,4 +1,4 @@
-import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult } from '../types';
+import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -35,11 +35,21 @@ export async function pingSystemHealth(): Promise<void> {
   if (!res.ok) throw new Error('Server unavailable');
 }
 
-export async function fetchPosts(tag?: string, sort: string = 'recent', query?: string): Promise<Post[]> {
+export const POSTS_PAGE_SIZE = 12;
+
+export async function fetchPosts(
+  tag?: string,
+  sort: string = 'recent',
+  query?: string,
+  offset: number = 0,
+  limit: number = POSTS_PAGE_SIZE,
+): Promise<PostPage> {
   const params = new URLSearchParams();
   if (tag) params.append('tag', tag);
   if (sort) params.append('sort', sort);
   if (query) params.append('q', query);
+  params.append('offset', String(offset));
+  params.append('limit', String(limit));
 
   const res = await fetch(`${API_BASE}/posts?${params.toString()}`);
   if (!res.ok) throw new Error('Failed to load posts');

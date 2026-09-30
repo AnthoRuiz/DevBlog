@@ -21,6 +21,7 @@ from app.models.interaction import Upvote, Bookmark, Comment
 from app.models.user import User, UserRole
 from app.schemas.post import (
     PostRead,
+    PostPage,
     PostDetailRead,
     PostCreate,
     PostUpdate,
@@ -42,16 +43,16 @@ from app.core.limiter import limiter
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
 
-@router.get("", response_model=list[PostRead])
+@router.get("", response_model=PostPage)
 async def list_posts(
     tag: Optional[str] = Query(None, description="Filter by tag slug"),
     q: Optional[str] = Query(None, description="Search by title or summary"),
     sort: str = Query("recent", regex="^(recent|top_voted|trending)$"),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(12, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db)
 ):
-    query = select(Post).where(Post.is_published == True).options(selectinload(Post.tags))
+    query = select(Post).where(Post.is_published == True)
 
     if tag:
         query = query.join(Post.tags).where(Tag.slug == tag)
@@ -60,6 +61,11 @@ async def list_posts(
         search_filter = f"%{q}%"
         query = query.where((Post.title.ilike(search_filter)) | (Post.summary.ilike(search_filter)))
 
+    # Total for the same filters, so the client knows whether there is another page
+    total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar_one()
+
+    query = query.options(selectinload(Post.tags))
+
     if sort == "top_voted":
         query = query.order_by(desc(Post.upvotes_count), desc(Post.created_at))
     elif sort == "trending":
@@ -67,10 +73,17 @@ async def list_posts(
     else:
         query = query.order_by(desc(Post.published_at), desc(Post.created_at))
 
-    query = query.offset(offset).limit(limit)
+    # Post.id as a final tie-breaker keeps page boundaries stable when sort keys are equal
+    query = query.order_by(desc(Post.id)).offset(offset).limit(limit)
     result = await db.execute(query)
     posts = result.scalars().all()
-    return [PostRead.model_validate(p) for p in posts]
+    return PostPage(
+        items=[PostRead.model_validate(p) for p in posts],
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=offset + len(posts) < total,
+    )
 
 @router.get("/tags/all", response_model=list[TagRead])
 async def list_all_tags(db: AsyncSession = Depends(get_db)):
