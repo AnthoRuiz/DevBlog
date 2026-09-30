@@ -107,6 +107,8 @@ export interface Translations {
   toolbarLink: string;
   toolbarTable: string;
   toolbarDivider: string;
+  toolbarImage: string;
+  toolbarImageUploading: string;
   editorEmptyPreview: string;
   markdownGuideTitle: string;
   systemStatusBtn: string;
@@ -237,6 +239,8 @@ export const translations: Record<Language, Translations> = {
     toolbarLink: 'Enlace ([texto](url))',
     toolbarTable: 'Insertar tabla técnica',
     toolbarDivider: 'Línea divisoria (---)',
+    toolbarImage: 'Subir e insertar imagen (JPG, PNG, WEBP, GIF)',
+    toolbarImageUploading: 'Subiendo imagen...',
     editorEmptyPreview: 'El artículo aún no tiene contenido. Escribe en la pestaña "Escribir" para ver la previsualización.',
     markdownGuideTitle: 'Guía Rápida de Formato Markdown (Estilo Word)',
     systemStatusBtn: '🖥️ Estado (/status)',
@@ -365,6 +369,8 @@ export const translations: Record<Language, Translations> = {
     toolbarLink: 'Link ([text](url))',
     toolbarTable: 'Insert technical table',
     toolbarDivider: 'Divider line (---)',
+    toolbarImage: 'Upload and insert image (JPG, PNG, WEBP, GIF)',
+    toolbarImageUploading: 'Uploading image...',
     editorEmptyPreview: 'The article does not have content yet. Write in the "Write" tab to see the live preview.',
     markdownGuideTitle: 'Quick Markdown Formatting Guide (Word-like)',
     systemStatusBtn: '🖥️ Status (/status)',
@@ -493,6 +499,8 @@ export const translations: Record<Language, Translations> = {
     toolbarLink: 'Link ([texto](url))',
     toolbarTable: 'Inserir tabela técnica',
     toolbarDivider: 'Linha divisória (---)',
+    toolbarImage: 'Enviar e inserir imagem (JPG, PNG, WEBP, GIF)',
+    toolbarImageUploading: 'Enviando imagem...',
     editorEmptyPreview: 'O artigo ainda não tem conteúdo. Escreva na aba "Escrever" para ver a pré-visualização.',
     markdownGuideTitle: 'Guia Rápido de Formatação Markdown (Estilo Word)',
     systemStatusBtn: '🖥️ Status (/status)',
@@ -621,6 +629,8 @@ export const translations: Record<Language, Translations> = {
     toolbarLink: 'Lien ([texte](url))',
     toolbarTable: 'Insérer un tableau technique',
     toolbarDivider: 'Ligne de séparation (---)',
+    toolbarImage: 'Téléverser et insérer une image (JPG, PNG, WEBP, GIF)',
+    toolbarImageUploading: "Téléversement de l'image...",
     editorEmptyPreview: 'L\'article n\'a pas encore de contenu. Écrivez dans l\'onglet "Écrire" pour voir l\'aperçu.',
     markdownGuideTitle: 'Guide Rapide de Formatage Markdown (Style Word)',
     systemStatusBtn: '🖥️ Statut (/status)',

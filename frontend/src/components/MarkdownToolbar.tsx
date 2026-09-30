@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Bold,
   Italic,
@@ -10,6 +10,8 @@ import {
   Code2,
   Quote,
   Link2,
+  ImagePlus,
+  Loader2,
   Table,
   Minus,
   Eye,
@@ -25,6 +27,9 @@ interface MarkdownToolbarProps {
   onChange: (newValue: string) => void;
   activeTab: 'write' | 'preview';
   onTabChange: (tab: 'write' | 'preview') => void;
+  // Uploads a file and resolves to its public URL; the image button is hidden when omitted
+  onUploadImage?: (file: File) => Promise<string>;
+  onUploadError?: (message: string) => void;
   t: Translations;
 }
 
@@ -34,9 +39,13 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
   onChange,
   activeTab,
   onTabChange,
+  onUploadImage,
+  onUploadError,
   t,
 }) => {
   const [showGuide, setShowGuide] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Wrap the selected text, or insert placeholder text
   const wrapSelection = (prefix: string, suffix: string, defaultText: string) => {
@@ -143,6 +152,37 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
       el.focus();
       el.setSelectionRange(start + tableText.length, start + tableText.length);
     }, 10);
+  };
+
+  // Upload an image and insert ![alt](url) as its own paragraph at the cursor
+  const handleImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    const el = textareaRef.current;
+    if (!file || !el || !onUploadImage) return;
+
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    setIsUploadingImage(true);
+    try {
+      const url = await onUploadImage(file);
+      const alt = file.name.replace(/\.[^.]+$/, '').replace(/[[\]]/g, '') || 'image';
+      // Read the current text: the user may have kept typing while the upload was in flight
+      const current = el.value;
+      const before = current.substring(0, start);
+      const after = current.substring(end);
+      const leading = before === '' || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+      const snippet = `${leading}![${alt}](${url})\n\n`;
+      onChange(`${before}${snippet}${after}`);
+      setTimeout(() => {
+        el.focus();
+        el.setSelectionRange(start + snippet.length, start + snippet.length);
+      }, 10);
+    } catch (err) {
+      onUploadError?.(err instanceof Error ? err.message : 'Failed to upload image');
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   // Insert a link
@@ -319,6 +359,26 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
             >
               <Link2 className="w-3.5 h-3.5" />
             </button>
+            {onUploadImage && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={isUploadingImage}
+                  className="p-1.5 rounded hover:bg-[#1a2336] text-slate-300 hover:text-cyan-300 transition-colors disabled:opacity-50"
+                  title={isUploadingImage ? t.toolbarImageUploading : t.toolbarImage}
+                >
+                  {isUploadingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
+                </button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={handleImageSelected}
+                  className="hidden"
+                />
+              </>
+            )}
             <button
               type="button"
               onClick={insertTable}
@@ -393,6 +453,7 @@ export const MarkdownToolbar: React.FC<MarkdownToolbarProps> = ({
               <p className="text-slate-400"><code>&gt; Important note</code></p>
               <p className="text-slate-400"><code>- List item</code></p>
               <p className="text-slate-400"><code>[See Docs](https://...)</code></p>
+              <p className="text-slate-400"><code>![Alt text](/uploads/image.png)</code></p>
             </div>
           </div>
         </div>

@@ -730,6 +730,8 @@ export const NewPostModal: FC<NewPostModalProps> = ({
               onChange={setContentMarkdown}
               activeTab={editorTab}
               onTabChange={setEditorTab}
+              onUploadImage={token ? (file) => uploadImage(file, token) : undefined}
+              onUploadError={setErrorMsg}
               t={t}
             />
 

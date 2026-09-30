@@ -21,6 +21,15 @@ const safeUrl = (escapedUrl: string) => {
   return '#';
 };
 
+// Images: only http(s) and same-origin paths (e.g. /uploads/...); returns null for anything else
+const safeImageUrl = (escapedUrl: string) => {
+  const url = escapedUrl.trim();
+  if (/[\u0000-\u001f\u007f]/.test(url)) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith('/') && !url.startsWith('//')) return url;
+  return null;
+};
+
 interface MarkdownRendererProps {
   content: string;
   emptyMessage?: string;
@@ -46,8 +55,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
-  // Render text with basic inline formatting (bold, italic, links, code)
+  // Render text with basic inline formatting (images, bold, italic, links, code)
   const renderInline = (text: string) => {
+    // Images ![alt](url)
+    const imageRegex = /!\[([^\]]*)\]\(([^)\s]+)\)/g;
     // Links [text](url)
     const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
     // Inline code `code`
@@ -59,9 +70,18 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 
     let html = escapeHtml(text);
 
-    // Links are extracted before other formatting so bold/italic can never inject
-    // markup inside the href attribute
+    // Images and links are extracted before other formatting so bold/italic can never inject
+    // markup inside the src/href attributes. Images go first so ![alt](url) is not read as a link.
     const links: string[] = [];
+    html = html.replace(imageRegex, (_, alt: string, url: string) => {
+      const src = safeImageUrl(url);
+      links.push(
+        src
+          ? `<img src="${src}" alt="${alt}" loading="lazy" class="block max-w-full h-auto mx-auto my-3 rounded-xl border border-[#1e293b]" />`
+          : alt
+      );
+      return `\u0000${links.length - 1}\u0000`;
+    });
     html = html.replace(linkRegex, (_, label: string, url: string) => {
       links.push(
         `<a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition-colors">${label}</a>`
