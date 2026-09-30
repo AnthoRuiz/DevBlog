@@ -122,7 +122,7 @@ Confidence is a number from 0 to 1. Keep the reason under 12 words.
         "additionalProperties": False,
     }
     try:
-        result = await generate_json(prompt, schema, task="classify_tag", max_tokens=256, timeout=10.0)
+        result = await generate_json(prompt, schema, task="classify_tag", max_tokens=256, timeout=25.0)
     except LLMUnavailable:
         return None
 
@@ -146,9 +146,11 @@ async def classify_tag(name: str, sections: Sequence[Section]) -> TagClassificat
     # LLM providers with failover; keywords when none is configured or all fail
     result = await _classify_with_llm(name.strip(), sections) or classify_by_keywords(name)
 
-    if len(_cache) >= _CACHE_MAX:
-        _cache.pop(next(iter(_cache)))
-    _cache[key] = result
+    # Cache only LLM answers: a keyword fallback after a transient failure should retry the LLM next time
+    if result.source not in ("keywords", "none"):
+        if len(_cache) >= _CACHE_MAX:
+            _cache.pop(next(iter(_cache)))
+        _cache[key] = result
     return result
 
 

@@ -1,6 +1,6 @@
 # SYS.BLOG • End-to-End Technical Specification & Architecture Manual
 
-> **Document Version:** 3.3.0 (2026-09-30)  
+> **Document Version:** 3.4.0 (2026-10-01)  
 > **Target Audience:** Systems architects, AI agents, DevOps engineers and full-stack developers  
 > **Production URL:** `https://blog.anthoruiz.dev`  
 > **Local endpoints:** Production stack: frontend `127.0.0.1:3000`, API `127.0.0.1:8000` · Development stack: frontend `localhost:5173`, API `localhost:8001/docs`
@@ -342,15 +342,15 @@ The first registered account becomes `ADMIN`; every later sign-up is a `READER`.
 - **One entry point:** `generate_json(prompt, schema, task=..., max_tokens, timeout, effort, stream)` returns a JSON object matching the schema plus the provider that produced it (e.g. `claude:claude-opus-5-5`).
 - **Failover:** providers are tried in `LLM_PROVIDER_ORDER` (default `claude,gemini`), skipping those without an API key. Any exception, timeout, refusal, `max_tokens` truncation or JSON missing required keys moves on to the next provider; when all fail, `LLMUnavailable` is raised with a `reason`: `not_configured`, `quota_exhausted` (every provider tried was out of quota: Gemini HTTP 429 `RESOURCE_EXHAUSTED`, Claude 429 or "credit balance too low"; carries the soonest known `retry_after` from `Retry-After` or a `RetryInfo.retryDelay`) or `failed`.
 - **Claude:** official SDK (`AsyncAnthropic`, one SDK retry so failover is quick), model `CLAUDE_MODEL` (default `claude-opus-5-5`), structured output via `output_config.format` (`json_schema`), `effort: low` for short tasks and `medium` for translation, streaming for translations, and the server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`).
-- **Gemini:** REST `generateContent` with `response_mime_type: application/json` and `maxOutputTokens`.
+- **Gemini:** REST `generateContent` (API key in the `x-goog-api-key` header) with `response_mime_type: application/json`, `responseJsonSchema` (without it Gemini may return a bare list), `thinkingConfig.thinkingLevel: low` and `maxOutputTokens` = task budget + 1024 (thinking tokens count against it). `GEMINI_MODEL` is a list: an overloaded (503), retired (404), empty or out-of-quota (429) model moves on to the next one, and when every model answered 503 the list is retried once after 2 s; free-tier quotas are per model, so the list also stretches the quota. The provider only reports `quota_exhausted` when every listed model is out of quota.
 - **Features and their non-AI behaviour:**
 
 | Feature | Timeout | Without a working provider |
 |---|---|---|
 | Translation (`POST /posts/ai-translate`) | 180 s, streamed | No fake translation: HTTP 429 + `Retry-After` when the quota is exhausted, 503 otherwise; `detail = {code, message, retry_after}` so the editor shows a localized message |
-| Tag suggestions (`POST /posts/ai-suggest-tags`) | 20 s | Existing tags / known technologies found in the text; response `provider: "keywords"` plus `fallback_reason`; may be empty |
-| Reading time (post create/update, `POST /posts/ai-estimate-reading-time`) | 15 s | Heuristic: prose 180 wpm, code ~20 lines/min, density factor |
-| Tag-section validation | 10 s | Keyword classifier (4.4) |
+| Tag suggestions (`POST /posts/ai-suggest-tags`) | 40 s | Existing tags / known technologies found in the text; response `provider: "keywords"` plus `fallback_reason`; may be empty |
+| Reading time (`POST /posts/ai-estimate-reading-time`) | 30 s | Heuristic: prose 180 wpm, code ~20 lines/min, density factor. Post create/update always use the heuristic so publishing never waits on an LLM |
+| Tag-section validation | 25 s | Keyword classifier (4.4); only LLM answers are cached |
 
 - `GET /posts/ai-status` tells the editor whether AI is available; the editor then disables translation and labels keyword suggestions.
 
@@ -517,7 +517,7 @@ Production reads `.env`, development reads `.env.dev` (templates: `.env.example`
 | `ANTHROPIC_API_KEY` | | empty | Claude API key for the AI features |
 | `CLAUDE_MODEL` | | `claude-opus-5-5` | Claude model |
 | `GEMINI_API_KEY` | | empty | Google AI Studio key for the AI features |
-| `GEMINI_MODEL` | | `gemini-1.5-flash` | Gemini model |
+| `GEMINI_MODEL` | | `gemini-flash-latest,gemini-flash-lite-latest` | Gemini model(s), comma-separated, tried in order |
 | `LLM_PROVIDER_ORDER` | | `claude,gemini` | Failover order of the configured providers |
 | `BACKEND_PORT` | | `8001` | Dev backend host port (`.env.dev` only) |
 | `VITE_API_PROXY_TARGET` | | `http://localhost:8001` | Vite dev proxy target (shell env when running `npm run dev`) |

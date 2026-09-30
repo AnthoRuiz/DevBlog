@@ -40,7 +40,12 @@ from app.schemas.post import (
     TagSuggestRequest,
     TagSuggestResponse,
 )
-from app.services.ai_features import translate_post_content, suggest_post_tags, estimate_reading_time
+from app.services.ai_features import (
+    translate_post_content,
+    suggest_post_tags,
+    estimate_reading_time,
+    estimate_reading_time_heuristic,
+)
 from app.services.llm import LLMUnavailable, configured_providers
 from app.services import media_service, tag_classifier
 from app.api.deps import get_current_admin, get_current_author_or_admin, get_current_user_optional, get_client_hash
@@ -339,7 +344,8 @@ async def create_post(
 
     reading_time = post_in.reading_time_minutes
     if not reading_time or reading_time <= 0:
-        reading_time = await estimate_reading_time(post_in.title, post_in.summary, post_in.content_markdown)
+        # Instant heuristic: publishing must not wait on a (possibly slow) LLM call
+        reading_time = estimate_reading_time_heuristic(post_in.content_markdown)
 
     new_post = Post(
         author_id=current_user.id,
@@ -409,10 +415,8 @@ async def update_post(
     if post_update.reading_time_minutes is not None:
         post.reading_time_minutes = post_update.reading_time_minutes
     elif post_update.content_markdown is not None or post_update.title is not None:
-        curr_title = post_update.title or post.title
-        curr_summary = post_update.summary or post.summary
         curr_content = post_update.content_markdown if post_update.content_markdown is not None else post.content_markdown
-        post.reading_time_minutes = await estimate_reading_time(curr_title, curr_summary, curr_content)
+        post.reading_time_minutes = estimate_reading_time_heuristic(curr_content)
     if post_update.language is not None:
         post.language = post_update.language
     if post_update.is_published is not None:

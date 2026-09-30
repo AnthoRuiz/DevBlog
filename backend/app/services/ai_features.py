@@ -129,14 +129,14 @@ Markdown content:
 {content_markdown[:3000]}
 """
     try:
-        result = await generate_json(prompt, _TAGS_SCHEMA, task="suggest_tags", max_tokens=512, timeout=20.0)
+        result = await generate_json(prompt, _TAGS_SCHEMA, task="suggest_tags", max_tokens=512, timeout=40.0)
         tags = [str(t).strip() for t in result.data.get("suggested_tags", []) if str(t).strip()]
         return tags[:5], result.provider, None
     except LLMUnavailable as e:
         return _suggest_tags_by_keywords(title, summary, content_markdown, existing_tags), KEYWORD_PROVIDER, e.reason
 
 
-def _estimate_reading_time_heuristic(content: str) -> int:
+def estimate_reading_time_heuristic(content: str) -> int:
     """Offline fallback: prose at 180 words/min, code at ~20 lines/min, plus a density factor."""
     code_blocks = re.findall(r"```[\s\S]*?```", content)
     code_text = " ".join(code_blocks)
@@ -173,10 +173,10 @@ Markdown content:
 {content[:4000]}
 """
     try:
-        result = await generate_json(prompt, _READING_TIME_SCHEMA, task="reading_time", max_tokens=256, timeout=15.0)
+        result = await generate_json(prompt, _READING_TIME_SCHEMA, task="reading_time", max_tokens=256, timeout=30.0)
         minutes = result.data.get("reading_time_minutes")
         if isinstance(minutes, (int, float)) and minutes >= 1:
             return min(120, max(1, round(minutes)))
     except LLMUnavailable:
         pass
-    return _estimate_reading_time_heuristic(content)
+    return estimate_reading_time_heuristic(content)

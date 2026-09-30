@@ -5,6 +5,7 @@ tried in LLM_PROVIDER_ORDER, skipping those without an API key; any error, timeo
 invalid JSON moves on to the next one. When every provider fails (or none is configured)
 LLMUnavailable is raised and the caller decides on a non-AI fallback or an explicit error.
 """
+import asyncio
 import json
 import logging
 import re
@@ -56,7 +57,7 @@ def _parse_seconds(value: Optional[str]) -> Optional[int]:
 @dataclass
 class LLMResult:
     data: dict[str, Any]
-    provider: str  # e.g. "claude:claude-opus-5-5" or "gemini:gemini-1.5-flash"
+    provider: str  # e.g. "claude:claude-opus-5-5" or "gemini:gemini-flash-latest"
 
 
 def _has(key: Optional[str]) -> bool:
@@ -133,17 +134,30 @@ async def _send_claude(client: anthropic.AsyncAnthropic, params: dict, schema: d
 
 
 # ── Gemini ────────────────────────────────────────────────────────────────────
-async def _call_gemini(prompt: str, schema: dict, max_tokens: int, timeout: float) -> LLMResult:
-    url = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent"
-        f"?key={settings.GEMINI_API_KEY.strip()}"
-    )
+def gemini_models() -> list[str]:
+    """GEMINI_MODEL may list several models (comma-separated), tried in order."""
+    return [m.strip() for m in settings.GEMINI_MODEL.split(",") if m.strip()]
+
+
+async def _call_gemini_model(model: str, prompt: str, schema: dict, max_tokens: int, timeout: float) -> LLMResult:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"response_mime_type": "application/json", "temperature": 0.2, "maxOutputTokens": max_tokens},
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "temperature": 0.2,
+            # Thinking tokens count against maxOutputTokens: keep thinking low and leave headroom,
+            # otherwise short tasks can come back with no text at all
+            "thinkingConfig": {"thinkingLevel": "low"},
+            "maxOutputTokens": max_tokens + 1024,
+            # Without a schema Gemini may return e.g. a bare list instead of the requested object
+            "responseJsonSchema": schema,
+        },
     }
+    # Key in a header so it never appears in URLs or logs
+    headers = {"x-goog-api-key": settings.GEMINI_API_KEY.strip()}
     async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(url, json=payload)
+        resp = await client.post(url, json=payload, headers=headers)
     if resp.status_code == 429:
         # Free-tier quota or rate limit (RESOURCE_EXHAUSTED); the wait may come as a header or a RetryInfo detail
         retry_after = _parse_seconds(resp.headers.get("retry-after"))
@@ -152,11 +166,44 @@ async def _call_gemini(prompt: str, schema: dict, max_tokens: int, timeout: floa
                 retry_after = retry_after or _parse_seconds(detail.get("retryDelay"))
         except Exception:
             pass
-        raise ProviderQuotaExceeded(f"HTTP 429 {resp.text[:200]}", retry_after)
+        raise ProviderQuotaExceeded(f"{model}: HTTP 429", retry_after)
     if resp.status_code != 200:
-        raise ValueError(f"HTTP {resp.status_code}")
-    text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-    return LLMResult(_check_required(json.loads(text), schema), f"gemini:{settings.GEMINI_MODEL}")
+        raise ValueError(f"{model}: HTTP {resp.status_code}")
+    candidate = resp.json()["candidates"][0]
+    parts = candidate.get("content", {}).get("parts")
+    if not parts:
+        raise ValueError(f"{model}: empty response (finishReason={candidate.get('finishReason')})")
+    return LLMResult(_check_required(json.loads(parts[0]["text"]), schema), f"gemini:{model}")
+
+
+async def _call_gemini(prompt: str, schema: dict, max_tokens: int, timeout: float) -> LLMResult:
+    """Try each configured Gemini model: an overloaded (503), retired (404) or out-of-quota model
+    moves on to the next one. Free-tier quotas are per model, so a list also stretches the quota."""
+    models = gemini_models()
+    quota_hits: list[Optional[int]] = []
+    last_error: Optional[Exception] = None
+    # The free tier often answers 503 ("high demand"); when every model was overloaded, retry the list once
+    for attempt in range(2):
+        overloaded = 0
+        quota_hits = []
+        for model in models:
+            try:
+                return await _call_gemini_model(model, prompt, schema, max_tokens, timeout)
+            except ProviderQuotaExceeded as e:
+                quota_hits.append(e.retry_after)
+                logger.info(f"[LLM] gemini model {model} is out of quota; trying the next model")
+            except Exception as e:
+                last_error = e
+                overloaded += "HTTP 503" in str(e)
+                logger.info(f"[LLM] gemini model {model} failed ({e}); trying the next model")
+        if attempt == 0 and models and overloaded == len(models):
+            await asyncio.sleep(2)
+            continue
+        break
+    if models and len(quota_hits) == len(models):
+        known = [s for s in quota_hits if s]
+        raise ProviderQuotaExceeded(f"every Gemini model is out of quota ({', '.join(models)})", min(known) if known else None)
+    raise last_error or ValueError("no Gemini model configured")
 
 
 async def generate_json(

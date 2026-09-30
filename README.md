@@ -174,7 +174,7 @@ All settings live in `.env` (production) or `.env.dev` (development). Templates:
 | `ALLOW_ROLE_SELF_SWITCH` | | Test role switcher — never enable in production (default `False`) |
 | `SEED_DEMO_POSTS` | | Seed demo posts into an empty database (default `False`; `True` in dev) |
 | `ANTHROPIC_API_KEY` / `CLAUDE_MODEL` | | Claude (default model `claude-opus-5-5`) for the AI features |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | | Google Gemini for the AI features |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | | Google Gemini for the AI features; `GEMINI_MODEL` accepts a comma-separated list tried in order (default `gemini-flash-latest,gemini-flash-lite-latest`) |
 | `LLM_PROVIDER_ORDER` | | Failover order of the configured providers (default `claude,gemini`) |
 
 > ⚠️ `POSTGRES_PASSWORD` is only applied when a database volume is first created. To change it later, run `ALTER USER` in Postgres **and** update `.env`.

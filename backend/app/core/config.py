@@ -58,7 +58,8 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: Optional[str] = None
     CLAUDE_MODEL: str = "claude-opus-5-5"
     GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    # One or more models (comma-separated), tried in order; "-latest" aliases survive model retirements
+    GEMINI_MODEL: str = "gemini-flash-latest,gemini-flash-lite-latest"
     LLM_PROVIDER_ORDER: str = "claude,gemini"
     
     # CORS
