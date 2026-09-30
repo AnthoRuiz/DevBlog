@@ -12,7 +12,7 @@ import {
   Plus,
   Tag as TagIcon,
 } from 'lucide-react';
-import { Tag, Post, PostDetail } from '../types';
+import { Tag, Post, PostDetail, Section, TagValidation } from '../types';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
 import {
   uploadImage,
@@ -20,15 +20,19 @@ import {
   updatePost,
   translatePostWithAi,
   createTag,
+  validateTagSection,
   suggestTagsWithAi,
 } from '../services/api';
 import { MarkdownToolbar } from './MarkdownToolbar';
+import { SectionIcon } from './SectionIcon';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface NewPostModalProps {
   isOpen: boolean;
   onClose: () => void;
   tags: Tag[];
+  sections: Section[];
+  isAdmin?: boolean;
   token: string | null;
   onPostCreated: () => void;
   editingPost?: Post | PostDetail | null;
@@ -40,6 +44,8 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   isOpen,
   onClose,
   tags,
+  sections,
+  isAdmin = false,
   token,
   onPostCreated,
   editingPost = null,
@@ -53,6 +59,10 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const [language, setLanguage] = useState<Language>(defaultLang);
   const [coverImageUrl, setCoverImageUrl] = useState('');
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [sectionId, setSectionId] = useState<string>('');
+  // Real-time check that a new tag name fits the selected section
+  const [tagCheck, setTagCheck] = useState<TagValidation | null>(null);
+  const [isCheckingTag, setIsCheckingTag] = useState(false);
   const [contentMarkdown, setContentMarkdown] = useState('');
 
   // Enhanced Tags State
@@ -83,6 +93,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setLanguage((editingPost.language as Language) || defaultLang);
       setCoverImageUrl(editingPost.cover_image_url || '');
       setSelectedTagIds(editingPost.tags ? editingPost.tags.map((tg) => tg.id) : []);
+      setSectionId(editingPost.section?.id || '');
       setContentMarkdown('content_markdown' in editingPost ? (editingPost as PostDetail).content_markdown : '');
     } else {
       setTitle('');
@@ -90,6 +101,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setLanguage(defaultLang);
       setCoverImageUrl('');
       setSelectedTagIds([]);
+      setSectionId('');
       setContentMarkdown('');
     }
     setEditorTab('write');
@@ -107,6 +119,30 @@ export const NewPostModal: FC<NewPostModalProps> = ({
     });
   }, [tags]);
 
+  useEffect(() => {
+    const name = tagSearchQuery.trim();
+    setTagCheck(null);
+    if (!isOpen || !token || !sectionId || name.length < 2) return;
+    if (availableTags.some((tg) => tg.name.toLowerCase() === name.toLowerCase())) return;
+    let cancelled = false;
+    setIsCheckingTag(true);
+    const timer = setTimeout(async () => {
+      try {
+        const result = await validateTagSection(name, sectionId, token);
+        if (!cancelled) setTagCheck(result);
+      } catch {
+        // Advisory only: the backend still enforces the rule when the tag is created
+      } finally {
+        if (!cancelled) setIsCheckingTag(false);
+      }
+    }, 450);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      setIsCheckingTag(false);
+    };
+  }, [tagSearchQuery, sectionId, isOpen, token]);
+
   if (!isOpen) return null;
 
   const handleSelectTag = (tagId: string) => {
@@ -120,9 +156,17 @@ export const NewPostModal: FC<NewPostModalProps> = ({
     setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
   };
 
-  const handleCreateCustomTag = async (nameToCreate?: string) => {
+  const handleCreateCustomTag = async (
+    nameToCreate?: string,
+    options: { sectionId?: string; force?: boolean } = {}
+  ) => {
     const tagName = (nameToCreate || tagSearchQuery).trim();
     if (!tagName || !token) return;
+    const targetSectionId = options.sectionId || sectionId;
+    if (!targetSectionId) {
+      setErrorMsg(t.sectionRequired);
+      return;
+    }
 
     const existing = availableTags.find(
       (t) => t.name.toLowerCase() === tagName.toLowerCase()
@@ -138,13 +182,21 @@ export const NewPostModal: FC<NewPostModalProps> = ({
     setIsCreatingTag(true);
     setErrorMsg(null);
     try {
-      const newTag = await createTag(tagName, token);
+      // Blocked by the real-time check: offer the suggested section instead of calling the API
+      if (tagCheck && tagCheck.blocked && tagCheck.name.toLowerCase() === tagName.toLowerCase() && !options.sectionId && !options.force) {
+        setErrorMsg(
+          t.tagSectionMismatch.replace('{tag}', tagName).replace('{section}', tagCheck.suggested_section?.name ?? '')
+        );
+        return;
+      }
+      const newTag = await createTag(tagName, targetSectionId, token, { force: options.force });
       setAvailableTags((prev) => {
         if (prev.some((t) => t.id === newTag.id)) return prev;
         return [...prev, newTag];
       });
       setSelectedTagIds((prev) => [...prev, newTag.id]);
       setTagSearchQuery('');
+      setTagCheck(null);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to create category';
       setErrorMsg(message);
@@ -203,11 +255,20 @@ export const NewPostModal: FC<NewPostModalProps> = ({
     }
   };
 
-  const filteredTags = availableTags.filter((tag) => {
-    const matchesQuery = tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase().trim());
-    const notSelected = !selectedTagIds.includes(tag.id);
-    return matchesQuery && notSelected;
-  });
+  const filteredTags = availableTags
+    .filter((tag) => {
+      const matchesQuery = tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase().trim());
+      const notSelected = !selectedTagIds.includes(tag.id);
+      return matchesQuery && notSelected;
+    })
+    // Tags of the post's section first
+    .sort((a, b) => Number(b.section_id === sectionId) - Number(a.section_id === sectionId));
+
+  const sectionById = new Map(sections.map((s) => [s.id, s]));
+  const selectedSection = sectionById.get(sectionId);
+  const tagNameInput = tagSearchQuery.trim();
+  const currentTagCheck = tagCheck && tagCheck.name.toLowerCase() === tagNameInput.toLowerCase() ? tagCheck : null;
+  const createBlocked = Boolean(currentTagCheck?.blocked);
 
   const exactMatchExists = availableTags.some(
     (tag) => tag.name.toLowerCase() === tagSearchQuery.toLowerCase().trim()
@@ -282,6 +343,10 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setErrorMsg('Please fill in the title and summary.');
       return;
     }
+    if (!sectionId) {
+      setErrorMsg(t.sectionRequired);
+      return;
+    }
 
     setIsSubmitting(true);
     setErrorMsg(null);
@@ -297,6 +362,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             content_markdown: contentMarkdown || undefined,
             cover_image_url: coverImageUrl.trim() || undefined,
             tag_ids: selectedTagIds,
+            section_id: sectionId,
           },
           token
         );
@@ -309,6 +375,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             content_markdown: contentMarkdown,
             cover_image_url: coverImageUrl.trim() || undefined,
             tag_ids: selectedTagIds,
+            section_id: sectionId,
             is_published: true,
           },
           token
@@ -464,6 +531,34 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             />
           </div>
 
+          <div role="group" aria-labelledby="post-section-label">
+            <span id="post-section-label" className="block text-xs font-mono text-slate-400 mb-1.5">
+              {t.sectionLabel} *
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {sections.map((section) => {
+                const active = section.id === sectionId;
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => setSectionId(section.id)}
+                    aria-pressed={active}
+                    title={section.description}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
+                      active ? 'bg-[#0f1422]' : 'bg-[#07090e] border-[#1e293b] text-slate-400 hover:text-white'
+                    }`}
+                    style={active ? { borderColor: section.color_hex, color: section.color_hex } : undefined}
+                  >
+                    <SectionIcon icon={section.icon} className="w-3.5 h-3.5" style={{ color: section.color_hex }} />
+                    {section.name}
+                  </button>
+                );
+              })}
+            </div>
+            {!sectionId && <p className="mt-1.5 text-[11px] font-mono text-slate-500">{t.sectionPlaceholder}</p>}
+          </div>
+
           <div>
             <label className="block text-xs font-mono text-slate-400 mb-1.5">
               {t.postCoverLabel}
@@ -610,14 +705,53 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handleCreateCustomTag()}
-                    disabled={isCreatingTag}
-                    className="absolute right-1.5 px-2 py-1 rounded-lg bg-cyan-950 border border-cyan-800 text-[10px] font-mono text-cyan-300 hover:bg-cyan-900 transition-colors flex items-center gap-1"
+                    disabled={isCreatingTag || createBlocked}
+                    className="absolute right-1.5 px-2 py-1 rounded-lg bg-cyan-950 border border-cyan-800 text-[10px] font-mono text-cyan-300 hover:bg-cyan-900 transition-colors flex items-center gap-1 disabled:opacity-40"
                   >
                     <Plus className="w-3 h-3" />
                     <span>{isCreatingTag ? '...' : 'Create'}</span>
                   </button>
                 )}
               </div>
+
+              {/* Section check for a new tag name */}
+              {tagNameInput && !exactMatchExists && isCheckingTag && (
+                <p className="mt-1.5 text-[11px] font-mono text-slate-500">{t.tagCheckingSection}</p>
+              )}
+              {currentTagCheck && !currentTagCheck.matches_selected && currentTagCheck.suggested_section && (
+                <div
+                  role="status"
+                  className="mt-2 p-2.5 rounded-xl border text-xs font-mono flex flex-wrap items-center justify-between gap-2"
+                  style={{ borderColor: `${currentTagCheck.suggested_section.color_hex}66`, color: currentTagCheck.suggested_section.color_hex }}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <SectionIcon icon={currentTagCheck.suggested_section.icon} className="w-3.5 h-3.5" />
+                    {t.tagSectionMismatch
+                      .replace('{tag}', currentTagCheck.name)
+                      .replace('{section}', currentTagCheck.suggested_section.name)}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCreateCustomTag(undefined, { sectionId: currentTagCheck.suggested_section?.id })}
+                      disabled={isCreatingTag}
+                      className="px-2.5 py-1 rounded-lg border border-current font-bold hover:bg-white/5 disabled:opacity-50"
+                    >
+                      {t.tagCreateInSection.replace('{section}', currentTagCheck.suggested_section.name)}
+                    </button>
+                    {isAdmin && createBlocked && (
+                      <button
+                        type="button"
+                        onClick={() => handleCreateCustomTag(undefined, { force: true })}
+                        disabled={isCreatingTag}
+                        className="px-2 py-1 rounded-lg text-slate-400 hover:text-white underline underline-offset-2 disabled:opacity-50"
+                      >
+                        {t.tagCreateAnyway}
+                      </button>
+                    )}
+                  </span>
+                </div>
+              )}
 
               {/* Autocomplete / Filtering Dropdown */}
               {isTagSearchFocused && (
@@ -634,7 +768,11 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                           onClick={() => handleSelectTag(tag.id)}
                           className="inline-flex items-center gap-1 text-[11px] font-mono px-2.5 py-1 rounded-lg border border-[#1e293b] bg-[#07090e] hover:border-cyan-500/50 hover:bg-cyan-950/30 text-slate-300 hover:text-cyan-300 transition-all text-left"
                         >
-                          <Plus className="w-3 h-3 text-slate-500" />
+                          <span
+                            aria-hidden="true"
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ backgroundColor: sectionById.get(tag.section_id)?.color_hex ?? '#64748b' }}
+                          />
                           <span>#{tag.name}</span>
                         </button>
                       ))}
@@ -652,13 +790,14 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleCreateCustomTag()}
-                      disabled={isCreatingTag}
-                      className="w-full flex items-center justify-between p-2 rounded-lg bg-cyan-950/30 hover:bg-cyan-950/60 border border-cyan-900/50 text-xs font-mono text-cyan-300 transition-colors text-left"
+                      disabled={isCreatingTag || createBlocked}
+                      className="w-full flex items-center justify-between p-2 rounded-lg bg-cyan-950/30 hover:bg-cyan-950/60 border border-cyan-900/50 text-xs font-mono text-cyan-300 transition-colors text-left disabled:opacity-40"
                     >
                       <div className="flex items-center gap-2">
                         <Plus className="w-3.5 h-3.5 text-cyan-400" />
                         <span>
                           {t.createNewTagAction} <strong className="text-white">#{tagSearchQuery.trim()}</strong>
+                          {selectedSection && <span className="text-slate-500"> · {selectedSection.name}</span>}
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-500 font-mono">↵ Enter</span>
@@ -687,7 +826,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                     onClick={handleAddAllSuggestedTags}
                     className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
                   >
-                    + Agregar todas
+                    + Add all
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-1.5">

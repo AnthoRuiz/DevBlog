@@ -1,4 +1,4 @@
-import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage } from '../types';
+import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -37,14 +37,25 @@ export async function pingSystemHealth(): Promise<void> {
 
 export const POSTS_PAGE_SIZE = 12;
 
-export async function fetchPosts(
-  tag?: string,
-  sort: string = 'recent',
-  query?: string,
-  offset: number = 0,
-  limit: number = POSTS_PAGE_SIZE,
-): Promise<PostPage> {
+export interface PostQuery {
+  section?: string;
+  tag?: string;
+  sort?: string;
+  query?: string;
+  offset?: number;
+  limit?: number;
+}
+
+export async function fetchPosts({
+  section,
+  tag,
+  sort = 'recent',
+  query,
+  offset = 0,
+  limit = POSTS_PAGE_SIZE,
+}: PostQuery = {}): Promise<PostPage> {
   const params = new URLSearchParams();
+  if (section) params.append('section', section);
   if (tag) params.append('tag', tag);
   if (sort) params.append('sort', sort);
   if (query) params.append('q', query);
@@ -53,6 +64,41 @@ export async function fetchPosts(
 
   const res = await fetch(`${API_BASE}/posts?${params.toString()}`);
   if (!res.ok) throw new Error('Failed to load posts');
+  return res.json();
+}
+
+export async function fetchSections(): Promise<SectionWithCount[]> {
+  const res = await fetch(`${API_BASE}/sections`);
+  if (!res.ok) throw new Error('Failed to load sections');
+  return res.json();
+}
+
+// ADMIN only
+export async function updateSection(
+  sectionId: string,
+  data: { name?: string; description?: string; color_hex?: string },
+  token: string
+): Promise<Section> {
+  const res = await fetch(`${API_BASE}/admin/sections/${sectionId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to update section' }));
+    throw new Error(err.detail || 'Failed to update section');
+  }
+  return res.json();
+}
+
+// Checks whether a new tag name fits the selected section (Gemini or keyword classifier)
+export async function validateTagSection(name: string, sectionId: string, token: string): Promise<TagValidation> {
+  const res = await fetch(`${API_BASE}/posts/tags/validate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name, section_id: sectionId }),
+  });
+  if (!res.ok) throw new Error('Failed to validate tag');
   return res.json();
 }
 
@@ -163,6 +209,7 @@ export async function createPost(
     cover_image_url?: string;
     reading_time_minutes?: number;
     tag_ids: string[];
+    section_id: string;
     is_published: boolean;
   },
   token: string
@@ -194,6 +241,7 @@ export async function updatePost(
     cover_image_url?: string;
     reading_time_minutes?: number;
     tag_ids?: string[];
+    section_id?: string;
     is_published?: boolean;
   },
   token: string
@@ -309,8 +357,9 @@ export async function translatePostWithAi(
 
 export async function createTag(
   name: string,
+  sectionId: string,
   token: string,
-  colorHex?: string
+  options: { colorHex?: string; force?: boolean } = {}
 ): Promise<Tag> {
   const res = await fetch(`${API_BASE}/posts/tags`, {
     method: 'POST',
@@ -318,7 +367,12 @@ export async function createTag(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ name, color_hex: colorHex || '#38bdf8' }),
+    body: JSON.stringify({
+      name,
+      section_id: sectionId,
+      color_hex: options.colorHex || '#38bdf8',
+      force: options.force ?? false,
+    }),
   });
 
   if (!res.ok) {

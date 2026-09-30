@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowBigUp, Bookmark, Clock, Eye, Calendar, Terminal, Edit3, Trash2 } from 'lucide-react';
 import { Post } from '../types';
+import { SectionIcon } from './SectionIcon';
 import { Language, Translations, getLanguageFlag, getLanguageName } from '../i18n';
 
 interface DigestCardProps {
@@ -170,6 +171,15 @@ export const DigestCard: React.FC<DigestCardProps> = ({
 
         {/* Card body */}
         <div className="p-5">
+          {post.section && (
+            <span
+              className="inline-flex items-center gap-1.5 mb-2 text-[11px] font-mono font-bold"
+              style={{ color: post.section.color_hex }}
+            >
+              <SectionIcon icon={post.section.icon} className="w-3.5 h-3.5" />
+              {post.section.name}
+            </span>
+          )}
           {/* Top metadata: publish date, reading time and views */}
           <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-400 font-mono mb-2.5">
             {displayDate && (

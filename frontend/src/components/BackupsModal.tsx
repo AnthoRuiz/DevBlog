@@ -15,7 +15,9 @@ import {
   UserCheck,
   ImageIcon,
   Eraser,
+  LayoutGrid,
 } from 'lucide-react';
+import { SectionsAdmin } from './SectionsAdmin';
 import { BackupItem, BackupsResponse, MediaStats, User, UserRole } from '../types';
 import {
   fetchAdminBackups,
@@ -36,6 +38,7 @@ interface BackupsModalProps {
   token?: string;
   currentUser?: User | null;
   onRoleChanged?: (updatedUser: User) => void;
+  onSectionsUpdated?: () => void;
 }
 
 export const BackupsModal: React.FC<BackupsModalProps> = ({
@@ -44,8 +47,9 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
   token,
   currentUser,
   onRoleChanged,
+  onSectionsUpdated,
 }) => {
-  const [activeTab, setActiveTab] = useState<'roles' | 'backups'>('roles');
+  const [activeTab, setActiveTab] = useState<'roles' | 'backups' | 'sections'>('roles');
   
   // Backups state
   const [data, setData] = useState<BackupsResponse | null>(null);
@@ -310,6 +314,19 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
             <Database className="w-4 h-4" />
             <span>Backups PostgreSQL ({data?.total_backups ?? 0})</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('sections')}
+            className={`flex items-center gap-2 py-3 px-4 text-xs font-mono font-bold border-b-2 transition-all ${
+              activeTab === 'sections'
+                ? 'border-emerald-400 text-emerald-300 bg-emerald-500/5'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4" />
+            <span>Sections</span>
+          </button>
         </div>
 
         {/* Notifications */}
@@ -465,6 +482,10 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
         )}
 
         {/* TAB CONTENT: POSTGRESQL BACKUPS */}
+        {activeTab === 'sections' && (
+          <SectionsAdmin token={token} onMessage={setMessage} onSectionsUpdated={onSectionsUpdated} />
+        )}
+
         {activeTab === 'backups' && (
           <div className="p-6 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

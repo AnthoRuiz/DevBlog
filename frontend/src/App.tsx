@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { StreakHeader } from './components/StreakHeader';
+import { SectionIcon } from './components/SectionIcon';
 import { DigestCard } from './components/DigestCard';
 import { ArticleModal } from './components/ArticleModal';
 import { LoginModal } from './components/LoginModal';
 import { NewPostModal } from './components/NewPostModal';
 import { SystemStatusModal } from './components/SystemStatusModal';
 import { BackupsModal } from './components/BackupsModal';
-import { Post, PostDetail, StreakStats, Tag, User, UserRole } from './types';
+import { Post, PostDetail, SectionWithCount, StreakStats, Tag, User, UserRole } from './types';
 import {
   fetchPosts,
+  fetchSections,
   POSTS_PAGE_SIZE,
   fetchStreakStats,
   fetchPostBySlug,
@@ -35,6 +37,9 @@ export function App() {
   const feedRequestId = useRef(0);
   const [stats, setStats] = useState<StreakStats | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [sections, setSections] = useState<SectionWithCount[]>([]);
+  // Section filter (slug); undefined = all sections
+  const [selectedSection, setSelectedSection] = useState<string | undefined>(undefined);
   const [selectedTag, setSelectedTag] = useState<string | undefined>(undefined);
   const [sortBy, setSortBy] = useState<string>('recent');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -145,7 +150,7 @@ export function App() {
 
   useEffect(() => {
     loadData();
-  }, [selectedTag, sortBy, debouncedSearch]);
+  }, [selectedSection, selectedTag, sortBy, debouncedSearch]);
 
   const loadData = async () => {
     const requestId = ++feedRequestId.current;
@@ -160,7 +165,7 @@ export function App() {
 
         // If the API returned nothing but we have local bookmarks, filter them from all posts
         if (bookmarkedPosts.length === 0 && bookmarkedIds.size > 0) {
-          const allPosts = await fetchPosts(undefined, sortBy, undefined, 0, 100);
+          const allPosts = await fetchPosts({ sort: sortBy, offset: 0, limit: 100 });
           const filtered = allPosts.items.filter((p) => bookmarkedIds.has(p.id));
           setPosts(filtered);
         } else {
@@ -171,12 +176,14 @@ export function App() {
         if (statsData) setStats(statsData);
         if (tagsData.length > 0) setTags(tagsData);
       } else {
-        const [page, statsData, tagsData] = await Promise.all([
-          fetchPosts(selectedTag, sortBy, debouncedSearch),
+        const [page, statsData, tagsData, sectionsData] = await Promise.all([
+          fetchPosts({ section: selectedSection, tag: selectedTag, sort: sortBy, query: debouncedSearch }),
           fetchStreakStats().catch(() => null),
           fetchAllTags().catch(() => []),
+          fetchSections().catch(() => []),
         ]);
         if (requestId !== feedRequestId.current) return;
+        if (sectionsData.length > 0) setSections(sectionsData);
         setPosts(page.items);
         setTotalPosts(page.total);
         setHasMorePosts(page.has_more);
@@ -195,7 +202,14 @@ export function App() {
     const requestId = feedRequestId.current;
     setIsLoadingMore(true);
     try {
-      const page = await fetchPosts(selectedTag, sortBy, debouncedSearch, posts.length, POSTS_PAGE_SIZE);
+      const page = await fetchPosts({
+        section: selectedSection,
+        tag: selectedTag,
+        sort: sortBy,
+        query: debouncedSearch,
+        offset: posts.length,
+        limit: POSTS_PAGE_SIZE,
+      });
       // Filters changed while this page was loading: drop it
       if (requestId !== feedRequestId.current) return;
       setPosts((prev) => {
@@ -304,16 +318,32 @@ export function App() {
   };
 
   const handleClearFilters = () => {
+    setSelectedSection(undefined);
     setSelectedTag(undefined);
     setSearchQuery('');
   };
 
-  const isFiltering = selectedTag !== undefined || Boolean(searchQuery);
+  const selectedSectionObject = sections.find((s) => s.slug === selectedSection);
+
+  const handleSelectSection = (slug: string | undefined) => {
+    const next = sections.find((s) => s.slug === slug);
+    setSelectedSection(slug);
+    // Leave bookmarks, and drop a tag filter that does not belong to the new section
+    const currentTag = tags.find((tg) => tg.slug === selectedTag);
+    if (selectedTag === '__bookmarks__' || (next && currentTag && currentTag.section_id !== next.id)) {
+      setSelectedTag(undefined);
+    }
+  };
+
+  const isFiltering = selectedSection !== undefined || selectedTag !== undefined || Boolean(searchQuery);
+
+  // Only the selected section's tags are offered as filters
+  const visibleTags = selectedSectionObject ? tags.filter((tg) => tg.section_id === selectedSectionObject.id) : tags;
 
   // Group and compact tags to save screen space
   const PRIMARY_TAG_LIMIT = 6;
-  const primaryTags = tags.slice(0, PRIMARY_TAG_LIMIT);
-  const remainingTags = tags.slice(PRIMARY_TAG_LIMIT);
+  const primaryTags = visibleTags.slice(0, PRIMARY_TAG_LIMIT);
+  const remainingTags = visibleTags.slice(PRIMARY_TAG_LIMIT);
   const isSelectedInPrimary = primaryTags.some((t) => t.slug === selectedTag);
   const selectedTagObject = tags.find((t) => t.slug === selectedTag);
   const showPinnedSelectedTag = Boolean(selectedTag && selectedTag !== '__bookmarks__' && !isSelectedInPrimary);
@@ -446,6 +476,44 @@ export function App() {
           onOpenStatus={handleOpenStatus}
           t={t}
         />
+
+        {/* Section bar */}
+        {sections.length > 0 && (
+          <nav aria-label={t.sectionsNavLabel} className="flex gap-2 mb-4 overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => handleSelectSection(undefined)}
+              aria-pressed={selectedSection === undefined}
+              className={`flex-shrink-0 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all border ${
+                selectedSection === undefined
+                  ? 'bg-[#0f1422] border-slate-500 text-white'
+                  : 'bg-[#0b0f19] border-[#1e293b] text-slate-400 hover:text-white'
+              }`}
+            >
+              {t.allSections}
+            </button>
+            {sections.map((section) => {
+              const active = selectedSection === section.slug;
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => handleSelectSection(active ? undefined : section.slug)}
+                  aria-pressed={active}
+                  title={section.description}
+                  className={`flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all border ${
+                    active ? 'bg-[#0f1422]' : 'bg-[#0b0f19] border-[#1e293b] text-slate-400 hover:text-white'
+                  }`}
+                  style={active ? { borderColor: section.color_hex, color: section.color_hex } : undefined}
+                >
+                  <SectionIcon icon={section.icon} className="w-4 h-4" style={{ color: section.color_hex }} />
+                  <span>{section.name}</span>
+                  <span className="text-[11px] font-mono text-slate-500">{section.post_count}</span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
 
         {/* Category, tag and sort filter bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-[#1e293b] pb-4">
@@ -598,6 +666,8 @@ export function App() {
             <div className="flex items-center gap-2 text-slate-300">
               <Filter className="w-3.5 h-3.5 text-cyan-400" />
               <span>
+                {selectedSectionObject && selectedTag !== '__bookmarks__' ? `${selectedSectionObject.name}` : ''}
+                {selectedSectionObject && selectedTag && selectedTag !== '__bookmarks__' ? ' • ' : ''}
                 {selectedTag === '__bookmarks__'
                   ? `${t.bookmarksTab}`
                   : selectedTag
@@ -718,6 +788,8 @@ export function App() {
           setEditingPost(null);
         }}
         tags={tags}
+        sections={sections}
+        isAdmin={currentUser?.role === 'ADMIN'}
         token={userToken}
         onPostCreated={loadData}
         editingPost={editingPost}
@@ -743,6 +815,7 @@ export function App() {
           setCurrentUser(updatedUser);
           localStorage.setItem('current_user', JSON.stringify(updatedUser));
         }}
+        onSectionsUpdated={loadData}
       />
     </div>
   );

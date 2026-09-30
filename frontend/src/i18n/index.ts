@@ -113,6 +113,18 @@ export interface Translations {
   loadingMorePosts: string;
   // Placeholders: {shown}, {total}
   showingPostsCount: string;
+  allSections: string;
+  sectionsNavLabel: string;
+  sectionLabel: string;
+  sectionPlaceholder: string;
+  sectionRequired: string;
+  // Placeholders: {tag}, {section}
+  tagSectionMismatch: string;
+  // Placeholder: {section}
+  tagCreateInSection: string;
+  tagCreateAnyway: string;
+  tagCheckingSection: string;
+  tagOtherSections: string;
   editorEmptyPreview: string;
   markdownGuideTitle: string;
   systemStatusBtn: string;
@@ -248,6 +260,16 @@ export const translations: Record<Language, Translations> = {
     loadMorePosts: 'Cargar más artículos',
     loadingMorePosts: 'Cargando...',
     showingPostsCount: 'Mostrando {shown} de {total} artículos',
+    allSections: 'Todo',
+    sectionsNavLabel: 'Secciones del blog',
+    sectionLabel: 'Sección',
+    sectionPlaceholder: 'Elige una sección',
+    sectionRequired: 'Elige la sección del artículo.',
+    tagSectionMismatch: '"{tag}" parece de {section}, no de esta sección.',
+    tagCreateInSection: 'Crear en {section}',
+    tagCreateAnyway: 'Crear aquí de todos modos',
+    tagCheckingSection: 'Comprobando sección...',
+    tagOtherSections: 'Otras secciones',
     editorEmptyPreview: 'El artículo aún no tiene contenido. Escribe en la pestaña "Escribir" para ver la previsualización.',
     markdownGuideTitle: 'Guía Rápida de Formato Markdown (Estilo Word)',
     systemStatusBtn: '🖥️ Estado (/status)',
@@ -381,6 +403,16 @@ export const translations: Record<Language, Translations> = {
     loadMorePosts: 'Load more posts',
     loadingMorePosts: 'Loading...',
     showingPostsCount: 'Showing {shown} of {total} posts',
+    allSections: 'All',
+    sectionsNavLabel: 'Blog sections',
+    sectionLabel: 'Section',
+    sectionPlaceholder: 'Choose a section',
+    sectionRequired: 'Choose the section for this post.',
+    tagSectionMismatch: '"{tag}" looks like {section}, not this section.',
+    tagCreateInSection: 'Create in {section}',
+    tagCreateAnyway: 'Create here anyway',
+    tagCheckingSection: 'Checking section...',
+    tagOtherSections: 'Other sections',
     editorEmptyPreview: 'The article does not have content yet. Write in the "Write" tab to see the live preview.',
     markdownGuideTitle: 'Quick Markdown Formatting Guide (Word-like)',
     systemStatusBtn: '🖥️ Status (/status)',
@@ -514,6 +546,16 @@ export const translations: Record<Language, Translations> = {
     loadMorePosts: 'Carregar mais artigos',
     loadingMorePosts: 'Carregando...',
     showingPostsCount: 'Mostrando {shown} de {total} artigos',
+    allSections: 'Tudo',
+    sectionsNavLabel: 'Seções do blog',
+    sectionLabel: 'Seção',
+    sectionPlaceholder: 'Escolha uma seção',
+    sectionRequired: 'Escolha a seção do artigo.',
+    tagSectionMismatch: '"{tag}" parece ser de {section}, não desta seção.',
+    tagCreateInSection: 'Criar em {section}',
+    tagCreateAnyway: 'Criar aqui mesmo assim',
+    tagCheckingSection: 'Verificando seção...',
+    tagOtherSections: 'Outras seções',
     editorEmptyPreview: 'O artigo ainda não tem conteúdo. Escreva na aba "Escrever" para ver a pré-visualização.',
     markdownGuideTitle: 'Guia Rápido de Formatação Markdown (Estilo Word)',
     systemStatusBtn: '🖥️ Status (/status)',
@@ -647,6 +689,16 @@ export const translations: Record<Language, Translations> = {
     loadMorePosts: "Charger plus d'articles",
     loadingMorePosts: 'Chargement...',
     showingPostsCount: 'Affichage de {shown} sur {total} articles',
+    allSections: 'Tout',
+    sectionsNavLabel: 'Sections du blog',
+    sectionLabel: 'Section',
+    sectionPlaceholder: 'Choisissez une section',
+    sectionRequired: "Choisissez la section de l'article.",
+    tagSectionMismatch: '« {tag} » semble appartenir à {section}, pas à cette section.',
+    tagCreateInSection: 'Créer dans {section}',
+    tagCreateAnyway: 'Créer ici quand même',
+    tagCheckingSection: 'Vérification de la section...',
+    tagOtherSections: 'Autres sections',
     editorEmptyPreview: 'L\'article n\'a pas encore de contenu. Écrivez dans l\'onglet "Écrire" pour voir l\'aperçu.',
     markdownGuideTitle: 'Guide Rapide de Formatage Markdown (Style Word)',
     systemStatusBtn: '🖥️ Statut (/status)',

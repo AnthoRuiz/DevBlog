@@ -11,11 +11,39 @@ export interface User {
   created_at: string;
 }
 
+export type SectionIcon = 'code' | 'cpu' | 'target' | 'heart' | 'gamepad';
+
+export interface Section {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  color_hex: string;
+  icon: SectionIcon | string;
+  sort_order: number;
+}
+
+export interface SectionWithCount extends Section {
+  post_count: number;
+}
+
 export interface Tag {
   id: string;
   name: string;
   slug: string;
   color_hex: string;
+  section_id: string;
+}
+
+export interface TagValidation {
+  name: string;
+  existing_tag: Tag | null;
+  suggested_section: Section | null;
+  matches_selected: boolean;
+  blocked: boolean;
+  confidence: number;
+  reason: string;
+  source: 'gemini' | 'keywords' | 'none' | string;
 }
 
 export interface Comment {
@@ -41,6 +69,7 @@ export interface Post {
   is_published: boolean;
   published_at?: string;
   created_at: string;
+  section?: Section | null;
   tags: Tag[];
 }
 
@@ -57,6 +86,7 @@ export interface PostUpdate {
   language?: string;
   reading_time_minutes?: number;
   is_published?: boolean;
+  section_id?: string;
   tag_ids?: string[];
 }
 
