@@ -352,6 +352,11 @@ frontend/src/
 #### Inline image upload (`MarkdownToolbar.tsx`)
 - The image button uploads through `POST /posts/upload-image` and inserts `![alt](url)` as its own paragraph at the cursor, reading the live textarea value so text typed during the upload is kept.
 
+#### Feed pagination (`App.tsx`)
+- The feed loads 12 posts at a time (`POSTS_PAGE_SIZE`). **Load more** requests the next page with `offset = posts loaded` and appends it (deduplicated by id); a counter shows `Showing X of Y posts`.
+- Changing tag, sort or search starts a fresh first page; a request counter discards late responses from a previous filter.
+- Ordering always ends with `Post.id` as a tie-breaker, so page boundaries are stable when dates or votes are equal.
+
 #### Compact tag filter bar (`App.tsx`)
 - Shows `All`, `Bookmarks (N)` and the first 6 tags (`PRIMARY_TAG_LIMIT`); the rest live in a searchable `+N more` dropdown. A tag picked from the dropdown is pinned to the bar with a remove button.
 
@@ -386,7 +391,7 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 ### 6.2 Posts & Tags
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `GET` | `/posts` | Public | List published posts (`tag`, `q`, `sort=recent\|top_voted\|trending`, `limit`, `offset`) |
+| `GET` | `/posts` | Public | Paginated published posts (`tag`, `q`, `sort=recent\|top_voted\|trending`, `limit` 1–100 default 12, `offset`); returns `{items, total, limit, offset, has_more}` |
 | `GET` | `/posts/{slug}` | Public | Post detail (increments views) |
 | `POST` | `/posts` | Author | Create a post |
 | `PUT` | `/posts/{post_id}` | Author | Update a post (owner or admin) |

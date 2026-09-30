@@ -11,7 +11,7 @@ A self-hosted technical blog engine and Homelab observability hub, running on ba
 
 ## 🌟 Features
 
-- **Technical digest feed:** two-column post grid with reading time, views, upvotes, bookmarks and a writing-streak header.
+- **Technical digest feed:** two-column post grid with reading time, views, upvotes, bookmarks and a writing-streak header, paginated 12 posts at a time with **Load more**.
 - **Markdown editor:** Word-style toolbar, live preview, syntax highlighting (highlight.js), dark-themed **Mermaid.js** diagrams, and one-click image upload that embeds `![alt](/uploads/...)` in the post body.
 - **Multilingual UI (i18n):** 🇪🇸 Español (`es`) · 🇺🇸 English (`en`) · 🇧🇷 Português (`pt`) · 🇫🇷 Français (`fr`), plus an original-language badge on every post.
 - **Google Gemini AI:** one-click post translation, tag suggestions and reading-time estimates (with an offline fallback when no API key is set).
