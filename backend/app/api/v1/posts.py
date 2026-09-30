@@ -27,6 +27,7 @@ from app.schemas.post import (
     PostUpdate,
     TagRead,
     TagValidateRequest,
+    AIStatusResponse,
     TagValidateResponse,
     SectionRead,
     UpvoteResponse,
@@ -39,7 +40,8 @@ from app.schemas.post import (
     TagSuggestRequest,
     TagSuggestResponse,
 )
-from app.services.gemini import translate_post_content, suggest_post_tags, estimate_reading_time
+from app.services.ai_features import translate_post_content, suggest_post_tags, estimate_reading_time
+from app.services.llm import LLMUnavailable, configured_providers
 from app.services import media_service, tag_classifier
 from app.api.deps import get_current_admin, get_current_author_or_admin, get_current_user_optional, get_client_hash
 from app.core.limiter import limiter
@@ -97,6 +99,12 @@ async def list_posts(
         offset=offset,
         has_more=offset + len(posts) < total,
     )
+
+@router.get("/ai-status", response_model=AIStatusResponse)
+async def ai_status(current_user: User = Depends(get_current_author_or_admin)):
+    """Which AI providers are configured (the editor disables AI-only features when none)."""
+    providers = configured_providers()
+    return AIStatusResponse(available=bool(providers), providers=providers)
 
 @router.get("/tags/all", response_model=list[TagRead])
 async def list_all_tags(db: AsyncSession = Depends(get_db)):
@@ -186,13 +194,13 @@ async def ai_suggest_tags(
     res_tags = await db.execute(select(Tag.name))
     existing_tag_names = list(res_tags.scalars().all())
 
-    suggestions = await suggest_post_tags(
+    suggestions, provider = await suggest_post_tags(
         title=req.title,
         summary=req.summary or "",
         content_markdown=req.content_markdown or "",
         existing_tags=existing_tag_names
     )
-    return TagSuggestResponse(suggested_tags=suggestions)
+    return TagSuggestResponse(suggested_tags=suggestions, provider=provider)
 
 @router.post("/ai-estimate-reading-time")
 async def ai_estimate_reading_time(
@@ -200,7 +208,7 @@ async def ai_estimate_reading_time(
     current_user: User = Depends(get_current_author_or_admin),
 ):
     """
-    Estimate reading time in minutes with AI (Google Gemini), weighing
+    Estimate reading time in minutes with AI (Claude/Gemini, heuristic fallback), weighing
     technical density (code, terminal, diagrams) and length.
     """
     minutes = await estimate_reading_time(
@@ -267,15 +275,19 @@ async def ai_translate_post(
 ):
     """
     Translate title, summary and markdown into a supported language (es, en, pt, fr)
-    with Google Gemini AI, preserving code blocks and technical structure.
+    with an LLM (Claude/Gemini with failover), preserving code blocks and technical structure.
+    There is no non-AI fallback: without a working provider this returns 503.
     """
-    res = await translate_post_content(
-        title=req.title,
-        summary=req.summary,
-        content_markdown=req.content_markdown,
-        target_lang=req.target_lang,
-        source_lang=req.source_lang or "es"
-    )
+    try:
+        res = await translate_post_content(
+            title=req.title,
+            summary=req.summary,
+            content_markdown=req.content_markdown,
+            target_lang=req.target_lang,
+            source_lang=req.source_lang or "es"
+        )
+    except LLMUnavailable as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"AI translation is unavailable: {e}")
     return PostTranslateResponse(**res)
 
 @router.get("/{slug}", response_model=PostDetailRead)

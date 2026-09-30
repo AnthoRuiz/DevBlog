@@ -12,6 +12,7 @@ from app.models.post import Post
 from app.models.user import User
 from app.api.deps import get_current_admin
 from app.core.config import settings
+from app.services.llm import configured_providers
 from app.schemas.stats import (
     StreakStats,
     SystemStats,
@@ -114,7 +115,7 @@ async def get_system_status(
     db: AsyncSession = Depends(get_db),
     current_admin: User = Depends(get_current_admin),
 ):
-    """Return health status and internal latency of each component (PostgreSQL, FastAPI, Nginx, Gemini)."""
+    """Return health status and internal latency of each component (PostgreSQL, FastAPI, Nginx) plus AI provider configuration."""
     t_start = time.perf_counter()
 
     # 1. Measure PostgreSQL latency in milliseconds
@@ -153,14 +154,18 @@ async def get_system_status(
         details="HTTP/2 Reverse Proxy & Brotli/Gzip"
     )
 
-    # 4. Google Gemini AI Engine
-    ai_status = "operational"
-    ai_details = f"Google Gemini ({settings.GEMINI_MODEL}) connected" if settings.GEMINI_API_KEY else "Homelab AI fallback engine (active)"
+    # 4. AI providers: report configuration only (pinging them would cost money on every refresh)
+    providers = configured_providers()
+    models = {"claude": settings.CLAUDE_MODEL, "gemini": settings.GEMINI_MODEL}
     ai_service = ServiceStatus(
-        name="Google Gemini AI Engine",
-        status=ai_status,
-        latency_ms=1.2,
-        details=ai_details
+        name="AI Providers",
+        status="operational" if providers else "degraded",
+        latency_ms=0.0,
+        details=(
+            "Failover order: " + " -> ".join(f"{p} ({models[p]})" for p in providers)
+            if providers
+            else "Not configured: translation disabled, keyword fallbacks active"
+        ),
     )
 
     hardware = get_hardware_telemetry()

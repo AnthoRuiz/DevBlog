@@ -1,19 +1,16 @@
 """Decide which blog section a tag name belongs to (e.g. "WoW" -> gaming, never tech).
 
-Uses Google Gemini when GEMINI_API_KEY is configured and falls back to a keyword classifier
-otherwise (or when Gemini fails). The fallback only answers when the name clearly matches one
+Uses the configured LLM providers (Claude and/or Gemini, with failover; see services/llm.py) and
+falls back to a keyword classifier when none is configured or all of them fail. The fallback only answers when the name clearly matches one
 section; anything ambiguous or unknown returns no suggestion, which never blocks tag creation.
 """
-import json
 import logging
 import re
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
-import httpx
-
-from app.core.config import settings
 from app.models.post import Section
+from app.services.llm import LLMUnavailable, generate_json
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +66,7 @@ class TagClassification:
     section_slug: Optional[str]
     confidence: float
     reason: str
-    source: str  # "gemini" | "keywords" | "none"
+    source: str  # "<provider>:<model>" (e.g. "claude:claude-opus-5-5") | "keywords" | "none"
 
 
 _cache: dict[str, TagClassification] = {}
@@ -100,7 +97,7 @@ def classify_by_keywords(name: str) -> TagClassification:
     return TagClassification(None, 0.0, "No known keyword", "none")
 
 
-async def _classify_with_gemini(name: str, sections: Sequence[Section]) -> Optional[TagClassification]:
+async def _classify_with_llm(name: str, sections: Sequence[Section]) -> Optional[TagClassification]:
     options = "\n".join(f'- "{s.slug}": {s.name} — {s.description}' for s in sections)
     prompt = f"""You classify tags for a personal blog into exactly one of its sections.
 
@@ -111,38 +108,32 @@ Tag: "{name}"
 
 Decide which section this tag belongs to. Consider abbreviations and proper nouns
 (e.g. "WoW" is World of Warcraft -> gaming; "LeetCode" -> career; "Burnout" -> mental-health).
-If the tag could reasonably belong to several sections or you do not recognize it, use null.
-
-Return ONLY a JSON object:
-{{"section_slug": "<one of the slugs above or null>", "confidence": <0.0-1.0>, "reason": "<max 12 words>"}}
+If the tag could reasonably belong to several sections or you do not recognize it, answer "none".
+Confidence is a number from 0 to 1. Keep the reason under 12 words.
 """
-    api_url = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent"
-        f"?key={settings.GEMINI_API_KEY.strip()}"
-    )
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"response_mime_type": "application/json", "temperature": 0},
+    schema = {
+        "type": "object",
+        "properties": {
+            "section_slug": {"type": "string", "enum": [s.slug for s in sections] + ["none"]},
+            "confidence": {"type": "number"},
+            "reason": {"type": "string"},
+        },
+        "required": ["section_slug", "confidence", "reason"],
+        "additionalProperties": False,
     }
     try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            resp = await client.post(api_url, json=payload)
-        if resp.status_code != 200:
-            logger.warning(f"Gemini tag classification returned status {resp.status_code}")
-            return None
-        parsed = json.loads(resp.json()["candidates"][0]["content"]["parts"][0]["text"])
-    except Exception as e:
-        logger.error(f"Gemini tag classification failed: {e}")
+        result = await generate_json(prompt, schema, task="classify_tag", max_tokens=256, timeout=10.0)
+    except LLMUnavailable:
         return None
 
     valid = {s.slug for s in sections}
-    slug = parsed.get("section_slug")
+    slug = result.data.get("section_slug")
     slug = slug if slug in valid else None
     try:
-        confidence = max(0.0, min(1.0, float(parsed.get("confidence", 0))))
+        confidence = max(0.0, min(1.0, float(result.data.get("confidence", 0))))
     except (TypeError, ValueError):
         confidence = 0.0
-    return TagClassification(slug, confidence if slug else 0.0, str(parsed.get("reason", ""))[:120], "gemini")
+    return TagClassification(slug, confidence if slug else 0.0, str(result.data.get("reason", ""))[:120], result.provider)
 
 
 async def classify_tag(name: str, sections: Sequence[Section]) -> TagClassification:
@@ -152,11 +143,8 @@ async def classify_tag(name: str, sections: Sequence[Section]) -> TagClassificat
     if key in _cache:
         return _cache[key]
 
-    result: Optional[TagClassification] = None
-    if settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip():
-        result = await _classify_with_gemini(name.strip(), sections)
-    if result is None:
-        result = classify_by_keywords(name)
+    # LLM providers with failover; keywords when none is configured or all fail
+    result = await _classify_with_llm(name.strip(), sections) or classify_by_keywords(name)
 
     if len(_cache) >= _CACHE_MAX:
         _cache.pop(next(iter(_cache)))

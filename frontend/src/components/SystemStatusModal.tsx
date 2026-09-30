@@ -206,7 +206,7 @@ export const SystemStatusModal: FC<SystemStatusModalProps> = ({ isOpen, onClose,
                             {srv.name.includes('PostgreSQL') && <Database className="w-3.5 h-3.5 text-blue-400" />}
                             {srv.name.includes('FastAPI') && <Activity className="w-3.5 h-3.5 text-emerald-400" />}
                             {srv.name.includes('Nginx') && <Globe className="w-3.5 h-3.5 text-sky-400" />}
-                            {srv.name.includes('Gemini') && <Sparkles className="w-3.5 h-3.5 text-purple-400" />}
+                            {srv.name.includes('AI') && <Sparkles className="w-3.5 h-3.5 text-purple-400" />}
                             <span className="text-xs font-mono font-semibold text-white">
                               {srv.name}
                             </span>

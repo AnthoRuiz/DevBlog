@@ -151,3 +151,10 @@ class TagSuggestRequest(BaseModel):
 
 class TagSuggestResponse(BaseModel):
     suggested_tags: list[str]
+    # LLM that produced them (e.g. "claude:claude-opus-5-5") or "keywords" for the offline fallback
+    provider: str
+
+class AIStatusResponse(BaseModel):
+    available: bool
+    # Configured providers in failover order, e.g. ["claude", "gemini"]
+    providers: list[str]

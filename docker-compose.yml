@@ -37,8 +37,11 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:?Set ENVIRONMENT in .env (production or development)}
       # Optional: their defaults are the safe choice
       - DEBUG=${DEBUG:-False}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-opus-5-5}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
+      - LLM_PROVIDER_ORDER=${LLM_PROVIDER_ORDER:-claude,gemini}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@devblog.local}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ALLOW_ROLE_SELF_SWITCH=${ALLOW_ROLE_SELF_SWITCH:-False}

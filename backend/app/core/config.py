@@ -54,9 +54,12 @@ class Settings(BaseSettings):
     FACEBOOK_APP_ID: Optional[str] = None
     FACEBOOK_APP_SECRET: Optional[str] = None
 
-    # Gemini AI
+    # AI providers (see services/llm.py). Tried in LLM_PROVIDER_ORDER; providers without a key are skipped.
+    ANTHROPIC_API_KEY: Optional[str] = None
+    CLAUDE_MODEL: str = "claude-opus-5-5"
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-1.5-flash"
+    LLM_PROVIDER_ORDER: str = "claude,gemini"
     
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = [
