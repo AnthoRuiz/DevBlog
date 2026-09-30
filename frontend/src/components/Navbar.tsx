@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Terminal, User as UserIcon, Search, Globe, LogOut, X, Activity, Database } from 'lucide-react';
+import { Terminal, User as UserIcon, Search, Globe, LogOut, X, Activity, Database, FileText } from 'lucide-react';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
 import { User, UserRole } from '../types';
 
@@ -11,6 +11,9 @@ interface NavbarProps {
   onOpenStatus?: () => void;
   onOpenBackups?: () => void;
   onSwitchRole?: (role: UserRole) => void;
+  onOpenMyPosts?: () => void;
+  // Posts waiting for admin review (badge on the admin panel button)
+  reviewPending?: number;
   userEmail?: string | null;
   currentUser?: User | null;
   serverNode?: string;
@@ -27,6 +30,8 @@ export const Navbar: FC<NavbarProps> = ({
   onOpenStatus,
   onOpenBackups,
   onSwitchRole,
+  onOpenMyPosts,
+  reviewPending = 0,
   userEmail,
   currentUser,
   serverNode = 'Homelab Docker',
@@ -110,6 +115,14 @@ export const Navbar: FC<NavbarProps> = ({
             >
               <Database className="w-3.5 h-3.5 text-purple-400" />
               <span>Panel Admin</span>
+              {reviewPending > 0 && (
+                <span
+                  className="ml-0.5 min-w-[1.1rem] px-1 rounded-full bg-amber-400 text-slate-950 text-[10px] font-bold text-center"
+                  title={t.reviewPendingBadge}
+                >
+                  {reviewPending}
+                </span>
+              )}
             </button>
           )}
 
@@ -144,29 +157,35 @@ export const Navbar: FC<NavbarProps> = ({
                     className={`text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded border uppercase cursor-pointer focus:outline-none transition-colors ${
                       currentUser.role === 'ADMIN'
                         ? 'bg-[#0f1422] text-purple-300 border-purple-500/50 shadow-sm shadow-purple-500/10'
-                        : currentUser.role === 'AUTHOR'
-                        ? 'bg-[#0f1422] text-cyan-300 border-cyan-500/50'
-                        : 'bg-[#0f1422] text-slate-400 border-slate-700'
+                        : 'bg-[#0f1422] text-cyan-300 border-cyan-500/50'
                     }`}
                   >
                     <option value="ADMIN" className="bg-[#0b0f19] text-purple-300">ADMIN</option>
-                    <option value="AUTHOR" className="bg-[#0b0f19] text-cyan-300">AUTHOR</option>
-                    <option value="READER" className="bg-[#0b0f19] text-slate-300">READER</option>
+                    <option value="CREATOR" className="bg-[#0b0f19] text-cyan-300">CREATOR</option>
                   </select>
                 ) : currentUser?.role ? (
                   <span
                     className={`text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded border uppercase ${
                       currentUser.role === 'ADMIN'
                         ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm shadow-purple-500/10'
-                        : currentUser.role === 'AUTHOR'
-                        ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                        : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
                     }`}
                   >
                     {currentUser.role}
                   </span>
                 ) : null}
               </span>
+              {onOpenMyPosts && (
+                <button
+                  type="button"
+                  onClick={onOpenMyPosts}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1e293b] hover:border-cyan-500/50 bg-[#0b0f19] text-xs font-medium text-slate-300 transition-colors"
+                  title={t.myPosts}
+                >
+                  <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="hidden sm:inline">{t.myPosts}</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onLogout}

@@ -119,7 +119,7 @@ export const StreakHeader: FC<StreakHeaderProps> = ({ stats, onNewPost, onOpenSt
               </span>
             </div>
           ) : (
-            /* Simple LIVE / DOWN indicator for AUTHOR, READER and visitors */
+            /* Simple LIVE / DOWN indicator for creators and visitors */
             <div
               onClick={onOpenStatus}
               className={`flex items-center gap-2 border px-3.5 py-2 rounded-xl text-xs font-mono transition-all cursor-pointer shadow-sm group select-none ${

@@ -1,4 +1,4 @@
-import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions } from '../types';
+import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions, ReviewItem } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -113,7 +113,11 @@ export async function fetchBookmarkedPosts(): Promise<Post[]> {
 }
 
 export async function fetchPostBySlug(slug: string): Promise<PostDetail> {
-  const res = await fetch(`${API_BASE}/posts/${slug}`);
+  // Signed-in authors and admins can also open unpublished posts (drafts, in review, rejected)
+  const token = localStorage.getItem('auth_token');
+  const res = await fetch(`${API_BASE}/posts/${slug}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!res.ok) throw new Error('Post not found');
   return res.json();
 }
@@ -210,7 +214,8 @@ export async function createPost(
     reading_time_minutes?: number;
     tag_ids: string[];
     section_id: string;
-    is_published: boolean;
+    // true: publish (admins, trusted creators) or submit for review; false: save as draft
+    submit: boolean;
   },
   token: string
 ): Promise<PostDetail> {
@@ -242,7 +247,7 @@ export async function updatePost(
     reading_time_minutes?: number;
     tag_ids?: string[];
     section_id?: string;
-    is_published?: boolean;
+    submit?: boolean;
   },
   token: string
 ): Promise<PostDetail> {
@@ -561,4 +566,45 @@ export async function updateUserRole(
   return res.json();
 }
 
+async function authJson<T>(path: string, token: string, fallback: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(init.headers || {}) },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: fallback }));
+    throw new Error(typeof err.detail === 'string' ? err.detail : fallback);
+  }
+  return res.json();
+}
 
+export function fetchMyPosts(token: string): Promise<Post[]> {
+  return authJson('/posts/mine', token, 'Failed to load your posts');
+}
+
+export function fetchReviewQueue(token: string): Promise<ReviewItem[]> {
+  return authJson('/admin/review', token, 'Failed to load the review queue');
+}
+
+export async function fetchReviewCount(token: string): Promise<number> {
+  const data = await authJson<{ pending: number }>('/admin/review/count', token, 'Failed to load the review count');
+  return data.pending;
+}
+
+export function approvePost(postId: string, token: string): Promise<Post> {
+  return authJson(`/admin/posts/${postId}/approve`, token, 'Failed to approve the post', { method: 'POST' });
+}
+
+export function rejectPost(postId: string, reason: string, token: string): Promise<Post> {
+  return authJson(`/admin/posts/${postId}/reject`, token, 'Failed to reject the post', {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function updateUserTrusted(userId: string, isTrusted: boolean, token: string): Promise<User> {
+  return authJson(`/auth/users/${userId}/trusted`, token, 'Failed to update the user', {
+    method: 'PUT',
+    body: JSON.stringify({ is_trusted: isTrusted }),
+  });
+}

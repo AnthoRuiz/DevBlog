@@ -16,9 +16,11 @@ import {
   ImageIcon,
   Eraser,
   LayoutGrid,
+  ClipboardCheck,
 } from 'lucide-react';
 import { SectionsAdmin } from './SectionsAdmin';
-import { BackupItem, BackupsResponse, MediaStats, User, UserRole } from '../types';
+import { ReviewQueue } from './ReviewQueue';
+import { BackupItem, BackupsResponse, MediaStats, ReviewItem, User, UserRole } from '../types';
 import {
   fetchAdminBackups,
   createAdminBackup,
@@ -27,6 +29,7 @@ import {
   updateMyRole,
   fetchUsers,
   updateUserRole,
+  updateUserTrusted,
   fetchMediaStats,
   cleanupMedia,
   ROLE_TESTING_ENABLED,
@@ -39,6 +42,9 @@ interface BackupsModalProps {
   currentUser?: User | null;
   onRoleChanged?: (updatedUser: User) => void;
   onSectionsUpdated?: () => void;
+  reviewPending?: number;
+  onReviewed?: () => void;
+  onPreviewPost?: (item: ReviewItem) => void;
 }
 
 export const BackupsModal: React.FC<BackupsModalProps> = ({
@@ -48,8 +54,11 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
   currentUser,
   onRoleChanged,
   onSectionsUpdated,
+  reviewPending = 0,
+  onReviewed,
+  onPreviewPost,
 }) => {
-  const [activeTab, setActiveTab] = useState<'roles' | 'backups' | 'sections'>('roles');
+  const [activeTab, setActiveTab] = useState<'review' | 'roles' | 'backups' | 'sections'>('review');
   
   // Backups state
   const [data, setData] = useState<BackupsResponse | null>(null);
@@ -149,6 +158,27 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
     }
   };
 
+  // Action: let a creator publish without review (or require review again)
+  const handleToggleTrusted = async (user: User) => {
+    if (!token || isUpdatingRole) return;
+    setIsUpdatingRole(true);
+    setMessage(null);
+    try {
+      const updated = await updateUserTrusted(user.id, !user.is_trusted, token);
+      setUsersList((prev) => prev.map((u) => (u.id === user.id ? updated : u)));
+      setMessage({
+        text: updated.is_trusted
+          ? `${updated.email} now publishes without review.`
+          : `${updated.email} now needs review before publishing.`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      setMessage({ text: err?.message || 'Failed to update the user', type: 'error' });
+    } finally {
+      setIsUpdatingRole(false);
+    }
+  };
+
   // Action: create backup
   const handleCreateBackup = async () => {
     if (!token || isCreating) return;
@@ -237,20 +267,12 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
       bg: 'bg-purple-500/10',
     },
     {
-      role: 'AUTHOR',
-      label: 'Author (AUTHOR)',
-      desc: 'Create posts, AI translations, and edit only their own posts.',
+      role: 'CREATOR',
+      label: 'Creator (CREATOR)',
+      desc: 'Writes and edits their own posts. Posts go through review unless the account is trusted.',
       color: 'text-cyan-300',
       border: 'border-cyan-500/40',
       bg: 'bg-cyan-500/10',
-    },
-    {
-      role: 'READER',
-      label: 'Reader (READER)',
-      desc: 'Read, comment and upvote only. Cannot publish or edit.',
-      color: 'text-slate-300',
-      border: 'border-slate-600',
-      bg: 'bg-slate-800/40',
     },
   ];
 
@@ -274,7 +296,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Role switcher for permission testing and backup management
+                Content review, users, sections and backups
               </p>
             </div>
           </div>
@@ -288,7 +310,20 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
         </div>
 
         {/* Navigation tabs */}
-        <div className="flex border-b border-[#1e293b] bg-[#07090e] px-6">
+        <div className="flex flex-wrap border-b border-[#1e293b] bg-[#07090e] px-6">
+          <button
+            type="button"
+            onClick={() => setActiveTab('review')}
+            className={`flex items-center gap-2 py-3 px-4 text-xs font-mono font-bold border-b-2 transition-all ${
+              activeTab === 'review'
+                ? 'border-amber-400 text-amber-300 bg-amber-500/5'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            <span>Review ({reviewPending})</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('roles')}
@@ -299,7 +334,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Roles (Testing)</span>
+            <span>Users & roles</span>
           </button>
 
           <button
@@ -370,7 +405,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                 how the UI, buttons and endpoints respond:
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 {rolesConfig.map((r) => {
                   const isCurrent = currentUser?.role === r.role;
                   return (
@@ -463,15 +498,27 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                           className={`bg-[#0b0f19] border text-xs font-mono font-bold rounded-lg px-2.5 py-1 focus:outline-none cursor-pointer transition-colors ${
                             u.role === 'ADMIN'
                               ? 'border-purple-500/40 text-purple-300'
-                              : u.role === 'AUTHOR'
-                              ? 'border-cyan-500/40 text-cyan-300'
-                              : 'border-slate-700 text-slate-400'
+                              : 'border-cyan-500/40 text-cyan-300'
                           }`}
                         >
                           <option value="ADMIN" className="bg-[#0b0f19] text-purple-300">ADMIN</option>
-                          <option value="AUTHOR" className="bg-[#0b0f19] text-cyan-300">AUTHOR</option>
-                          <option value="READER" className="bg-[#0b0f19] text-slate-300">READER</option>
+                          <option value="CREATOR" className="bg-[#0b0f19] text-cyan-300">CREATOR</option>
                         </select>
+                        {u.role === 'CREATOR' && (
+                          <label
+                            className="flex items-center gap-1.5 text-[11px] font-mono text-slate-400 cursor-pointer"
+                            title="Trusted creators publish without admin review"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={u.is_trusted}
+                              disabled={isUpdatingRole}
+                              onChange={() => handleToggleTrusted(u)}
+                              className="accent-cyan-400"
+                            />
+                            Trusted
+                          </label>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -481,7 +528,10 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
           </div>
         )}
 
-        {/* TAB CONTENT: POSTGRESQL BACKUPS */}
+        {activeTab === 'review' && (
+          <ReviewQueue token={token} onMessage={setMessage} onReviewed={onReviewed} onPreview={onPreviewPost} />
+        )}
+
         {activeTab === 'sections' && (
           <SectionsAdmin token={token} onMessage={setMessage} onSectionsUpdated={onSectionsUpdated} />
         )}

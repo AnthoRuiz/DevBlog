@@ -35,6 +35,8 @@ interface NewPostModalProps {
   tags: Tag[];
   sections: Section[];
   isAdmin?: boolean;
+  // Admins and trusted creators publish directly; other creators submit for review
+  canPublishDirectly?: boolean;
   token: string | null;
   onPostCreated: () => void;
   editingPost?: Post | PostDetail | null;
@@ -48,6 +50,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   tags,
   sections,
   isAdmin = false,
+  canPublishDirectly = false,
   token,
   onPostCreated,
   editingPost = null,
@@ -360,8 +363,13 @@ export const NewPostModal: FC<NewPostModalProps> = ({
     }
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    savePost(true);
+  };
+
+  // submit=true publishes (or sends to review); submit=false keeps the post as a draft
+  const savePost = async (submit: boolean) => {
     if (!token) {
       setErrorMsg('You must sign in to publish or edit a post');
       return;
@@ -391,6 +399,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             cover_image_url: coverImageUrl.trim() || undefined,
             tag_ids: selectedTagIds,
             section_id: sectionId,
+            submit,
           },
           token
         );
@@ -404,7 +413,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             cover_image_url: coverImageUrl.trim() || undefined,
             tag_ids: selectedTagIds,
             section_id: sectionId,
-            is_published: true,
+            submit,
           },
           token
         );
@@ -447,6 +456,16 @@ export const NewPostModal: FC<NewPostModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
+          {editingPost?.status === 'rejected' && (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-200">
+              <p className="font-bold mb-1">{t.postRejectedTitle}</p>
+              {editingPost.review_note && <p className="whitespace-pre-wrap">{editingPost.review_note}</p>}
+              <p className="mt-2 text-amber-300/80">{t.postRejectedHint}</p>
+            </div>
+          )}
+          {editingPost?.status === 'pending_review' && (
+            <div className="rounded-xl border border-sky-500/40 bg-sky-500/10 p-3 text-xs text-sky-200">{t.postPendingNotice}</div>
+          )}
           {errorMsg && (
             <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono">
               ⚠️ {errorMsg}
@@ -941,7 +960,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-[#1e293b]">
             <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-500">
               <Sparkles className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-              <span>{t.aiReadingTimeNote}</span>
+              <span>{canPublishDirectly ? t.aiReadingTimeNote : t.reviewRequiredNote}</span>
             </div>
 
             <div className="flex items-center justify-end gap-3">
@@ -953,6 +972,14 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                 {t.cancelBtn}
               </button>
               <button
+                type="button"
+                onClick={() => savePost(false)}
+                disabled={isSubmitting}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold border border-[#1e293b] hover:border-slate-500 text-slate-300 hover:text-white transition-colors disabled:opacity-50"
+              >
+                {t.saveDraftBtn}
+              </button>
+              <button
                 type="submit"
                 disabled={isSubmitting}
                 className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg shadow-cyan-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
@@ -961,7 +988,9 @@ export const NewPostModal: FC<NewPostModalProps> = ({
                 <span>
                   {isSubmitting
                     ? isEditing ? t.savingChanges : t.publishingPost
-                    : isEditing ? t.saveChangesBtn : t.publishPostBtn}
+                    : !canPublishDirectly
+                    ? t.submitForReviewBtn
+                    : editingPost?.status === 'published' ? t.saveChangesBtn : t.publishPostBtn}
                 </span>
               </button>
             </div>

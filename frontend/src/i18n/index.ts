@@ -6,6 +6,20 @@ export interface Translations {
   searchPlaceholder: string;
   authorLogin: string;
   authorLogout: string;
+  myPosts: string;
+  myPostsEmpty: string;
+  statusDraft: string;
+  statusPendingReview: string;
+  statusPublished: string;
+  statusRejected: string;
+  reviewNoteLabel: string;
+  postRejectedTitle: string;
+  postRejectedHint: string;
+  postPendingNotice: string;
+  reviewRequiredNote: string;
+  saveDraftBtn: string;
+  submitForReviewBtn: string;
+  reviewPendingBadge: string;
   writingStreak: string;
   activeStatus: string;
   streakDescription: string;
@@ -164,6 +178,20 @@ export const translations: Record<Language, Translations> = {
     searchPlaceholder: 'Buscar por tecnología o palabra clave...',
     authorLogin: 'Acceso / Registro',
     authorLogout: 'Cerrar Sesión',
+    myPosts: 'Mis posts',
+    myPostsEmpty: 'Todavía no has escrito ningún post.',
+    statusDraft: 'Borrador',
+    statusPendingReview: 'En revisión',
+    statusPublished: 'Publicado',
+    statusRejected: 'Rechazado',
+    reviewNoteLabel: 'Motivo',
+    postRejectedTitle: 'Este post fue devuelto por el administrador',
+    postRejectedHint: 'Edítalo y vuelve a enviarlo a revisión.',
+    postPendingNotice: 'Este post está esperando la revisión del administrador.',
+    reviewRequiredNote: 'Tus posts se publican cuando el administrador los revisa.',
+    saveDraftBtn: 'Guardar borrador',
+    submitForReviewBtn: 'Enviar a revisión',
+    reviewPendingBadge: 'Posts esperando revisión',
     writingStreak: 'DÍAS DE RACHA DE ESCRITURA',
     activeStatus: 'ACTIVA',
     streakDescription: 'Publicando aprendizajes continuos sobre arquitectura, sistemas distribuidos y homelab.',
@@ -316,6 +344,20 @@ export const translations: Record<Language, Translations> = {
     searchPlaceholder: 'Search by technology or keyword...',
     authorLogin: 'Login / Register',
     authorLogout: 'Log Out',
+    myPosts: 'My posts',
+    myPostsEmpty: 'You haven\'t written any posts yet.',
+    statusDraft: 'Draft',
+    statusPendingReview: 'In review',
+    statusPublished: 'Published',
+    statusRejected: 'Rejected',
+    reviewNoteLabel: 'Reason',
+    postRejectedTitle: 'This post was sent back by the admin',
+    postRejectedHint: 'Edit it and submit it for review again.',
+    postPendingNotice: 'This post is waiting for the admin\'s review.',
+    reviewRequiredNote: 'Your posts go live once the admin reviews them.',
+    saveDraftBtn: 'Save draft',
+    submitForReviewBtn: 'Submit for review',
+    reviewPendingBadge: 'Posts waiting for review',
     writingStreak: 'DAYS WRITING STREAK',
     activeStatus: 'ACTIVE',
     streakDescription: 'Publishing continuous learnings on systems architecture, distributed computing, and homelab.',
@@ -468,6 +510,20 @@ export const translations: Record<Language, Translations> = {
     searchPlaceholder: 'Pesquisar por tecnologia ou palavra-chave...',
     authorLogin: 'Entrar / Registrar',
     authorLogout: 'Encerrar Sessão',
+    myPosts: 'Meus posts',
+    myPostsEmpty: 'Você ainda não escreveu nenhum post.',
+    statusDraft: 'Rascunho',
+    statusPendingReview: 'Em revisão',
+    statusPublished: 'Publicado',
+    statusRejected: 'Rejeitado',
+    reviewNoteLabel: 'Motivo',
+    postRejectedTitle: 'Este post foi devolvido pelo administrador',
+    postRejectedHint: 'Edite-o e envie-o para revisão novamente.',
+    postPendingNotice: 'Este post está aguardando a revisão do administrador.',
+    reviewRequiredNote: 'Seus posts são publicados depois que o administrador os revisa.',
+    saveDraftBtn: 'Salvar rascunho',
+    submitForReviewBtn: 'Enviar para revisão',
+    reviewPendingBadge: 'Posts aguardando revisão',
     writingStreak: 'DIAS DE SEQUÊNCIA DE ESCRITA',
     activeStatus: 'ATIVA',
     streakDescription: 'Publicando aprendizados contínuos sobre arquitetura, sistemas distribuídos e homelab.',
@@ -620,6 +676,20 @@ export const translations: Record<Language, Translations> = {
     searchPlaceholder: 'Rechercher par technologie ou mot-clé...',
     authorLogin: 'Connexion / Inscription',
     authorLogout: 'Déconnexion',
+    myPosts: 'Mes articles',
+    myPostsEmpty: 'Vous n\'avez encore écrit aucun article.',
+    statusDraft: 'Brouillon',
+    statusPendingReview: 'En révision',
+    statusPublished: 'Publié',
+    statusRejected: 'Refusé',
+    reviewNoteLabel: 'Motif',
+    postRejectedTitle: 'Cet article a été renvoyé par l\'administrateur',
+    postRejectedHint: 'Modifiez-le puis soumettez-le à nouveau.',
+    postPendingNotice: 'Cet article attend la révision de l\'administrateur.',
+    reviewRequiredNote: 'Vos articles sont publiés après la révision de l\'administrateur.',
+    saveDraftBtn: 'Enregistrer le brouillon',
+    submitForReviewBtn: 'Soumettre à révision',
+    reviewPendingBadge: 'Articles en attente de révision',
     writingStreak: 'JOURS DE SÉRIE D\'ÉCRITURE',
     activeStatus: 'ACTIVE',
     streakDescription: 'Partage d\'apprentissages continus sur l\'architecture, les systèmes distribués et le homelab.',

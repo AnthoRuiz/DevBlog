@@ -1,4 +1,7 @@
-export type UserRole = 'ADMIN' | 'AUTHOR' | 'READER';
+// Anonymous visitors are the readers; every account is a creator, admins manage the site
+export type UserRole = 'ADMIN' | 'CREATOR';
+
+export type PostStatus = 'draft' | 'pending_review' | 'published' | 'rejected';
 
 export interface User {
   id: string;
@@ -6,6 +9,8 @@ export interface User {
   full_name: string;
   avatar_url?: string;
   role: UserRole;
+  // Trusted creators publish without admin review
+  is_trusted: boolean;
   is_active: boolean;
   is_verified: boolean;
   created_at: string;
@@ -80,11 +85,18 @@ export interface Post {
   reading_time_minutes: number;
   upvotes_count: number;
   views_count: number;
-  is_published: boolean;
+  status: PostStatus;
+  // Reason given by the admin when the post was rejected
+  review_note?: string | null;
   published_at?: string;
   created_at: string;
   section?: Section | null;
   tags: Tag[];
+}
+
+// A post waiting for admin review, with who wrote it
+export interface ReviewItem extends Post {
+  author_name?: string | null;
 }
 
 export interface PostDetail extends Post {
@@ -99,7 +111,8 @@ export interface PostUpdate {
   cover_image_url?: string;
   language?: string;
   reading_time_minutes?: number;
-  is_published?: boolean;
+  // true: publish or submit for review; false: back to draft
+  submit?: boolean;
   section_id?: string;
   tag_ids?: string[];
 }

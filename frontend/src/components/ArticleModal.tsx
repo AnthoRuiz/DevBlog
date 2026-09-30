@@ -191,6 +191,11 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
           </div>
 
           {/* Main title */}
+          {post.status !== 'published' && (
+            <div className="rounded-xl border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs font-mono text-sky-200">
+              {{ draft: t.statusDraft, pending_review: t.statusPendingReview, rejected: t.statusRejected }[post.status]}
+            </div>
+          )}
           <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
             {post.title}
           </h1>
