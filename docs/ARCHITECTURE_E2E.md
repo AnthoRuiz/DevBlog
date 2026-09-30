@@ -1,4 +1,4 @@
-# SYS.BLOG • End-to-End Technical Specification & Architecture Manual
+# Anthony Ruiz — Blog • End-to-End Technical Specification & Architecture Manual
 
 > **Document Version:** 3.4.0 (2026-10-01)  
 > **Target Audience:** Systems architects, AI agents, DevOps engineers and full-stack developers  
@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary & System Philosophy
 
-**SYS.BLOG** is a self-hosted engineering publication platform and Homelab observability hub. It runs on consumer hardware (a laptop or mini-PC under Windows 11 + WSL2) and is published worldwide through Cloudflare's edge without opening any router ports.
+**Anthony Ruiz — Blog** (blog.anthoruiz.dev) is a self-hosted personal engineering blog and Homelab observability hub. Branding (name, tagline, `>ar_` monogram, tokens, fonts) follows the personal brand book. It runs on consumer hardware (a laptop or mini-PC under Windows 11 + WSL2) and is published worldwide through Cloudflare's edge without opening any router ports.
 
 ### Core Architectural Tenets
 1. **Edge-routed, zero port forwarding:** no residential router ports (80/443) are opened. All ingress traverses an outbound-only encrypted tunnel (`cloudflared`) to Cloudflare's edge. Every other service listens on `127.0.0.1` only.
@@ -388,7 +388,7 @@ frontend/src/
 ├── utils/                      # Formatting helpers
 └── components/
     ├── Navbar.tsx              # Top bar: search, language switcher, status, admin panel
-    ├── StreakHeader.tsx        # Writing streak + admin telemetry or LIVE/DOWN badge
+    ├── BrandMark.tsx           # >ar_ monogram (inline SVG from the brand book)
     ├── DigestCard.tsx          # Post card (cover, language badge, metadata, actions)
     ├── ArticleModal.tsx        # Post reader with comments, upvotes and bookmarks
     ├── NewPostModal.tsx        # Editor: cover upload, tags, AI translate/suggest/estimate
@@ -405,9 +405,8 @@ frontend/src/
 
 ### 5.3 Key UI Behaviour
 
-#### Adaptive telemetry widget (`StreakHeader.tsx`)
-- **`ADMIN`:** polls `/stats/telemetry` every 5 s with the admin token and shows `LIVE | CPU | RAM | TEMP | UP | /status ↗`.
-- **Everyone else:** polls the public `/stats/system` ping and shows a `LIVE` / `DOWN` badge only.
+#### Public home without telemetry
+- The public home shows no telemetry or statistics; hardware data lives only in the admin `/status` modal (`/stats/telemetry`, `/stats/status`). Signed-in users get **New post** and **My posts** in the navbar.
 
 #### Markdown rendering (`MarkdownRenderer.tsx`)
 - In-house parser for headings, lists, quotes, tables, inline formatting and fenced code (highlight.js), with ` ```mermaid ` blocks delegated to `MermaidRenderer`.
@@ -497,7 +496,7 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 ### 6.4 Stats, Backups & Logs
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `GET` | `/stats/streak` | Public | Writing streak, post/view/upvote totals (no hardware data) |
+| `GET` | `/site` | Public | Site identity (`name`, `tagline`, `description`, canonical `url`) and published post count |
 | `GET` | `/stats/system` | Public | Liveness ping |
 | `GET` | `/stats/telemetry` | Admin | Live CPU, RAM, disk, temperature and uptime |
 | `GET` | `/stats/status` | Admin | Per-service health and latency + hardware snapshot |
@@ -537,6 +536,9 @@ Production reads `.env`, development reads `.env.dev` (templates: `.env.example`
 | `GEMINI_API_KEY` | | empty | Google AI Studio key for the AI features |
 | `GEMINI_MODEL` | | `gemini-flash-latest,gemini-flash-lite-latest` | Gemini model(s), comma-separated, tried in order |
 | `LLM_PROVIDER_ORDER` | | `claude,gemini` | Failover order of the configured providers |
+| `SITE_NAME` / `SITE_TAGLINE` | | `Anthony Ruiz` / brand tagline | Site identity served by `GET /site` |
+| `SITE_DESCRIPTION` | | one-line bio | Meta description for feeds and previews |
+| `SITE_URL` | | `https://blog.anthoruiz.dev` | Canonical base URL for post links, feeds and previews |
 | `BACKEND_PORT` | | `8001` | Dev backend host port (`.env.dev` only) |
 | `VITE_API_PROXY_TARGET` | | `http://localhost:8001` | Vite dev proxy target (shell env when running `npm run dev`) |
 | `VITE_ENABLE_ROLE_TESTING` | | unset | Shows the role testing UI (frontend build/dev env) |

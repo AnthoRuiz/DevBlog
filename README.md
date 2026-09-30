@@ -1,6 +1,8 @@
-# SYS.BLOG • Developer Digest & Homelab Hub
+# Anthony Ruiz — Blog
 
-A self-hosted technical blog engine and Homelab observability hub, running on bare-metal hardware and published through a Cloudflare Tunnel — with zero open router ports.
+> I build it at home before I trust it at scale.
+
+The personal blog of Anthony Ruiz: a self-hosted blog engine and Homelab observability hub, running on bare-metal hardware and published through a Cloudflare Tunnel — with zero open router ports.
 
 - 🌐 **Production:** [https://blog.anthoruiz.dev](https://blog.anthoruiz.dev)
 - 📖 **End-to-end architecture manual:** [`docs/ARCHITECTURE_E2E.md`](./docs/ARCHITECTURE_E2E.md)
@@ -11,7 +13,7 @@ A self-hosted technical blog engine and Homelab observability hub, running on ba
 
 ## 🌟 Features
 
-- **Technical digest feed:** two-column post grid with reading time, views, upvotes, bookmarks and a writing-streak header, paginated 12 posts at a time with **Load more**.
+- **Technical digest feed:** two-column post grid with reading time, views, upvotes and bookmarks, paginated 12 posts at a time with **Load more**.
 - **Markdown editor:** Word-style toolbar, live preview, syntax highlighting (highlight.js), dark-themed **Mermaid.js** diagrams, and one-click image upload that embeds `![alt](/uploads/...)` in the post body.
 - **Multilingual UI (i18n):** 🇪🇸 Español (`es`) · 🇺🇸 English (`en`) · 🇧🇷 Português (`pt`) · 🇫🇷 Français (`fr`), plus an original-language badge on every post.
 - **AI with failover (Claude + Gemini):** post translation, tag suggestions, reading-time estimates and tag-section validation. Providers are tried in order and the next one takes over if one fails. Without any provider, translation is disabled (never faked) and the other features use clearly labelled keyword/heuristic fallbacks.
@@ -20,7 +22,8 @@ A self-hosted technical blog engine and Homelab observability hub, running on ba
 - **Starter tags:** 19 tags seeded on an empty database, each assigned to its section.
 - **Two roles and a review queue:** anonymous visitors are the readers; every account is a `CREATOR` and `ADMIN` runs the site. Creators' posts wait in the admin's review queue (draft → in review → published or rejected with a reason) unless the admin marks the account as trusted. Admin posts publish directly. Creators get daily limits on AI calls (30) and uploads (20).
 - **Admin panel:** user and role management, backups (database + uploaded media, daily snapshots, 7-day rotation, one-click create/download/delete) and media storage usage with orphan cleanup.
-- **Homelab telemetry (admin only):** live CPU, RAM, temperature, disk and uptime via `psutil`, and per-service latency at `/#/status`. Other visitors only see a LIVE/DOWN indicator.
+- **Personal brand:** name, tagline, `>ar_` monogram, colors and fonts come from the personal brand book; the site identity is served by `GET /site` (`SITE_*` settings) so the UI, feeds and previews share it.
+- **Homelab telemetry (admin only):** live CPU, RAM, temperature, disk and uptime via `psutil`, and per-service latency at `/#/status`.
 - **Local media storage:** JPG, PNG and WEBP up to 5 MB and animated GIFs up to 15 MB, validated by file content and stored on the server (Docker volume) — no external object storage needed. Unused files are cleaned up automatically.
 - **Observability:** rotating server logs and a React `ErrorBoundary` that reports client crashes to the backend.
 
