@@ -1,6 +1,6 @@
 # SYS.BLOG • End-to-End Technical Specification & Architecture Manual
 
-> **Document Version:** 3.1.0 (2026-09-29)  
+> **Document Version:** 3.2.0 (2026-09-30)  
 > **Target Audience:** Systems architects, AI agents, DevOps engineers and full-stack developers  
 > **Production URL:** `https://blog.anthoruiz.dev`  
 > **Local endpoints:** Production stack: frontend `127.0.0.1:3000`, API `127.0.0.1:8000` · Development stack: frontend `localhost:5173`, API `localhost:8001/docs`
@@ -131,7 +131,8 @@ The Vite dev server proxies `/api` and `/uploads` to the development backend (`V
 
 ### 4.1 Technology Stack
 - **Framework:** FastAPI `0.110` on Uvicorn `0.28` (ASGI).
-- **ORM & driver:** SQLAlchemy `2.0` async with `asyncpg`; tables are created on startup with `Base.metadata.create_all` (no migrations yet).
+- **ORM & driver:** SQLAlchemy `2.0` async with `asyncpg`.
+- **Migrations:** Alembic (`backend/alembic.ini`, `backend/migrations/`), applied automatically on startup by `app/db/migrations.py` (see 4.9).
 - **Validation & settings:** Pydantic `2.6` and `pydantic-settings`.
 - **Security:** `passlib[bcrypt]` for password hashing, `python-jose` for JWT (HS256, 24 h expiry).
 - **Rate limiting:** SlowAPI (in-memory, keyed by `CF-Connecting-IP` / `X-Forwarded-For` / peer address).
@@ -159,6 +160,8 @@ erDiagram
     POSTS ||--o{ UPVOTES : "receives"
     POSTS ||--o{ BOOKMARKS : "receives"
     POSTS }o--o{ TAGS : "post_tags"
+    SECTIONS ||--o{ POSTS : "groups"
+    SECTIONS ||--o{ TAGS : "owns"
 
     USERS {
         uuid id PK
@@ -182,9 +185,20 @@ erDiagram
         datetime created_at
     }
 
+    SECTIONS {
+        uuid id PK
+        string name UK
+        string slug UK
+        string description
+        string color_hex
+        string icon
+        int sort_order
+    }
+
     POSTS {
         uuid id PK
         uuid author_id FK
+        uuid section_id FK
         string slug UK
         string title
         string language "es, en, pt, fr"
@@ -205,6 +219,7 @@ erDiagram
         string name UK
         string slug UK
         string color_hex
+        uuid section_id FK
     }
 
     COMMENTS {
@@ -234,17 +249,35 @@ erDiagram
     }
 ```
 
-### 4.4 Seed Data (`seed_initial_data()` in `backend/app/main.py`)
-Runs on every startup and only fills what is missing:
-1. **Starter tags** (only when the `tags` table is empty) — 19 tags from `DEFAULT_TAGS`:
+### 4.4 Sections
+Every post and every tag belongs to exactly one section (`section_id`, required, `ON DELETE RESTRICT`). The five sections are created by migration `0003_add_sections`:
+
+| Section | Slug | Color | Icon key |
+|---|---|---|---|
+| Tech & Coding | `tech` | `#22d3ee` | `code` |
+| AI | `ai` | `#a78bfa` | `cpu` |
+| Interviews & Career | `career` | `#fb923c` | `target` |
+| Mental Health | `mental-health` | `#f472b6` | `heart` |
+| Gaming | `gaming` | `#4ade80` | `gamepad` |
+
+Admins can edit name, description and color (`PUT /admin/sections/{id}`); slugs are fixed because they are used in URLs.
+
+**Tag-section validation (`backend/app/services/tag_classifier.py`).** A new tag must fit its section ("WoW" belongs to Gaming, never Tech & Coding):
+- With `GEMINI_API_KEY`, Gemini classifies the name against the section names and descriptions and returns `{section_slug, confidence, reason}`. Without a key, or on any Gemini error, a keyword classifier is used (games, consoles, engines, mental-health, interview and AI terms; short keywords match whole words only).
+- A tag is rejected only when another section is suggested with confidence ≥ 0.7. Ambiguous or unknown names return no suggestion and never block. Results are cached in memory.
+- The editor calls `POST /posts/tags/validate` while the author types (debounced) and offers "Create in <section>"; `POST /posts/tags` enforces the same rule (HTTP 422) unless an admin sends `force: true`.
+
+### 4.5 Seed Data (`seed_initial_data()` in `backend/app/main.py`)
+Runs on every startup (after migrations) and only fills what is missing:
+1. **Starter tags** (only when the `tags` table is empty) — 19 tags from `DEFAULT_TAGS`, each with its section:
    - *Technology:* Software Engineering, Python, JavaScript & TypeScript, React, Backend & APIs, Databases, Distributed Systems, Cloud & DevOps, Docker & Homelab, Security, AI & Machine Learning
    - *Career & interviews:* Interview Prep, System Design, Algorithms & Data Structures, Career Growth
    - *Wellbeing:* Mental Health, Productivity & Habits
    - *Gaming:* Video Games, Game Development
 2. **Admin user** (only when no `ADMIN` exists) — created from `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Without a password, a random one is generated and printed once to stdout (never to `server.log`). Existing admins still using the legacy default password are rotated to `ADMIN_PASSWORD` or reported with a warning.
-3. **Demo posts** (only when `SEED_DEMO_POSTS=True` and there are no posts) — three English posts with Unsplash covers. Enabled in development, disabled in production.
+3. **Demo posts** (only when `SEED_DEMO_POSTS=True` and there are no posts) — three English posts with Unsplash covers in Tech & Coding. Enabled in development, disabled in production.
 
-### 4.5 Security & Role-Based Access Control
+### 4.6 Security & Role-Based Access Control
 
 | Role | Capabilities |
 |---|---|
@@ -278,19 +311,26 @@ The first registered account becomes `ADMIN`; every later sign-up is a `READER`.
 | `POST /posts/{post_id}/upvote` | 30/min |
 | `POST /logs/client` | 20/min |
 
-### 4.6 Local Media Storage (`backend/app/services/media_service.py`)
+### 4.7 Local Media Storage (`backend/app/services/media_service.py`)
 - **Location:** `/app/uploads` (Docker volume `uploads_data`), served by Nginx and FastAPI at `/uploads/<file>`. Posts store only the URL (`cover_image_url`, or `![alt](/uploads/...)` inside `content_markdown`).
 - **Upload pipeline (`POST /posts/upload-image`):** read at most 15 MB + 1 byte, detect the type by magic bytes, apply the per-type limit (5 MB JPG/PNG/WEBP, 15 MB GIF), store as `img_<12 hex>.<ext>`.
 - **Orphan detection:** a file is orphaned when it matches the uploader's naming pattern, no post (published or draft) references it in its cover or markdown (relative or absolute `/uploads/` URL), and it is older than 24 h (grace period for posts still being written). Other files in the directory are never touched.
 - **Cleanup:** `cleanup_orphans()` runs daily right after a successful backup, and on demand via `POST /admin/media/cleanup`.
 
-### 4.7 Automated Backup Engine (`backend/app/services/backup_service.py`)
+### 4.8 Automated Backup Engine (`backend/app/services/backup_service.py`)
 - **Scheduler:** background task started in the FastAPI `lifespan`, running every 24 h: backup first, then orphan cleanup (only if the backup succeeded).
 - **Snapshot pair:** `pg_dump --clean --if-exists` gzip-compressed to `backup_devblog_YYYYMMDD_HHMMSS.sql.gz`, plus `backup_devblog_YYYYMMDD_HHMMSS.media.tar.gz` with every uploaded file (built in a worker thread, written atomically). Stored in `/app/backups` (host: `backend/backups/`).
 - **Retention:** keeps the 7 most recent pairs; rotation and deletion always remove both files. Backups predating media archiving are listed without a media archive.
 - **Safety:** filenames are validated against path traversal; all endpoints are admin-only.
 
-### 4.8 Observability & Hardware Telemetry
+### 4.9 Database Migrations (Alembic)
+- `0001_baseline` — the schema as of the Alembic introduction (autogenerated from the models).
+- `0002_reconcile_legacy` — idempotent fixes for databases created by older versions with `create_all` (nullable `bookmarks.user_id`, anonymous-bookmark index and unique constraint, no server default on `posts.language`). No-op on a database built from the baseline.
+- `0003_add_sections` — sections table plus `section_id` on tags and posts, with data backfill.
+- **Startup:** `run_migrations()` runs in a worker thread before seeding. A database that has the app tables but no `alembic_version` (created before Alembic) is stamped at `0001_baseline` first, so its data is kept and only later migrations run.
+- **New migration:** change the models, then `docker exec -w /app devblog_dev_backend alembic revision --autogenerate -m "<message>"`, review the file (add data backfills by hand), and restart the dev backend to apply it. `alembic check` reports whether models and schema still differ.
+
+### 4.10 Observability & Hardware Telemetry
 - **Logging:** rotating file handler at `/app/logs/server.log` (5 MB × 3) plus stdout; client errors are logged through the `devblog.client` logger.
 - **Telemetry (`GET /stats/telemetry`, admin):** CPU % (`psutil.cpu_percent`), logical/physical cores, RAM, disk, uptime (`psutil.boot_time`) and temperature (`psutil.sensors_temperatures`, estimated from CPU load when no sensor is exposed, as under WSL2).
 - **System status (`GET /stats/status`, admin):** measures a real `SELECT 1` round-trip to PostgreSQL and reports FastAPI, Nginx and Gemini status alongside the hardware snapshot.
@@ -391,17 +431,24 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 ### 6.2 Posts & Tags
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `GET` | `/posts` | Public | Paginated published posts (`tag`, `q`, `sort=recent\|top_voted\|trending`, `limit` 1–100 default 12, `offset`); returns `{items, total, limit, offset, has_more}` |
+| `GET` | `/posts` | Public | Paginated published posts (`section`, `tag`, `q`, `sort=recent\|top_voted\|trending`, `limit` 1–100 default 12, `offset`); returns `{items, total, limit, offset, has_more}` |
 | `GET` | `/posts/{slug}` | Public | Post detail (increments views) |
-| `POST` | `/posts` | Author | Create a post |
+| `POST` | `/posts` | Author | Create a post (`section_id` required) |
 | `PUT` | `/posts/{post_id}` | Author | Update a post (owner or admin) |
 | `DELETE` | `/posts/{post_id}` | Author | Delete a post (owner or admin) |
 | `POST` | `/posts/upload-image` | Author | Upload an image (`multipart/form-data`; JPG/PNG/WEBP ≤ 5 MB, GIF ≤ 15 MB) |
 | `GET` | `/posts/tags/all` | Public | List all tags |
-| `POST` | `/posts/tags` | Author | Create a tag |
+| `POST` | `/posts/tags` | Author | Create a tag in a section (`section_id` required; 422 when it clearly belongs to another section, admins may `force`) |
+| `POST` | `/posts/tags/validate` | Author | Real-time check of a new tag name against a section (30/min) |
 | `POST` | `/posts/ai-translate` | Author | Translate title, summary and markdown (Gemini) |
 | `POST` | `/posts/ai-suggest-tags` | Author | Suggest tags (Gemini) |
 | `POST` | `/posts/ai-estimate-reading-time` | Author | Estimate reading time (Gemini) |
+
+### 6.2b Sections
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/sections` | Public | Sections in display order with published post counts |
+| `PUT` | `/admin/sections/{section_id}` | Admin | Edit name, description or color |
 
 ### 6.3 Interactions
 | Method | Endpoint | Auth | Description |
@@ -450,7 +497,7 @@ Production reads `.env`, development reads `.env.dev` (templates: `.env.example`
 | `ADMIN_PASSWORD` | | random, printed once | Initial admin password |
 | `ALLOW_ROLE_SELF_SWITCH` | | `False` | Enables `PUT /auth/me/role` (testing only; blocked in production) |
 | `SEED_DEMO_POSTS` | | `False` (dev `True`) | Seeds the demo posts into an empty database |
-| `GEMINI_API_KEY` | | empty | Google AI Studio key; offline fallbacks when empty |
+| `GEMINI_API_KEY` | | empty | Google AI Studio key (translation, tag suggestions, reading time, tag-section validation); offline fallbacks when empty |
 | `GEMINI_MODEL` | | `gemini-1.5-flash` | Gemini model |
 | `BACKEND_PORT` | | `8001` | Dev backend host port (`.env.dev` only) |
 | `VITE_API_PROXY_TARGET` | | `http://localhost:8001` | Vite dev proxy target (shell env when running `npm run dev`) |
@@ -517,7 +564,7 @@ When reading, analyzing or extending this repository:
 2. **Environments:** never point development tooling at production. Use `docker-compose.dev.yml` + `.env.dev`; Vite already proxies to port 8001.
 3. **Secrets:** never add defaults for secrets in `docker-compose*.yml` or `config.py`; required values use `${VAR:?...}`. Never commit `.env*` files (other than the templates) or anything in `backend/backups/`.
 4. **Routing:** Nginx proxies `/api/` to `backend:8000/api/`; client routes live in `frontend/src/App.tsx` (hash routes `#/status`, `#/backups`).
-5. **Schema changes:** models live in `backend/app/models/`. There are no migrations: `create_all` only creates missing tables, so column changes on an existing database need a manual `ALTER TABLE` (or introducing Alembic, already in `requirements.txt`).
+5. **Schema changes:** models live in `backend/app/models/`; every schema change needs an Alembic migration in `backend/migrations/versions/` (autogenerate, then review and add data backfills). Migrations run automatically on startup. Never go back to `create_all`.
 6. **Seed data:** starter tags and demo posts are defined in `backend/app/main.py`; anything that must exist in a fresh database belongs there, not only in a live database.
 7. **CORS:** add new public hostnames to `BACKEND_CORS_ORIGINS` in `backend/app/core/config.py`.
 8. **Deploying:** use `./deploy.sh` from WSL; it refuses unsafe configurations and verifies security regressions after deploying.

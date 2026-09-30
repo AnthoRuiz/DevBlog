@@ -15,7 +15,9 @@ A self-hosted technical blog engine and Homelab observability hub, running on ba
 - **Markdown editor:** Word-style toolbar, live preview, syntax highlighting (highlight.js), dark-themed **Mermaid.js** diagrams, and one-click image upload that embeds `![alt](/uploads/...)` in the post body.
 - **Multilingual UI (i18n):** 🇪🇸 Español (`es`) · 🇺🇸 English (`en`) · 🇧🇷 Português (`pt`) · 🇫🇷 Français (`fr`), plus an original-language badge on every post.
 - **Google Gemini AI:** one-click post translation, tag suggestions and reading-time estimates (with an offline fallback when no API key is set).
-- **Starter tags:** 19 tags seeded on an empty database, covering technology, interview prep, career growth, mental health and gaming.
+- **Sections:** Tech & Coding, AI, Interviews & Career, Mental Health and Gaming — each with its own color and icon. The home page filters by section, and every post and tag belongs to one.
+- **AI tag validation:** new tags are checked in real time against the post's section (e.g. "WoW" can only be created under Gaming) using Gemini, with a keyword fallback when no API key is set.
+- **Starter tags:** 19 tags seeded on an empty database, each assigned to its section.
 - **Role-based access control:** `ADMIN`, `AUTHOR` and `READER`. The first account is `ADMIN`; after that, only an admin can assign roles.
 - **Admin panel:** user and role management, backups (database + uploaded media, daily snapshots, 7-day rotation, one-click create/download/delete) and media storage usage with orphan cleanup.
 - **Homelab telemetry (admin only):** live CPU, RAM, temperature, disk and uptime via `psutil`, and per-service latency at `/#/status`. Other visitors only see a LIVE/DOWN indicator.
@@ -204,6 +206,13 @@ docker exec -i devblog_backend tar xzf - -C /app/uploads < backend/backups/<file
 
 ### Media cleanup
 An upload is considered orphaned when no post (published or draft) references it in its cover or content and it is older than 24 hours. Orphans are deleted daily right after the backup — so they stay recoverable from the media archive for 7 days — or on demand from the admin panel (**Clean up unused media**).
+
+### Database migrations
+Schema changes are managed with Alembic (`backend/migrations/`) and applied automatically when the backend starts, in both environments. To create one after changing the models:
+```bash
+docker exec -w /app devblog_dev_backend alembic revision --autogenerate -m "describe the change"
+# review the generated file in backend/migrations/versions/, then restart the dev backend
+```
 
 ### Database shell
 ```bash
