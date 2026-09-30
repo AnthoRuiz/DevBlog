@@ -12,14 +12,14 @@ A self-hosted technical blog engine and Homelab observability hub, running on ba
 ## 🌟 Features
 
 - **Technical digest feed:** two-column post grid with reading time, views, upvotes, bookmarks and a writing-streak header.
-- **Markdown editor:** Word-style toolbar, live preview, syntax highlighting (highlight.js) and dark-themed **Mermaid.js** diagrams.
+- **Markdown editor:** Word-style toolbar, live preview, syntax highlighting (highlight.js), dark-themed **Mermaid.js** diagrams, and one-click image upload that embeds `![alt](/uploads/...)` in the post body.
 - **Multilingual UI (i18n):** 🇪🇸 Español (`es`) · 🇺🇸 English (`en`) · 🇧🇷 Português (`pt`) · 🇫🇷 Français (`fr`), plus an original-language badge on every post.
 - **Google Gemini AI:** one-click post translation, tag suggestions and reading-time estimates (with an offline fallback when no API key is set).
 - **Starter tags:** 19 tags seeded on an empty database, covering technology, interview prep, career growth, mental health and gaming.
 - **Role-based access control:** `ADMIN`, `AUTHOR` and `READER`. The first account is `ADMIN`; after that, only an admin can assign roles.
-- **Admin panel:** user and role management, plus PostgreSQL backups (daily automatic snapshots, 7-day rotation, one-click create/download/delete).
+- **Admin panel:** user and role management, backups (database + uploaded media, daily snapshots, 7-day rotation, one-click create/download/delete) and media storage usage with orphan cleanup.
 - **Homelab telemetry (admin only):** live CPU, RAM, temperature, disk and uptime via `psutil`, and per-service latency at `/#/status`. Other visitors only see a LIVE/DOWN indicator.
-- **Image uploads:** JPG, PNG, GIF and WEBP up to 5 MB, validated by file content.
+- **Local media storage:** JPG, PNG and WEBP up to 5 MB and animated GIFs up to 15 MB, validated by file content and stored on the server (Docker volume) — no external object storage needed. Unused files are cleaned up automatically.
 - **Observability:** rotating server logs and a React `ErrorBoundary` that reports client crashes to the backend.
 
 ---
@@ -32,7 +32,7 @@ A self-hosted technical blog engine and Homelab observability hub, running on ba
 | Authorization | Users cannot change their own role (the test switcher is off unless `ALLOW_ROLE_SELF_SWITCH=True`); admin-only endpoints for logs, telemetry, backups and users |
 | Initial admin | Created from `ADMIN_EMAIL` / `ADMIN_PASSWORD`; if no password is set, a random one is printed once to `docker logs`. No hardcoded credentials anywhere |
 | XSS | Markdown links only allow `http(s)`, `mailto` and relative URLs, and quotes are escaped; Mermaid runs with `securityLevel: 'strict'` |
-| Uploads | File type detected from magic bytes (SVG rejected), 5 MB cap, served with `nosniff` and a sandboxing CSP |
+| Uploads | File type detected from magic bytes (SVG rejected), 5 MB cap (15 MB for GIF), served with `nosniff` and a sandboxing CSP; embedded images only accept `http(s)` or same-origin URLs |
 | Google sign-in (API) | ID tokens must match `GOOGLE_CLIENT_ID` (`aud`) and carry a verified email; the endpoint is disabled while no client ID is configured |
 | Rate limiting | Per-visitor limits in Nginx (real IP restored from `CF-Connecting-IP`) and SlowAPI on authentication, comment/interaction endpoints and client logs |
 | Network | Only the Cloudflare Tunnel is public. Postgres, the backend and the frontend listen on `127.0.0.1` only |
@@ -187,14 +187,23 @@ docker logs --tail 50 devblog_tunnel
 Admins can also read the latest server log lines at `GET /api/v1/logs/recent`.
 
 ### Backups
-- Automatic daily `pg_dump` (gzip) with the 7 most recent kept; admins can also create, download and delete backups from the admin panel.
+- Every backup is a pair with the same timestamp: `backup_devblog_<ts>.sql.gz` (database, `pg_dump`) and `backup_devblog_<ts>.media.tar.gz` (all uploaded media).
+- Automatic daily backups keep the 7 most recent pairs; admins can also create, download and delete them from the admin panel.
 - Stored on the host in `backend/backups/` (git-ignored).
 
-Restore a backup (the dump includes `DROP ... IF EXISTS`, so it replaces the current data):
+Restore the database (the dump includes `DROP ... IF EXISTS`, so it replaces the current data):
 ```bash
 set -a; source <(grep -E '^POSTGRES_(USER|DB)=' .env); set +a
 gunzip -c backend/backups/<file>.sql.gz | docker exec -i devblog_postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
 ```
+
+Restore uploaded media (extracts the files back into the uploads volume):
+```bash
+docker exec -i devblog_backend tar xzf - -C /app/uploads < backend/backups/<file>.media.tar.gz
+```
+
+### Media cleanup
+An upload is considered orphaned when no post (published or draft) references it in its cover or content and it is older than 24 hours. Orphans are deleted daily right after the backup — so they stay recoverable from the media archive for 7 days — or on demand from the admin panel (**Clean up unused media**).
 
 ### Database shell
 ```bash

@@ -1,6 +1,6 @@
 # SYS.BLOG • End-to-End Technical Specification & Architecture Manual
 
-> **Document Version:** 3.0.0 (2026-09-29)  
+> **Document Version:** 3.1.0 (2026-09-29)  
 > **Target Audience:** Systems architects, AI agents, DevOps engineers and full-stack developers  
 > **Production URL:** `https://blog.anthoruiz.dev`  
 > **Local endpoints:** Production stack: frontend `127.0.0.1:3000`, API `127.0.0.1:8000` · Development stack: frontend `localhost:5173`, API `localhost:8001/docs`
@@ -121,7 +121,7 @@ The Vite dev server proxies `/api` and `/uploads` to the development backend (`V
    - **Rate limiting:** leaky bucket at `30 r/s` per visitor with `burst=50` (`zone=api_gateway_limit:10m`), HTTP 429 on exhaustion.
    - **Security headers:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (camera/microphone/geolocation off); `server_tokens off`.
    - **SPA fallback:** `try_files $uri $uri/ /index.html`.
-   - **API proxy:** `/api/` → `backend:8000/api/`, `client_max_body_size 6m` for uploads.
+   - **API proxy:** `/api/` → `backend:8000/api/`, `client_max_body_size 16m` for uploads.
    - **Uploads:** `/uploads/` → backend, cached 30 days, served with `nosniff` and `Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox`.
    - **gzip** for text, CSS, JSON, JavaScript and XML.
 
@@ -248,7 +248,7 @@ Runs on every startup and only fills what is missing:
 
 | Role | Capabilities |
 |---|---|
-| **`ADMIN`** | Everything an author can do, on any post · list users and change roles (cannot demote themselves while they are the only admin) · create, download and delete backups · hardware telemetry and system status · recent server logs |
+| **`ADMIN`** | Everything an author can do, on any post · list users and change roles (cannot demote themselves while they are the only admin) · create, download and delete backups · inspect media storage and clean up orphaned uploads · hardware telemetry and system status · recent server logs |
 | **`AUTHOR`** | Create posts · edit and delete **own** posts · upload images · create tags · AI translation, tag suggestions and reading-time estimates |
 | **`READER`** | Read, upvote, bookmark and comment. Cannot publish or edit |
 
@@ -263,7 +263,7 @@ The first registered account becomes `ADMIN`; every later sign-up is a `READER`.
 
 **Additional controls:**
 - **Google sign-in endpoint:** tokens verified via Google `tokeninfo` and required to match `GOOGLE_CLIENT_ID` (`aud`), a Google issuer, and `email_verified`; returns `503` while no client ID is configured.
-- **Uploads:** content detected by magic bytes (JPG, PNG, GIF, WEBP; SVG rejected), 5 MB cap, random filenames.
+- **Uploads:** content detected by magic bytes (JPG, PNG, GIF, WEBP; SVG rejected), 5 MB cap (15 MB for GIF), random filenames.
 - **Comments:** honeypot field `hp_website`, script/iframe stripping, length limits; rendered as plain text in the UI.
 - **Client log intake:** fields truncated and newlines neutralized so clients cannot forge log lines.
 
@@ -278,13 +278,19 @@ The first registered account becomes `ADMIN`; every later sign-up is a `READER`.
 | `POST /posts/{post_id}/upvote` | 30/min |
 | `POST /logs/client` | 20/min |
 
-### 4.6 Automated Database Backup Engine (`backend/app/services/backup_service.py`)
-- **Scheduler:** background task started in the FastAPI `lifespan`, running every 24 h.
-- **Snapshot:** `pg_dump --clean --if-exists` via `asyncio.create_subprocess_exec`, gzip-compressed to `backup_devblog_YYYYMMDD_HHMMSS.sql.gz` in `/app/backups` (host: `backend/backups/`).
-- **Retention:** keeps the 7 most recent `*.sql.gz` files and deletes older ones.
-- **Safety:** filenames are validated against path traversal; downloads are admin-only.
+### 4.6 Local Media Storage (`backend/app/services/media_service.py`)
+- **Location:** `/app/uploads` (Docker volume `uploads_data`), served by Nginx and FastAPI at `/uploads/<file>`. Posts store only the URL (`cover_image_url`, or `![alt](/uploads/...)` inside `content_markdown`).
+- **Upload pipeline (`POST /posts/upload-image`):** read at most 15 MB + 1 byte, detect the type by magic bytes, apply the per-type limit (5 MB JPG/PNG/WEBP, 15 MB GIF), store as `img_<12 hex>.<ext>`.
+- **Orphan detection:** a file is orphaned when it matches the uploader's naming pattern, no post (published or draft) references it in its cover or markdown (relative or absolute `/uploads/` URL), and it is older than 24 h (grace period for posts still being written). Other files in the directory are never touched.
+- **Cleanup:** `cleanup_orphans()` runs daily right after a successful backup, and on demand via `POST /admin/media/cleanup`.
 
-### 4.7 Observability & Hardware Telemetry
+### 4.7 Automated Backup Engine (`backend/app/services/backup_service.py`)
+- **Scheduler:** background task started in the FastAPI `lifespan`, running every 24 h: backup first, then orphan cleanup (only if the backup succeeded).
+- **Snapshot pair:** `pg_dump --clean --if-exists` gzip-compressed to `backup_devblog_YYYYMMDD_HHMMSS.sql.gz`, plus `backup_devblog_YYYYMMDD_HHMMSS.media.tar.gz` with every uploaded file (built in a worker thread, written atomically). Stored in `/app/backups` (host: `backend/backups/`).
+- **Retention:** keeps the 7 most recent pairs; rotation and deletion always remove both files. Backups predating media archiving are listed without a media archive.
+- **Safety:** filenames are validated against path traversal; all endpoints are admin-only.
+
+### 4.8 Observability & Hardware Telemetry
 - **Logging:** rotating file handler at `/app/logs/server.log` (5 MB × 3) plus stdout; client errors are logged through the `devblog.client` logger.
 - **Telemetry (`GET /stats/telemetry`, admin):** CPU % (`psutil.cpu_percent`), logical/physical cores, RAM, disk, uptime (`psutil.boot_time`) and temperature (`psutil.sensors_temperatures`, estimated from CPU load when no sensor is exposed, as under WSL2).
 - **System status (`GET /stats/status`, admin):** measures a real `SELECT 1` round-trip to PostgreSQL and reports FastAPI, Nginx and Gemini status alongside the hardware snapshot.
@@ -324,12 +330,12 @@ frontend/src/
     ├── DigestCard.tsx          # Post card (cover, language badge, metadata, actions)
     ├── ArticleModal.tsx        # Post reader with comments, upvotes and bookmarks
     ├── NewPostModal.tsx        # Editor: cover upload, tags, AI translate/suggest/estimate
-    ├── MarkdownToolbar.tsx     # Word-style formatting toolbar and quick guide
-    ├── MarkdownRenderer.tsx    # In-house markdown renderer with sanitized links
+    ├── MarkdownToolbar.tsx     # Formatting toolbar, inline image upload and quick guide
+    ├── MarkdownRenderer.tsx    # In-house markdown renderer with sanitized links and images
     ├── MermaidRenderer.tsx     # Mermaid diagram rendering with copy-source button
     ├── LoginModal.tsx          # Sign-in and sign-up
     ├── SystemStatusModal.tsx   # /status dashboard (admin data, notice for others)
-    ├── BackupsModal.tsx        # Admin panel: users & roles, backups
+    ├── BackupsModal.tsx        # Admin panel: users & roles, backups, media storage cleanup
     └── ErrorBoundary.tsx       # Crash screen with automatic error reporting
 ```
 
@@ -341,7 +347,10 @@ frontend/src/
 
 #### Markdown rendering (`MarkdownRenderer.tsx`)
 - In-house parser for headings, lists, quotes, tables, inline formatting and fenced code (highlight.js), with ` ```mermaid ` blocks delegated to `MermaidRenderer`.
-- All text is HTML-escaped (including quotes). Links are extracted before other inline formatting and only allow `http(s)`, `mailto` and relative URLs; anything else (e.g. `javascript:`, `data:`) becomes `#`.
+- All text is HTML-escaped (including quotes). Images and links are extracted before other inline formatting. Links only allow `http(s)`, `mailto` and relative URLs (anything else becomes `#`); images only allow `http(s)` and same-origin paths such as `/uploads/...` (anything else, including protocol-relative and `data:` URLs, is dropped).
+
+#### Inline image upload (`MarkdownToolbar.tsx`)
+- The image button uploads through `POST /posts/upload-image` and inserts `![alt](url)` as its own paragraph at the cursor, reading the live textarea value so text typed during the upload is kept.
 
 #### Compact tag filter bar (`App.tsx`)
 - Shows `All`, `Bookmarks (N)` and the first 6 tags (`PRIMARY_TAG_LIMIT`); the rest live in a searchable `+N more` dropdown. A tag picked from the dropdown is pinned to the bar with a remove button.
@@ -382,7 +391,7 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 | `POST` | `/posts` | Author | Create a post |
 | `PUT` | `/posts/{post_id}` | Author | Update a post (owner or admin) |
 | `DELETE` | `/posts/{post_id}` | Author | Delete a post (owner or admin) |
-| `POST` | `/posts/upload-image` | Author | Upload an image (`multipart/form-data`, JPG/PNG/GIF/WEBP, ≤ 5 MB) |
+| `POST` | `/posts/upload-image` | Author | Upload an image (`multipart/form-data`; JPG/PNG/WEBP ≤ 5 MB, GIF ≤ 15 MB) |
 | `GET` | `/posts/tags/all` | Public | List all tags |
 | `POST` | `/posts/tags` | Author | Create a tag |
 | `POST` | `/posts/ai-translate` | Author | Translate title, summary and markdown (Gemini) |
@@ -405,10 +414,12 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 | `GET` | `/stats/system` | Public | Liveness ping |
 | `GET` | `/stats/telemetry` | Admin | Live CPU, RAM, disk, temperature and uptime |
 | `GET` | `/stats/status` | Admin | Per-service health and latency + hardware snapshot |
-| `GET` | `/admin/backups` | Admin | List backups and retention policy |
-| `POST` | `/admin/backups/create` | Admin | Create a backup now |
-| `GET` | `/admin/backups/{filename}/download` | Admin | Download a backup (`application/gzip`) |
-| `DELETE` | `/admin/backups/{filename}` | Admin | Delete a backup |
+| `GET` | `/admin/backups` | Admin | List backups (with paired media archive) and retention policy |
+| `POST` | `/admin/backups/create` | Admin | Create a database dump + media archive now |
+| `GET` | `/admin/backups/{filename}/download` | Admin | Download a `.sql.gz` dump or `.media.tar.gz` archive |
+| `DELETE` | `/admin/backups/{filename}` | Admin | Delete a backup (a dump also deletes its media archive) |
+| `GET` | `/admin/media` | Admin | Media storage usage and orphaned files |
+| `POST` | `/admin/media/cleanup` | Admin | Delete orphaned uploads now |
 | `POST` | `/logs/client` | Public | Client error report (rate limited, sanitized) |
 | `GET` | `/logs/recent` | Admin | Tail of `server.log` (`lines=1..1000`, default 100) |
 
@@ -476,10 +487,13 @@ docker logs -f devblog_dev_backend     # development backend
 # Create a backup now (or use the admin panel)
 docker exec -w /app devblog_backend python -c "import asyncio; from app.services.backup_service import create_backup; print(asyncio.run(create_backup(keep=7)))"
 
-# Restore (the dump drops and recreates objects, replacing current data)
+# Restore the database (the dump drops and recreates objects, replacing current data)
 set -a; source <(grep -E '^POSTGRES_(USER|DB)=' .env); set +a
 gunzip -c backend/backups/backup_devblog_YYYYMMDD_HHMMSS.sql.gz \
   | docker exec -i devblog_postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+
+# Restore uploaded media into the uploads volume
+docker exec -i devblog_backend tar xzf - -C /app/uploads < backend/backups/backup_devblog_YYYYMMDD_HHMMSS.media.tar.gz
 ```
 Files that must survive rotation should be renamed so they no longer end in `.sql.gz` (e.g. `*.sql.gz.bak`).
 
