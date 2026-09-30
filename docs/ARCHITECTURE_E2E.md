@@ -340,15 +340,15 @@ The first registered account becomes `ADMIN`; every later sign-up is a `READER`.
 
 ### 4.11 AI Providers (`backend/app/services/llm.py`, `ai_features.py`)
 - **One entry point:** `generate_json(prompt, schema, task=..., max_tokens, timeout, effort, stream)` returns a JSON object matching the schema plus the provider that produced it (e.g. `claude:claude-opus-5-5`).
-- **Failover:** providers are tried in `LLM_PROVIDER_ORDER` (default `claude,gemini`), skipping those without an API key. Any exception, timeout, refusal, `max_tokens` truncation or JSON missing required keys moves on to the next provider; when all fail, `LLMUnavailable` is raised.
+- **Failover:** providers are tried in `LLM_PROVIDER_ORDER` (default `claude,gemini`), skipping those without an API key. Any exception, timeout, refusal, `max_tokens` truncation or JSON missing required keys moves on to the next provider; when all fail, `LLMUnavailable` is raised with a `reason`: `not_configured`, `quota_exhausted` (every provider tried was out of quota: Gemini HTTP 429 `RESOURCE_EXHAUSTED`, Claude 429 or "credit balance too low"; carries the soonest known `retry_after` from `Retry-After` or a `RetryInfo.retryDelay`) or `failed`.
 - **Claude:** official SDK (`AsyncAnthropic`, one SDK retry so failover is quick), model `CLAUDE_MODEL` (default `claude-opus-5-5`), structured output via `output_config.format` (`json_schema`), `effort: low` for short tasks and `medium` for translation, streaming for translations, and the server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`).
 - **Gemini:** REST `generateContent` with `response_mime_type: application/json` and `maxOutputTokens`.
 - **Features and their non-AI behaviour:**
 
 | Feature | Timeout | Without a working provider |
 |---|---|---|
-| Translation (`POST /posts/ai-translate`) | 180 s, streamed | HTTP 503 with an explanation (no fake translation) |
-| Tag suggestions (`POST /posts/ai-suggest-tags`) | 20 s | Existing tags / known technologies found in the text; response `provider: "keywords"`; may be empty |
+| Translation (`POST /posts/ai-translate`) | 180 s, streamed | No fake translation: HTTP 429 + `Retry-After` when the quota is exhausted, 503 otherwise; `detail = {code, message, retry_after}` so the editor shows a localized message |
+| Tag suggestions (`POST /posts/ai-suggest-tags`) | 20 s | Existing tags / known technologies found in the text; response `provider: "keywords"` plus `fallback_reason`; may be empty |
 | Reading time (post create/update, `POST /posts/ai-estimate-reading-time`) | 15 s | Heuristic: prose 180 wpm, code ~20 lines/min, density factor |
 | Tag-section validation | 10 s | Keyword classifier (4.4) |
 
@@ -457,7 +457,7 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 | `POST` | `/posts/tags` | Author | Create a tag in a section (`section_id` required; 422 when it clearly belongs to another section, admins may `force`) |
 | `POST` | `/posts/tags/validate` | Author | Real-time check of a new tag name against a section (30/min) |
 | `GET` | `/posts/ai-status` | Author | Configured AI providers in failover order |
-| `POST` | `/posts/ai-translate` | Author | Translate title, summary and markdown (AI; 503 without a provider) |
+| `POST` | `/posts/ai-translate` | Author | Translate title, summary and markdown (AI; 429 when the quota is exhausted, 503 without a provider) |
 | `POST` | `/posts/ai-suggest-tags` | Author | Suggest tags (AI, or keywords); returns `provider` |
 | `POST` | `/posts/ai-estimate-reading-time` | Author | Estimate reading time (AI, or heuristic) |
 
