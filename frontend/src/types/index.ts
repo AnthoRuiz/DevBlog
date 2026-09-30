@@ -113,6 +113,22 @@ export interface BackupItem {
   media_size_display?: string;
 }
 
+export interface MediaStats {
+  total_files: number;
+  total_size_display: string;
+  orphan_files: number;
+  orphan_size_display: string;
+  orphans: string[];
+  recent_unreferenced: number;
+  grace_hours: number;
+}
+
+export interface MediaCleanupResult {
+  deleted: string[];
+  deleted_count: number;
+  freed_display: string;
+}
+
 export interface BackupsResponse {
   status: string;
   retention_policy: string;

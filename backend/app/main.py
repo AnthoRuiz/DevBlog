@@ -200,19 +200,31 @@ An outbound tunnel opens the connection from inside the container to Cloudflare'
         await session.commit()
 
 async def automated_backup_scheduler():
-    """Run an automatic daily backup (every 24 hours) in the background, with rotation."""
+    """Every 24 hours: back up the database and media, then delete orphaned uploads."""
+    from app.services import backup_service, media_service
     while True:
         try:
             # Wait 24 hours (86400 seconds)
             await asyncio.sleep(86400)
-            from app.services import backup_service
             res = await backup_service.create_backup(keep=7)
-            print(f"[AutoBackup] Automatic backup succeeded: {res['filename']} ({res['size_display']})")
+            print(f"[AutoBackup] Automatic backup succeeded: {res['filename']} ({res['size_display']}, media {res['media_size_display']})")
         except asyncio.CancelledError:
             break
         except Exception as e:
             print(f"[AutoBackup] Automatic backup task failed: {e}")
             await asyncio.sleep(300)
+            continue
+
+        # Only clean up after a successful backup, so deleted files stay recoverable for the retention window
+        try:
+            async with AsyncSessionLocal() as session:
+                cleaned = await media_service.cleanup_orphans(session)
+            if cleaned["deleted"]:
+                print(f"[MediaCleanup] Deleted {len(cleaned['deleted'])} orphaned upload(s), freed {cleaned['freed_bytes']} bytes")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[MediaCleanup] Orphan cleanup failed: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

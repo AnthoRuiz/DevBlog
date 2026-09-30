@@ -4,6 +4,7 @@ from app.api.v1.posts import router as posts_router
 from app.api.v1.stats import router as stats_router
 from app.api.v1.logs import router as logs_router
 from app.api.v1.backups import router as backups_router
+from app.api.v1.media import router as media_router
 
 api_router = APIRouter()
 
@@ -12,3 +13,4 @@ api_router.include_router(posts_router)
 api_router.include_router(stats_router)
 api_router.include_router(logs_router)
 api_router.include_router(backups_router)
+api_router.include_router(media_router)

@@ -13,8 +13,10 @@ import {
   Users,
   Shield,
   UserCheck,
+  ImageIcon,
+  Eraser,
 } from 'lucide-react';
-import { BackupItem, BackupsResponse, User, UserRole } from '../types';
+import { BackupItem, BackupsResponse, MediaStats, User, UserRole } from '../types';
 import {
   fetchAdminBackups,
   createAdminBackup,
@@ -23,6 +25,8 @@ import {
   updateMyRole,
   fetchUsers,
   updateUserRole,
+  fetchMediaStats,
+  cleanupMedia,
   ROLE_TESTING_ENABLED,
 } from '../services/api';
 
@@ -49,6 +53,8 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
+  const [mediaStats, setMediaStats] = useState<MediaStats | null>(null);
+  const [isCleaningMedia, setIsCleaningMedia] = useState<boolean>(false);
 
   // Users and roles state
   const [usersList, setUsersList] = useState<User[]>([]);
@@ -64,6 +70,7 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
     try {
       const res = await fetchAdminBackups(token);
       setData(res);
+      setMediaStats(await fetchMediaStats(token));
     } catch (err: any) {
       setMessage({ text: err?.message || 'Failed to load backups', type: 'error' });
     } finally {
@@ -154,6 +161,23 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
       setMessage({ text: err?.message || 'Failed to create backup', type: 'error' });
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  // Action: delete uploads that no post references anymore
+  const handleCleanupMedia = async () => {
+    if (!token || isCleaningMedia || !mediaStats?.orphan_files) return;
+    if (!window.confirm(`Delete ${mediaStats.orphan_files} unused media file(s) (${mediaStats.orphan_size_display})? They remain in backups for 7 days.`)) return;
+    setIsCleaningMedia(true);
+    setMessage(null);
+    try {
+      const res = await cleanupMedia(token);
+      setMessage({ text: `Deleted ${res.deleted_count} unused file(s), freed ${res.freed_display}.`, type: 'success' });
+      setMediaStats(await fetchMediaStats(token));
+    } catch (err: any) {
+      setMessage({ text: err?.message || 'Failed to clean up media', type: 'error' });
+    } finally {
+      setIsCleaningMedia(false);
     }
   };
 
@@ -468,6 +492,36 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Media storage and orphan cleanup */}
+            {mediaStats && (
+              <div className="p-3.5 rounded-xl bg-[#07090e] border border-[#1e293b] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <ImageIcon className="w-6 h-6 text-pink-400 flex-shrink-0" />
+                  <div className="font-mono">
+                    <span className="text-[10px] uppercase text-slate-500 block">Media Storage</span>
+                    <span className="text-xs font-bold text-slate-200">
+                      {mediaStats.total_files} file(s) · {mediaStats.total_size_display}
+                    </span>
+                    <span className="text-[11px] text-slate-400 block">
+                      {mediaStats.orphan_files} unused ({mediaStats.orphan_size_display})
+                      {mediaStats.recent_unreferenced > 0 &&
+                        ` · ${mediaStats.recent_unreferenced} recent upload(s) kept for ${mediaStats.grace_hours}h`}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCleanupMedia}
+                  disabled={isCleaningMedia || mediaStats.orphan_files === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/30 text-pink-300 text-xs font-mono font-bold transition-colors disabled:opacity-40 self-end sm:self-auto"
+                  title="Delete uploads that no post references (also runs daily after the backup)"
+                >
+                  <Eraser className="w-3.5 h-3.5" />
+                  <span>{isCleaningMedia ? 'Cleaning...' : 'Clean up unused media'}</span>
+                </button>
+              </div>
+            )}
 
             {/* Action bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#1e293b]">

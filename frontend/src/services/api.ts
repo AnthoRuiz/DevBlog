@@ -1,4 +1,4 @@
-import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse } from '../types';
+import { Post, PostDetail, StreakStats, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -404,6 +404,29 @@ export async function deleteAdminBackup(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Failed to delete backup' }));
     throw new Error(err.detail || 'Failed to delete backup');
+  }
+  return res.json();
+}
+
+export async function fetchMediaStats(token: string): Promise<MediaStats> {
+  const res = await fetch(`${API_BASE}/admin/media`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to load media stats' }));
+    throw new Error(err.detail || 'Failed to load media stats');
+  }
+  return res.json();
+}
+
+export async function cleanupMedia(token: string): Promise<MediaCleanupResult> {
+  const res = await fetch(`${API_BASE}/admin/media/cleanup`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to clean up media' }));
+    throw new Error(err.detail || 'Failed to clean up media');
   }
   return res.json();
 }
