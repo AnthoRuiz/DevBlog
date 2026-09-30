@@ -18,7 +18,7 @@ A self-hosted technical blog engine and Homelab observability hub, running on ba
 - **Sections:** Tech & Coding, AI, Interviews & Career, Mental Health and Gaming — each with its own color and icon. The home page filters by section, and every post and tag belongs to one.
 - **AI tag validation:** new tags are checked in real time against the post's section (e.g. "WoW" can only be created under Gaming) using the AI providers, with a keyword fallback when none is available.
 - **Starter tags:** 19 tags seeded on an empty database, each assigned to its section.
-- **Role-based access control:** `ADMIN`, `AUTHOR` and `READER`. The first account is `ADMIN`; after that, only an admin can assign roles.
+- **Two roles and a review queue:** anonymous visitors are the readers; every account is a `CREATOR` and `ADMIN` runs the site. Creators' posts wait in the admin's review queue (draft → in review → published or rejected with a reason) unless the admin marks the account as trusted. Admin posts publish directly. Creators get daily limits on AI calls (30) and uploads (20).
 - **Admin panel:** user and role management, backups (database + uploaded media, daily snapshots, 7-day rotation, one-click create/download/delete) and media storage usage with orphan cleanup.
 - **Homelab telemetry (admin only):** live CPU, RAM, temperature, disk and uptime via `psutil`, and per-service latency at `/#/status`. Other visitors only see a LIVE/DOWN indicator.
 - **Local media storage:** JPG, PNG and WEBP up to 5 MB and animated GIFs up to 15 MB, validated by file content and stored on the server (Docker volume) — no external object storage needed. Unused files are cleaned up automatically.

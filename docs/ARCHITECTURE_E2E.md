@@ -14,7 +14,7 @@
 ### Core Architectural Tenets
 1. **Edge-routed, zero port forwarding:** no residential router ports (80/443) are opened. All ingress traverses an outbound-only encrypted tunnel (`cloudflared`) to Cloudflare's edge. Every other service listens on `127.0.0.1` only.
 2. **Secure by default:** secrets are required (no insecure fallbacks), production refuses to start with weak settings, and admin-only surfaces (telemetry, logs, backups, user management) require the `ADMIN` role.
-3. **Role-based access control (RBAC):** a 3-tier model (`ADMIN`, `AUTHOR`, `READER`) enforced through FastAPI route dependencies. Roles are assigned by admins only.
+3. **Role-based access control (RBAC):** two roles (`ADMIN`, `CREATOR`) enforced through FastAPI route dependencies; anonymous visitors are the readers. Every sign-up is a `CREATOR` and only admins change roles. Posts from untrusted creators go through an admin review queue.
 4. **Isolated environments:** production and development are separate Docker Compose projects with their own databases, volumes, ports and configuration files.
 5. **Autonomous operations:** automatic daily database backups with 7-copy rotation, Docker restart policies, and a deployment script with pre- and post-deploy checks.
 6. **AI assistance with failover:** Claude and Google Gemini behind one provider layer for translation, tag suggestions, reading time and tag-section validation. Fallbacks are honest: translation fails loudly without AI; the rest use labelled heuristics.
@@ -169,7 +169,8 @@ erDiagram
         string hashed_password "null for OAuth-only accounts"
         string full_name
         string avatar_url
-        enum role "ADMIN, AUTHOR, READER"
+        enum role "ADMIN, CREATOR"
+        bool is_trusted "publishes without review"
         bool is_active
         bool is_verified
         datetime created_at
@@ -208,7 +209,8 @@ erDiagram
         int reading_time_minutes
         int upvotes_count
         int views_count
-        bool is_published
+        enum status "draft, pending_review, published, rejected"
+        text review_note "rejection reason"
         datetime published_at
         datetime created_at
         datetime updated_at
@@ -281,16 +283,20 @@ Runs on every startup (after migrations) and only fills what is missing:
 
 | Role | Capabilities |
 |---|---|
-| **`ADMIN`** | Everything an author can do, on any post · list users and change roles (cannot demote themselves while they are the only admin) · create, download and delete backups · inspect media storage and clean up orphaned uploads · hardware telemetry and system status · recent server logs |
-| **`AUTHOR`** | Create posts · edit and delete **own** posts · upload images · create tags · AI translation, tag suggestions and reading-time estimates |
-| **`READER`** | Read, upvote, bookmark and comment. Cannot publish or edit |
+| Anonymous visitor | Read published posts, upvote, bookmark and comment |
+| **`ADMIN`** | Everything a creator can do, on any post, publishing directly · review queue (approve, or reject with a reason) · list users, change roles and mark creators as trusted (the last admin can never be demoted) · create, download and delete backups · inspect media storage and clean up orphaned uploads · hardware telemetry and system status · recent server logs |
+| **`CREATOR`** | Write posts (drafts, submit for review) · edit and delete **own** posts · upload images (20/day) · create tags · AI translation, tag suggestions and reading-time estimates (30/day) |
 
-The first registered account becomes `ADMIN`; every later sign-up is a `READER`. `PUT /auth/me/role` (self role switch) returns `403` unless `ALLOW_ROLE_SELF_SWITCH=True`, which is meant for local testing only.
+Every sign-up (email or Google) is a `CREATOR`; the admin account comes from `ADMIN_EMAIL`/`ADMIN_PASSWORD` at startup.
+
+**Post lifecycle (`posts.status`):** `draft` → `pending_review` → `published`, or `rejected` with a `review_note` the author sees; a rejected post can be edited and submitted again. `submit=true` publishes directly for admins and trusted creators and sends the post to review otherwise; `submit=false` keeps it as a draft. When an untrusted creator edits a published post it goes back to review. Unpublished posts are visible only to their author and admins, and readers can only interact with published posts.
+
+**Daily quotas (`app/core/quotas.py`):** per-user, in-memory counters that reset at UTC midnight (and on restart): AI calls 30/day, image uploads 20/day, real-time tag checks 200/day. Admins are exempt. Exceeding a quota returns `429`. `PUT /auth/me/role` (self role switch) returns `403` unless `ALLOW_ROLE_SELF_SWITCH=True`, which is meant for local testing only.
 
 **Route dependencies (`backend/app/api/deps.py`):**
 - `get_current_user_optional` — decodes the Bearer JWT if present, otherwise `None`.
 - `get_current_user` — requires a valid token (`401`).
-- `get_current_author_or_admin` — requires `AUTHOR` or `ADMIN` (`403`).
+- `get_current_creator_or_admin` — requires `CREATOR` or `ADMIN` (`403`).
 - `get_current_admin` — requires `ADMIN` (`403`).
 - `get_client_hash` — SHA-256 of IP + User-Agent for anonymous upvotes/bookmarks.
 
@@ -391,7 +397,9 @@ frontend/src/
     ├── MermaidRenderer.tsx     # Mermaid diagram rendering with copy-source button
     ├── LoginModal.tsx          # Sign-in and sign-up
     ├── SystemStatusModal.tsx   # /status dashboard (admin data, notice for others)
-    ├── BackupsModal.tsx        # Admin panel: users & roles, backups, media storage cleanup
+    ├── BackupsModal.tsx        # Admin panel: review queue, users & roles, sections, backups, media cleanup
+    ├── ReviewQueue.tsx         # Admin review tab: approve or reject pending posts
+    ├── MyPostsModal.tsx        # The signed-in user's posts with their review status
     └── ErrorBoundary.tsx       # Crash screen with automatic error reporting
 ```
 
@@ -431,41 +439,51 @@ frontend/src/
 
 Base URL: `https://blog.anthoruiz.dev/api/v1` (production) · `http://localhost:8001/api/v1` (development; interactive docs at `/docs`).
 
-Auth legend: **Public** — no token · **Optional** — token used if present · **Bearer** — any signed-in user · **Author** — `AUTHOR` or `ADMIN` · **Admin** — `ADMIN` only.
+Auth legend: **Public** — no token · **Optional** — token used if present · **Bearer** — any signed-in user · **Creator** — `CREATOR` or `ADMIN` · **Admin** — `ADMIN` only.
 
 ### 6.1 Authentication & Users
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/auth/register` | Public | Create an account (first user `ADMIN`, then `READER`); returns a JWT |
+| `POST` | `/auth/register` | Public | Create a `CREATOR` account; returns a JWT |
 | `POST` | `/auth/login` | Public | Email/password sign-in; returns a JWT |
 | `POST` | `/auth/oauth/google` | Public | Google ID-token sign-in (requires `GOOGLE_CLIENT_ID`) |
 | `GET` | `/auth/me` | Bearer | Current user profile and role |
 | `PUT` | `/auth/me/role` | Bearer | Self role switch — `403` unless `ALLOW_ROLE_SELF_SWITCH=True` |
 | `GET` | `/auth/users` | Admin | List users |
-| `PUT` | `/auth/users/{user_id}/role` | Admin | Change a user's role |
+| `PUT` | `/auth/users/{user_id}/role` | Admin | Change a user's role (the last admin cannot be demoted) |
+| `PUT` | `/auth/users/{user_id}/trusted` | Admin | Let a creator publish without review (`{is_trusted}`) |
 
 ### 6.2 Posts & Tags
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | `GET` | `/posts` | Public | Paginated published posts (`section`, `tag`, `q`, `sort=recent\|top_voted\|trending`, `limit` 1–100 default 12, `offset`); returns `{items, total, limit, offset, has_more}` |
-| `GET` | `/posts/{slug}` | Public | Post detail (increments views) |
-| `POST` | `/posts` | Author | Create a post (`section_id` required) |
-| `PUT` | `/posts/{post_id}` | Author | Update a post (owner or admin) |
-| `DELETE` | `/posts/{post_id}` | Author | Delete a post (owner or admin) |
-| `POST` | `/posts/upload-image` | Author | Upload an image (`multipart/form-data`; JPG/PNG/WEBP ≤ 5 MB, GIF ≤ 15 MB) |
+| `GET` | `/posts/mine` | Creator | The current user's posts in every status |
+| `GET` | `/posts/{slug}` | Optional | Post detail (increments views); unpublished posts only for their author and admins |
+| `POST` | `/posts` | Creator | Create a post (`section_id` required; `submit` publishes or sends to review, `false` saves a draft) |
+| `PUT` | `/posts/{post_id}` | Creator | Update a post (owner or admin) |
+| `DELETE` | `/posts/{post_id}` | Creator | Delete a post (owner or admin) |
+| `POST` | `/posts/upload-image` | Creator | Upload an image (`multipart/form-data`; JPG/PNG/WEBP ≤ 5 MB, GIF ≤ 15 MB) |
 | `GET` | `/posts/tags/all` | Public | List all tags |
-| `POST` | `/posts/tags` | Author | Create a tag in a section (`section_id` required; 422 when it clearly belongs to another section, admins may `force`) |
-| `POST` | `/posts/tags/validate` | Author | Real-time check of a new tag name against a section (30/min) |
-| `GET` | `/posts/ai-status` | Author | Configured AI providers in failover order |
-| `POST` | `/posts/ai-translate` | Author | Translate title, summary and markdown (AI; 429 when the quota is exhausted, 503 without a provider) |
-| `POST` | `/posts/ai-suggest-tags` | Author | Suggest tags (AI, or keywords); returns `provider` |
-| `POST` | `/posts/ai-estimate-reading-time` | Author | Estimate reading time (AI, or heuristic) |
+| `POST` | `/posts/tags` | Creator | Create a tag in a section (`section_id` required; 422 when it clearly belongs to another section, admins may `force`) |
+| `POST` | `/posts/tags/validate` | Creator | Real-time check of a new tag name against a section (30/min) |
+| `GET` | `/posts/ai-status` | Creator | Configured AI providers in failover order |
+| `POST` | `/posts/ai-translate` | Creator | Translate title, summary and markdown (AI; 429 when the quota is exhausted, 503 without a provider) |
+| `POST` | `/posts/ai-suggest-tags` | Creator | Suggest tags (AI, or keywords); returns `provider` |
+| `POST` | `/posts/ai-estimate-reading-time` | Creator | Estimate reading time (AI, or heuristic) |
 
 ### 6.2b Sections
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | `GET` | `/sections` | Public | Sections in display order with published post counts |
 | `PUT` | `/admin/sections/{section_id}` | Admin | Edit name, description or color |
+
+### 6.2c Review
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/admin/review` | Admin | Posts waiting for review, oldest first, with the author's name |
+| `GET` | `/admin/review/count` | Admin | `{pending}` for the admin panel badge |
+| `POST` | `/admin/posts/{post_id}/approve` | Admin | Publish a pending post |
+| `POST` | `/admin/posts/{post_id}/reject` | Admin | Send a pending post back with `{reason}` |
 
 ### 6.3 Interactions
 | Method | Endpoint | Auth | Description |
