@@ -194,13 +194,13 @@ async def ai_suggest_tags(
     res_tags = await db.execute(select(Tag.name))
     existing_tag_names = list(res_tags.scalars().all())
 
-    suggestions, provider = await suggest_post_tags(
+    suggestions, provider, fallback_reason = await suggest_post_tags(
         title=req.title,
         summary=req.summary or "",
         content_markdown=req.content_markdown or "",
         existing_tags=existing_tag_names
     )
-    return TagSuggestResponse(suggested_tags=suggestions, provider=provider)
+    return TagSuggestResponse(suggested_tags=suggestions, provider=provider, fallback_reason=fallback_reason)
 
 @router.post("/ai-estimate-reading-time")
 async def ai_estimate_reading_time(
@@ -287,7 +287,13 @@ async def ai_translate_post(
             source_lang=req.source_lang or "es"
         )
     except LLMUnavailable as e:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"AI translation is unavailable: {e}")
+        quota = e.reason == "quota_exhausted"
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS if quota else status.HTTP_503_SERVICE_UNAVAILABLE,
+            # Structured so the frontend can show a localized message
+            detail={"code": f"ai_{e.reason}", "message": f"AI translation is unavailable: {e}", "retry_after": e.retry_after},
+            headers={"Retry-After": str(e.retry_after)} if quota and e.retry_after else None,
+        )
     return PostTranslateResponse(**res)
 
 @router.get("/{slug}", response_model=PostDetailRead)

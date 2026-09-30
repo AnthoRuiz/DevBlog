@@ -7,6 +7,7 @@ LLMUnavailable is raised and the caller decides on a non-AI fallback or an expli
 """
 import json
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any, Literal, Optional
 
@@ -20,8 +21,36 @@ logger = logging.getLogger(__name__)
 Effort = Literal["low", "medium", "high"]
 
 
+UnavailableReason = Literal["not_configured", "quota_exhausted", "failed"]
+
+
 class LLMUnavailable(Exception):
-    """No configured provider could produce a valid answer."""
+    """No configured provider could produce a valid answer.
+
+    reason: "not_configured" (no API key at all), "quota_exhausted" (every provider tried was out of
+    quota / rate limited) or "failed" (any other error). retry_after: seconds, when a provider said so.
+    """
+
+    def __init__(self, message: str, reason: UnavailableReason = "failed", retry_after: Optional[int] = None):
+        super().__init__(message)
+        self.reason = reason
+        self.retry_after = retry_after
+
+
+class ProviderQuotaExceeded(Exception):
+    """A provider rejected the call for quota, rate-limit or credit reasons."""
+
+    def __init__(self, message: str, retry_after: Optional[int] = None):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+def _parse_seconds(value: Optional[str]) -> Optional[int]:
+    """Parse "34", "34s" or "34.5s" into whole seconds."""
+    if not value:
+        return None
+    match = re.fullmatch(r"\s*(\d+(?:\.\d+)?)s?\s*", str(value))
+    return int(float(match.group(1))) + (0 if float(match.group(1)).is_integer() else 1) if match else None
 
 
 @dataclass
@@ -74,6 +103,18 @@ async def _call_claude(prompt: str, schema: dict, max_tokens: int, timeout: floa
         fallbacks="default",
     )
     client = _claude().with_options(timeout=timeout)
+    try:
+        return await _send_claude(client, params, schema, stream)
+    except anthropic.RateLimitError as e:
+        raise ProviderQuotaExceeded(str(e), _parse_seconds(e.response.headers.get("retry-after")))
+    except anthropic.BadRequestError as e:
+        # An exhausted prepaid balance comes back as a 400 about the credit balance
+        if "credit balance" in str(e).lower():
+            raise ProviderQuotaExceeded(str(e))
+        raise
+
+
+async def _send_claude(client: anthropic.AsyncAnthropic, params: dict, schema: dict, stream: bool) -> LLMResult:
     if stream:
         # Long outputs (translations) stream to stay clear of HTTP timeouts
         async with client.beta.messages.stream(**params) as s:
@@ -103,6 +144,15 @@ async def _call_gemini(prompt: str, schema: dict, max_tokens: int, timeout: floa
     }
     async with httpx.AsyncClient(timeout=timeout) as client:
         resp = await client.post(url, json=payload)
+    if resp.status_code == 429:
+        # Free-tier quota or rate limit (RESOURCE_EXHAUSTED); the wait may come as a header or a RetryInfo detail
+        retry_after = _parse_seconds(resp.headers.get("retry-after"))
+        try:
+            for detail in resp.json().get("error", {}).get("details", []):
+                retry_after = retry_after or _parse_seconds(detail.get("retryDelay"))
+        except Exception:
+            pass
+        raise ProviderQuotaExceeded(f"HTTP 429 {resp.text[:200]}", retry_after)
     if resp.status_code != 200:
         raise ValueError(f"HTTP {resp.status_code}")
     text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
@@ -122,15 +172,28 @@ async def generate_json(
     """Ask each configured provider in order for a JSON object matching `schema`."""
     providers = configured_providers()
     if not providers:
-        raise LLMUnavailable("no AI provider configured (set ANTHROPIC_API_KEY and/or GEMINI_API_KEY)")
+        raise LLMUnavailable("no AI provider configured (set ANTHROPIC_API_KEY and/or GEMINI_API_KEY)", "not_configured")
 
+    quota_hits: list[Optional[int]] = []
     for provider in providers:
         try:
             if provider == "claude":
                 return await _call_claude(prompt, schema, max_tokens, timeout, effort, stream)
             return await _call_gemini(prompt, schema, max_tokens, timeout)
+        except ProviderQuotaExceeded as e:
+            logger.warning(f"[LLM] {provider} is out of quota for {task} (retry after: {e.retry_after or 'unknown'}s)")
+            quota_hits.append(e.retry_after)
         except anthropic.AuthenticationError:
             logger.error(f"[LLM] claude rejected the API key ({task}); trying the next provider")
         except Exception as e:
             logger.warning(f"[LLM] {provider} failed for {task}: {type(e).__name__}: {e}")
-    raise LLMUnavailable(f"every configured AI provider failed ({', '.join(providers)})")
+
+    if len(quota_hits) == len(providers):
+        # Every provider is out of quota: report the soonest known retry time
+        known = [s for s in quota_hits if s]
+        raise LLMUnavailable(
+            f"AI quota exhausted on every configured provider ({', '.join(providers)})",
+            "quota_exhausted",
+            min(known) if known else None,
+        )
+    raise LLMUnavailable(f"every configured AI provider failed ({', '.join(providers)})", "failed")

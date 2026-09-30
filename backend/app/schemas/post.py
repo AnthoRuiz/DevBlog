@@ -153,6 +153,8 @@ class TagSuggestResponse(BaseModel):
     suggested_tags: list[str]
     # LLM that produced them (e.g. "claude:claude-opus-5-5") or "keywords" for the offline fallback
     provider: str
+    # Why the keyword fallback was used: not_configured | quota_exhausted | failed (None when an LLM answered)
+    fallback_reason: Optional[str] = None
 
 class AIStatusResponse(BaseModel):
     available: bool

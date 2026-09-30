@@ -6,6 +6,7 @@ reading time fall back to transparent heuristics that report their source.
 """
 import math
 import re
+from typing import Optional
 
 from app.services.llm import LLMUnavailable, generate_json
 
@@ -112,8 +113,12 @@ async def suggest_post_tags(
     summary: str,
     content_markdown: str,
     existing_tags: list[str],
-) -> tuple[list[str], str]:
-    """Return (tags, provider). provider is the LLM used, or "keywords" for the offline fallback."""
+) -> tuple[list[str], str, Optional[str]]:
+    """Return (tags, provider, fallback_reason).
+
+    provider is the LLM used, or "keywords" for the offline fallback; fallback_reason says why
+    (not_configured | quota_exhausted | failed) and is None when an LLM answered.
+    """
     prompt = f"""You suggest tags for a personal blog post (topics: software engineering, AI,
 interviews and career, mental health, gaming). Suggest the 3 to 5 most relevant tags.
 Prefer these existing tags when they fit: {', '.join(existing_tags)}
@@ -126,9 +131,9 @@ Markdown content:
     try:
         result = await generate_json(prompt, _TAGS_SCHEMA, task="suggest_tags", max_tokens=512, timeout=20.0)
         tags = [str(t).strip() for t in result.data.get("suggested_tags", []) if str(t).strip()]
-        return tags[:5], result.provider
-    except LLMUnavailable:
-        return _suggest_tags_by_keywords(title, summary, content_markdown, existing_tags), KEYWORD_PROVIDER
+        return tags[:5], result.provider, None
+    except LLMUnavailable as e:
+        return _suggest_tags_by_keywords(title, summary, content_markdown, existing_tags), KEYWORD_PROVIDER, e.reason
 
 
 def _estimate_reading_time_heuristic(content: str) -> int:
