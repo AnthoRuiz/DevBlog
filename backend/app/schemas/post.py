@@ -3,6 +3,8 @@ from typing import Optional
 import uuid
 from datetime import datetime
 
+from app.models.post import PostStatus
+
 class SectionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -59,7 +61,8 @@ class PostBase(BaseModel):
     cover_image_url: Optional[str] = None
     language: str = "es"
     reading_time_minutes: Optional[int] = Field(default=None, ge=1)
-    is_published: bool = True
+    # True: publish (admins, trusted creators) or send to review (other creators). False: save as draft
+    submit: bool = True
     section_id: uuid.UUID
     tag_ids: list[uuid.UUID] = []
 
@@ -78,11 +81,21 @@ class PostRead(BaseModel):
     reading_time_minutes: int
     upvotes_count: int
     views_count: int
-    is_published: bool
+    status: PostStatus
+    review_note: Optional[str] = None
     published_at: Optional[datetime] = None
     created_at: datetime
     section: Optional[SectionRead] = None
     tags: list[TagRead] = []
+
+class ReviewItem(PostRead):
+    """A post waiting for admin review, with who wrote it."""
+    author_name: Optional[str] = None
+
+
+class PostReject(BaseModel):
+    reason: str = Field(..., min_length=3, max_length=1000)
+
 
 class PostPage(BaseModel):
     """One page of posts plus what the client needs to request the next one."""
@@ -117,7 +130,8 @@ class PostUpdate(BaseModel):
     cover_image_url: Optional[str] = None
     language: Optional[str] = None
     reading_time_minutes: Optional[int] = Field(None, ge=1)
-    is_published: Optional[bool] = None
+    # True: publish or (re)submit for review; False: move back to draft; None: keep the status
+    submit: Optional[bool] = None
     section_id: Optional[uuid.UUID] = None
     tag_ids: Optional[list[uuid.UUID]] = None
 

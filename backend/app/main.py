@@ -11,7 +11,7 @@ from app.api.v1.router import api_router
 from app.db.session import engine, AsyncSessionLocal
 from app.db.migrations import run_migrations
 from app.models.user import User, UserRole
-from app.models.post import Tag, Post, Section
+from app.models.post import Tag, Post, PostStatus, Section
 from app.core.security import get_password_hash, verify_password
 from app.core.logging import logger
 
@@ -139,7 +139,7 @@ async def fetch_article(slug: str) -> PostSchema:
                 reading_time_minutes=8,
                 upvotes_count=142,
                 views_count=1240,
-                is_published=True,
+                status=PostStatus.PUBLISHED,
                 tags=[t for t in all_tags if t.slug in ["distributed-systems", "python", "docker-homelab"]]
             )
 
@@ -175,7 +175,7 @@ This removes any mismatch between what the database stores and what the UI rende
                 reading_time_minutes=6,
                 upvotes_count=98,
                 views_count=890,
-                is_published=True,
+                status=PostStatus.PUBLISHED,
                 tags=[t for t in all_tags if t.slug in ["react", "javascript-typescript"]]
             )
 
@@ -201,7 +201,7 @@ An outbound tunnel opens the connection from inside the container to Cloudflare'
                 reading_time_minutes=5,
                 upvotes_count=114,
                 views_count=1520,
-                is_published=True,
+                status=PostStatus.PUBLISHED,
                 tags=[t for t in all_tags if t.slug in ["docker-homelab", "cloud-devops", "security"]]
             )
 

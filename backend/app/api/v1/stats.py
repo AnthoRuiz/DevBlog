@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, text
 
 from app.db.session import get_db
-from app.models.post import Post
+from app.models.post import Post, PostStatus
 from app.models.user import User
 from app.api.deps import get_current_admin
 from app.core.config import settings
@@ -182,7 +182,7 @@ async def get_system_status(
 @router.get("/streak", response_model=StreakStats)
 async def get_author_streak(db: AsyncSession = Depends(get_db)):
     # Count published posts
-    posts_res = await db.execute(select(func.count(Post.id)).where(Post.is_published == True))
+    posts_res = await db.execute(select(func.count(Post.id)).where(Post.status == PostStatus.PUBLISHED))
     total_articles = posts_res.scalar() or 0
 
     # Total views and upvotes
@@ -190,7 +190,7 @@ async def get_author_streak(db: AsyncSession = Depends(get_db)):
         select(
             func.coalesce(func.sum(Post.views_count), 0),
             func.coalesce(func.sum(Post.upvotes_count), 0)
-        ).where(Post.is_published == True)
+        ).where(Post.status == PostStatus.PUBLISHED)
     )
     views, upvotes = totals_res.one()
 

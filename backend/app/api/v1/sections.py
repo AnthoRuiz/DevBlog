@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin
 from app.db.session import get_db
-from app.models.post import Post, Section
+from app.models.post import Post, PostStatus, Section
 from app.models.user import User
 from app.schemas.post import SectionRead, SectionUpdate, SectionWithCount
 
@@ -18,7 +18,7 @@ async def list_sections(db: AsyncSession = Depends(get_db)):
     """All sections in display order, with their number of published posts."""
     published = (
         select(Post.section_id, func.count(Post.id).label("post_count"))
-        .where(Post.is_published == True)
+        .where(Post.status == PostStatus.PUBLISHED)
         .group_by(Post.section_id)
         .subquery()
     )

@@ -7,9 +7,9 @@ import enum
 from app.db.session import Base
 
 class UserRole(str, enum.Enum):
+    # Anonymous visitors are the readers; every account is a creator, admins manage the site
     ADMIN = "ADMIN"
-    AUTHOR = "AUTHOR"
-    READER = "READER"
+    CREATOR = "CREATOR"
 
 class User(Base):
     __tablename__ = "users"
@@ -19,7 +19,9 @@ class User(Base):
     hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True) # Null when the user only signs in with Google/Facebook
     full_name: Mapped[str] = mapped_column(String(120), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    role: Mapped[UserRole] = mapped_column(SQLEnum(UserRole), default=UserRole.READER, nullable=False)
+    role: Mapped[UserRole] = mapped_column(SQLEnum(UserRole), default=UserRole.CREATOR, nullable=False)
+    # Trusted creators publish without admin review
+    is_trusted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     

@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Text, Integer, Boolean, DateTime, ForeignKey, Table, Column
+import enum
+from sqlalchemy import String, Text, Integer, Boolean, DateTime, ForeignKey, Table, Column, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
@@ -11,6 +12,12 @@ post_tags = Table(
     Column("post_id", UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"), primary_key=True),
     Column("tag_id", UUID(as_uuid=True), ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
 )
+
+class PostStatus(str, enum.Enum):
+    DRAFT = "draft"
+    PENDING_REVIEW = "pending_review"
+    PUBLISHED = "published"
+    REJECTED = "rejected"
 
 class Section(Base):
     """Top-level blog section (e.g. Tech & Coding, Mental Health). Every post and tag belongs to one."""
@@ -57,7 +64,13 @@ class Post(Base):
     upvotes_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     views_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     
-    is_published: Mapped[bool] = mapped_column(Boolean, default=False, index=True, nullable=False)
+    # Only PUBLISHED posts are public; creators' posts wait in PENDING_REVIEW unless they are trusted
+    status: Mapped[PostStatus] = mapped_column(
+        SQLEnum(PostStatus, name="poststatus", values_callable=lambda e: [m.value for m in e]),
+        default=PostStatus.DRAFT, index=True, nullable=False,
+    )
+    # Reason given by the admin when a post is rejected
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

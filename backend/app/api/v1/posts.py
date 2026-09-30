@@ -16,7 +16,7 @@ def calculate_reading_time(text: str | None) -> int:
     return max(1, math.ceil(words / 200))
 
 from app.db.session import get_db
-from app.models.post import Post, Tag, Section, post_tags
+from app.models.post import Post, PostStatus, Tag, Section, post_tags
 from app.models.interaction import Upvote, Bookmark, Comment
 from app.models.user import User, UserRole
 from app.schemas.post import (
@@ -48,10 +48,28 @@ from app.services.ai_features import (
 )
 from app.services.llm import LLMUnavailable, configured_providers
 from app.services import media_service, tag_classifier
-from app.api.deps import get_current_admin, get_current_author_or_admin, get_current_user_optional, get_client_hash
+from app.core import quotas
+from app.api.deps import get_current_admin, get_current_creator_or_admin, get_current_user_optional, get_client_hash
 from app.core.limiter import limiter
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
+
+def _can_publish_directly(user: User) -> bool:
+    """Admins and trusted creators publish directly; other creators go through review."""
+    return user.role == UserRole.ADMIN or user.is_trusted
+
+
+def _submitted_status(user: User) -> PostStatus:
+    return PostStatus.PUBLISHED if _can_publish_directly(user) else PostStatus.PENDING_REVIEW
+
+
+async def _get_public_post_or_404(db: AsyncSession, post_id: uuid.UUID) -> Post:
+    """Readers can only interact (comment, upvote, bookmark) with published posts."""
+    post = (await db.execute(select(Post).where(Post.id == post_id, Post.status == PostStatus.PUBLISHED))).scalar_one_or_none()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return post
+
 
 async def _get_section_or_400(db: AsyncSession, section_id: uuid.UUID) -> Section:
     section = await db.get(Section, section_id)
@@ -69,7 +87,7 @@ async def list_posts(
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db)
 ):
-    query = select(Post).where(Post.is_published == True)
+    query = select(Post).where(Post.status == PostStatus.PUBLISHED)
 
     if section:
         query = query.join(Post.section).where(Section.slug == section)
@@ -106,7 +124,7 @@ async def list_posts(
     )
 
 @router.get("/ai-status", response_model=AIStatusResponse)
-async def ai_status(current_user: User = Depends(get_current_author_or_admin)):
+async def ai_status(current_user: User = Depends(get_current_creator_or_admin)):
     """Which AI providers are configured (the editor disables AI-only features when none)."""
     providers = configured_providers()
     return AIStatusResponse(available=bool(providers), providers=providers)
@@ -120,7 +138,7 @@ async def list_all_tags(db: AsyncSession = Depends(get_db)):
 @router.post("/tags", response_model=TagRead)
 async def create_tag(
     tag_in: TagCreate,
-    current_user: User = Depends(get_current_author_or_admin),
+    current_user: User = Depends(get_current_creator_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
     clean_name = tag_in.name.strip()
@@ -162,13 +180,14 @@ async def create_tag(
 async def validate_tag_section(
     request: Request,
     body: TagValidateRequest,
-    current_user: User = Depends(get_current_author_or_admin),
+    current_user: User = Depends(get_current_creator_or_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Check, while the author types, whether a new tag name fits the selected section.
     Uses Gemini when configured, otherwise a keyword classifier.
     """
+    quotas.consume(current_user, "tag_check")
     name = body.name.strip()
     section = await _get_section_or_400(db, body.section_id)
     existing = (
@@ -193,9 +212,10 @@ async def validate_tag_section(
 async def ai_suggest_tags(
     request: Request,
     req: TagSuggestRequest,
-    current_user: User = Depends(get_current_author_or_admin),
+    current_user: User = Depends(get_current_creator_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
+    quotas.consume(current_user, "ai")
     res_tags = await db.execute(select(Tag.name))
     existing_tag_names = list(res_tags.scalars().all())
 
@@ -210,12 +230,13 @@ async def ai_suggest_tags(
 @router.post("/ai-estimate-reading-time")
 async def ai_estimate_reading_time(
     req: TagSuggestRequest,
-    current_user: User = Depends(get_current_author_or_admin),
+    current_user: User = Depends(get_current_creator_or_admin),
 ):
     """
     Estimate reading time in minutes with AI (Claude/Gemini, heuristic fallback), weighing
     technical density (code, terminal, diagrams) and length.
     """
+    quotas.consume(current_user, "ai")
     minutes = await estimate_reading_time(
         title=req.title,
         summary=req.summary or "",
@@ -234,7 +255,7 @@ async def list_my_bookmarks(
         query = (
             select(Post)
             .join(Bookmark, Bookmark.post_id == Post.id)
-            .where(Bookmark.user_id == current_user.id, Post.is_published == True)
+            .where(Bookmark.user_id == current_user.id, Post.status == PostStatus.PUBLISHED)
             .options(selectinload(Post.tags))
             .order_by(desc(Bookmark.created_at))
         )
@@ -242,7 +263,7 @@ async def list_my_bookmarks(
         query = (
             select(Post)
             .join(Bookmark, Bookmark.post_id == Post.id)
-            .where(Bookmark.client_hash == client_hash, Post.is_published == True)
+            .where(Bookmark.client_hash == client_hash, Post.status == PostStatus.PUBLISHED)
             .options(selectinload(Post.tags))
             .order_by(desc(Bookmark.created_at))
         )
@@ -253,8 +274,9 @@ async def list_my_bookmarks(
 @router.post("/upload-image")
 async def upload_image(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_author_or_admin)
+    current_user: User = Depends(get_current_creator_or_admin)
 ):
+    quotas.consume(current_user, "upload")
     # Read at most the largest limit + 1 byte to detect oversized files without loading them fully
     data = await file.read(media_service.MAX_UPLOAD_BYTES + 1)
 
@@ -276,13 +298,14 @@ async def upload_image(
 async def ai_translate_post(
     request: Request,
     req: PostTranslateRequest,
-    current_user: User = Depends(get_current_author_or_admin),
+    current_user: User = Depends(get_current_creator_or_admin),
 ):
     """
     Translate title, summary and markdown into a supported language (es, en, pt, fr)
     with an LLM (Claude/Gemini with failover), preserving code blocks and technical structure.
     There is no non-AI fallback: without a working provider this returns 503.
     """
+    quotas.consume(current_user, "ai")
     try:
         res = await translate_post_content(
             title=req.title,
@@ -301,30 +324,51 @@ async def ai_translate_post(
         )
     return PostTranslateResponse(**res)
 
-@router.get("/{slug}", response_model=PostDetailRead)
-async def get_post_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
+@router.get("/mine", response_model=list[PostRead])
+async def list_my_posts(
+    current_user: User = Depends(get_current_creator_or_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Every post of the current user, whatever its status (drafts, in review, rejected, published)."""
     result = await db.execute(
         select(Post)
-        .where(Post.slug == slug, Post.is_published == True)
-        .options(selectinload(Post.tags), selectinload(Post.comments))
+        .where(Post.author_id == current_user.id)
+        .options(selectinload(Post.tags))
+        .order_by(desc(Post.updated_at), desc(Post.created_at))
+    )
+    return [PostRead.model_validate(p) for p in result.scalars().all()]
+
+
+@router.get("/{slug}", response_model=PostDetailRead)
+async def get_post_by_slug(
+    slug: str,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Post).where(Post.slug == slug).options(selectinload(Post.tags), selectinload(Post.comments))
     )
     post = result.scalar_one_or_none()
-    if not post:
+    # Unpublished posts are visible only to their author and admins (drafts, review, rejected)
+    can_preview = current_user is not None and (current_user.role == UserRole.ADMIN or post and post.author_id == current_user.id)
+    if not post or (post.status != PostStatus.PUBLISHED and not can_preview):
         raise HTTPException(status_code=404, detail="Post not found")
 
-    post.views_count += 1
-    await db.commit()
-    await db.refresh(post)
+    if post.status == PostStatus.PUBLISHED:
+        post.views_count += 1
+        await db.commit()
+        await db.refresh(post)
 
     return PostDetailRead.model_validate(post)
 
 @router.post("", response_model=PostDetailRead, status_code=status.HTTP_201_CREATED)
 async def create_post(
     post_in: PostCreate,
-    current_user: User = Depends(get_current_author_or_admin),
+    current_user: User = Depends(get_current_creator_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
     await _get_section_or_400(db, post_in.section_id)
+    post_status = _submitted_status(current_user) if post_in.submit else PostStatus.DRAFT
 
     base_slug = slugify(post_in.title)
     slug = base_slug
@@ -357,8 +401,8 @@ async def create_post(
         content_markdown=post_in.content_markdown,
         cover_image_url=post_in.cover_image_url,
         reading_time_minutes=reading_time,
-        is_published=post_in.is_published,
-        published_at=datetime.now(timezone.utc) if post_in.is_published else None,
+        status=post_status,
+        published_at=datetime.now(timezone.utc) if post_status == PostStatus.PUBLISHED else None,
         tags=tags
     )
     db.add(new_post)
@@ -373,7 +417,7 @@ async def create_post(
 async def update_post(
     post_id: uuid.UUID,
     post_update: PostUpdate,
-    current_user: User = Depends(get_current_author_or_admin),
+    current_user: User = Depends(get_current_creator_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(
@@ -419,9 +463,19 @@ async def update_post(
         post.reading_time_minutes = estimate_reading_time_heuristic(curr_content)
     if post_update.language is not None:
         post.language = post_update.language
-    if post_update.is_published is not None:
-        post.is_published = post_update.is_published
-        if post.is_published and not post.published_at:
+    content_changed = any(
+        value is not None
+        for value in (post_update.title, post_update.summary, post_update.content_markdown,
+                      post_update.cover_image_url, post_update.section_id, post_update.tag_ids)
+    )
+    if post_update.submit is not None:
+        post.status = _submitted_status(current_user) if post_update.submit else PostStatus.DRAFT
+    elif content_changed and post.status == PostStatus.PUBLISHED and not _can_publish_directly(current_user):
+        # An untrusted creator editing a live post sends it back to review
+        post.status = PostStatus.PENDING_REVIEW
+    if post.status == PostStatus.PUBLISHED:
+        post.review_note = None
+        if not post.published_at:
             post.published_at = datetime.now(timezone.utc)
 
     if post_update.tag_ids is not None:
@@ -438,7 +492,7 @@ async def update_post(
 @router.delete("/{post_id}")
 async def delete_post(
     post_id: uuid.UUID,
-    current_user: User = Depends(get_current_author_or_admin),
+    current_user: User = Depends(get_current_creator_or_admin),
     db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(select(Post).where(Post.id == post_id))
@@ -476,10 +530,7 @@ async def create_comment(
     current_user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
-    post_res = await db.execute(select(Post).where(Post.id == post_id))
-    post = post_res.scalar_one_or_none()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+    post = await _get_public_post_or_404(db, post_id)
 
     # Anti-spam: honeypot field against bots
     if comment_in.hp_website:
@@ -517,10 +568,7 @@ async def toggle_upvote(
     current_user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
-    post_res = await db.execute(select(Post).where(Post.id == post_id))
-    post = post_res.scalar_one_or_none()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+    post = await _get_public_post_or_404(db, post_id)
 
     client_hash = get_client_hash(request)
 
@@ -559,10 +607,7 @@ async def toggle_bookmark(
     current_user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
-    post_res = await db.execute(select(Post).where(Post.id == post_id))
-    post = post_res.scalar_one_or_none()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+    post = await _get_public_post_or_404(db, post_id)
 
     client_hash = get_client_hash(request)
 

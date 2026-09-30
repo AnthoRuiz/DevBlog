@@ -26,10 +26,9 @@ async def register(request: Request, user_in: UserCreate, db: AsyncSession = Dep
             detail="An account with this email already exists"
         )
     
-    # The very first user in the database automatically becomes ADMIN
-    users_count = await db.execute(select(func.count(User.id)))
-    is_first_user = (users_count.scalar() or 0) == 0
-    role = UserRole.ADMIN if is_first_user else UserRole.READER
+    # Every account is a creator; the admin is seeded at startup and can promote others.
+    # Creators' posts go through admin review unless the admin marks them as trusted.
+    role = UserRole.CREATOR
 
     new_user = User(
         email=user_in.email,
@@ -131,9 +130,7 @@ async def oauth_google(request: Request, oauth_in: OAuthLoginRequest, db: AsyncS
         user = user_res.scalar_one_or_none()
 
         if not user:
-            # The very first user becomes ADMIN
-            users_count = await db.execute(select(func.count(User.id)))
-            role = UserRole.ADMIN if (users_count.scalar() or 0) == 0 else UserRole.READER
+            role = UserRole.CREATOR
 
             user = User(
                 email=email,
@@ -176,7 +173,7 @@ async def update_my_role_for_testing(
 ):
     """
     Role switcher for quickly testing permissions locally:
-    lets the authenticated user switch between ADMIN, AUTHOR and READER.
+    lets the authenticated user switch between ADMIN and CREATOR.
     Disabled unless ALLOW_ROLE_SELF_SWITCH=True (local test environments only).
     """
     if not settings.ALLOW_ROLE_SELF_SWITCH:
@@ -209,15 +206,37 @@ async def update_user_role(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if user.id == current_admin.id and role_in.role != UserRole.ADMIN:
+    # The last admin can never be demoted (by themselves or anyone else)
+    if user.role == UserRole.ADMIN and role_in.role != UserRole.ADMIN:
         admin_count = await db.execute(select(func.count(User.id)).where(User.role == UserRole.ADMIN))
         if (admin_count.scalar() or 0) <= 1:
             raise HTTPException(
                 status_code=400,
-                detail="You cannot remove your own ADMIN role while you are the only admin"
+                detail="The last admin cannot be demoted. Promote another admin first."
             )
 
     user.role = role_in.role
+    await db.commit()
+    await db.refresh(user)
+    return UserRead.model_validate(user)
+
+
+class UserTrustUpdate(BaseModel):
+    is_trusted: bool
+
+
+@router.put("/users/{user_id}/trusted", response_model=UserRead)
+async def update_user_trust(
+    user_id: uuid.UUID,
+    trust_in: UserTrustUpdate,
+    current_admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Trusted creators publish directly; the rest go through the review queue. ADMIN only."""
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_trusted = trust_in.is_trusted
     await db.commit()
     await db.refresh(user)
     return UserRead.model_validate(user)

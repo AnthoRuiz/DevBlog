@@ -15,6 +15,7 @@ class UserCreate(UserBase):
 class UserRead(UserBase):
     id: uuid.UUID
     role: UserRole
+    is_trusted: bool = False
     is_active: bool
     is_verified: bool
     created_at: datetime

@@ -56,12 +56,12 @@ async def get_current_admin(
         )
     return current_user
 
-async def get_current_author_or_admin(
+async def get_current_creator_or_admin(
     current_user: User = Depends(get_current_user)
 ) -> User:
-    if current_user.role not in [UserRole.ADMIN, UserRole.AUTHOR]:
+    if current_user.role not in (UserRole.ADMIN, UserRole.CREATOR):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions: AUTHOR or ADMIN role required to manage posts"
+            detail="Insufficient permissions: CREATOR or ADMIN role required to manage posts"
         )
     return current_user
