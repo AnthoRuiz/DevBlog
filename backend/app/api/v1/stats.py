@@ -14,14 +14,15 @@ from app.api.deps import get_current_admin
 from app.core.config import settings
 from app.services.llm import configured_providers
 from app.schemas.stats import (
-    StreakStats,
+    SiteInfo,
     SystemStats,
     HardwareTelemetry,
     ServiceStatus,
     SystemStatusResponse,
 )
 
-router = APIRouter(prefix="/stats", tags=["Stats & Streak"])
+router = APIRouter(prefix="/stats", tags=["Stats"])
+site_router = APIRouter(tags=["Site"])
 
 def get_hardware_telemetry() -> HardwareTelemetry:
     """Collect real host/system metrics using psutil."""
@@ -179,32 +180,16 @@ async def get_system_status(
         services=[pg_service, fastapi_service, nginx_service, ai_service]
     )
 
-@router.get("/streak", response_model=StreakStats)
-async def get_author_streak(db: AsyncSession = Depends(get_db)):
-    # Count published posts
-    posts_res = await db.execute(select(func.count(Post.id)).where(Post.status == PostStatus.PUBLISHED))
-    total_articles = posts_res.scalar() or 0
-
-    # Total views and upvotes
-    totals_res = await db.execute(
-        select(
-            func.coalesce(func.sum(Post.views_count), 0),
-            func.coalesce(func.sum(Post.upvotes_count), 0)
-        ).where(Post.status == PostStatus.PUBLISHED)
-    )
-    views, upvotes = totals_res.one()
-
-    # Estimated writing streak in days
-    streak_days = max(14, total_articles * 2)
-
-    # Public endpoint: hardware telemetry is only served to ADMIN via /stats/telemetry
-    return StreakStats(
-        current_streak_days=streak_days,
-        total_articles_published=total_articles,
-        total_views=int(views),
-        total_upvotes=int(upvotes),
-        homelab_uptime_percent=99.98,
-        server_node="Homelab Docker (Ubuntu 22.04 LTS)",
+@site_router.get("/site", response_model=SiteInfo)
+async def get_site_info(db: AsyncSession = Depends(get_db)):
+    """Public site identity (name, tagline, canonical URL) and the number of published posts."""
+    total = (await db.execute(select(func.count(Post.id)).where(Post.status == PostStatus.PUBLISHED))).scalar() or 0
+    return SiteInfo(
+        name=settings.SITE_NAME,
+        tagline=settings.SITE_TAGLINE,
+        description=settings.SITE_DESCRIPTION,
+        url=settings.SITE_URL.rstrip("/"),
+        total_posts=total,
     )
 
 @router.get("/system", response_model=SystemStats)

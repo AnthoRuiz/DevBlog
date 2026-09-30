@@ -30,14 +30,12 @@ class SystemStatusResponse(BaseModel):
     hardware: HardwareTelemetry
     services: list[ServiceStatus]
 
-class StreakStats(BaseModel):
-    current_streak_days: int
-    total_articles_published: int
-    total_views: int
-    total_upvotes: int
-    homelab_uptime_percent: float = 99.98
-    server_node: str = "Homelab Docker (Ubuntu 22.04)"
-    telemetry: Optional[HardwareTelemetry] = None
+class SiteInfo(BaseModel):
+    name: str
+    tagline: str
+    description: str
+    url: str
+    total_posts: int
 
 class SystemStats(BaseModel):
     status: str = "healthy"

@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-flash-latest,gemini-flash-lite-latest"
     LLM_PROVIDER_ORDER: str = "claude,gemini"
     
+    # Site identity (personal brand book), shared by the frontend, RSS feeds and social previews
+    SITE_NAME: str = "Anthony Ruiz"
+    SITE_TAGLINE: str = "I build it at home before I trust it at scale."
+    SITE_DESCRIPTION: str = (
+        "Software engineer in security. I build distributed systems in my homelab and write about what breaks."
+    )
+    SITE_URL: str = "https://blog.anthoruiz.dev"
+
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:5173",
