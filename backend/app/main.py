@@ -8,7 +8,8 @@ from slugify import slugify
 
 from app.core.config import settings
 from app.api.v1.router import api_router
-from app.db.session import engine, Base, AsyncSessionLocal
+from app.db.session import engine, AsyncSessionLocal
+from app.db.migrations import run_migrations
 from app.models.user import User, UserRole
 from app.models.post import Tag, Post
 from app.core.security import get_password_hash, verify_password
@@ -228,9 +229,8 @@ async def automated_backup_scheduler():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create tables on startup
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Apply database migrations (Alembic) before anything touches the schema
+    await asyncio.to_thread(run_migrations)
     # Seed initial data
     await seed_initial_data()
     # Start the automatic backup scheduler
