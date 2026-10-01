@@ -25,8 +25,8 @@ export const Layout: FC = () => (
 );
 
 const LayoutFrame: FC = () => {
-  const { lang, setLang, t } = useLanguage();
-  const { token, user, isAdmin, canPublishDirectly, login, logout, setUser, switchRole } = useAuth();
+  const { lang, t } = useLanguage();
+  const { token, user, isAdmin, canPublishDirectly, login, setUser } = useAuth();
   const { pending: reviewPending } = useReviewBadge();
   const { notifyPostsChanged, editor, openEditor, closeEditor, isLoginOpen, setLoginOpen } = useShell();
   const sections = useSections();
@@ -97,21 +97,15 @@ const LayoutFrame: FC = () => {
       {ROLE_TESTING_ENABLED && <RoleTestingBar onOpenAdmin={() => openAdminPanel('backups')} />}
 
       <Navbar
-        onSearch={setSearchQuery}
         searchQuery={searchQuery}
+        onSearch={setSearchQuery}
         onOpenLogin={() => setLoginOpen(true)}
-        onLogout={logout}
+        onNewPost={() => openEditor()}
+        onOpenMyPosts={() => setIsMyPostsOpen(true)}
+        onOpenAdmin={() => openAdminPanel('backups')}
         onOpenStatus={() => openAdminPanel('status')}
-        onOpenBackups={() => openAdminPanel('backups')}
-        onSwitchRole={ROLE_TESTING_ENABLED ? switchRole : undefined}
-        onOpenMyPosts={user ? () => setIsMyPostsOpen(true) : undefined}
-        onNewPost={user ? () => openEditor() : undefined}
+        showRoleSwitch={ROLE_TESTING_ENABLED}
         reviewPending={reviewPending}
-        userEmail={user?.email ?? null}
-        currentUser={user}
-        currentLang={lang}
-        onSelectLanguage={setLang}
-        t={t}
       />
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8">

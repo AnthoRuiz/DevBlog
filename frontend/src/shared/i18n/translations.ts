@@ -211,6 +211,15 @@ export interface Translations {
   homeBrowseByTagSub: string;
   homeSectionEmpty: string;
   homeAllPosts: string;
+  menuAccount: string;
+  menuAdminPanel: string;
+  menuSystemStatus: string;
+  myPostsFilterAll: string;
+  myPostsEmptyFilter: string;
+  viewPostBtn: string;
+  pagePrev: string;
+  pageNext: string;
+  paginationLabel: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -421,6 +430,15 @@ export const translations: Record<Language, Translations> = {
     homeBrowseByTagSub: 'Todos los temas de todas las secciones',
     homeSectionEmpty: 'Todavía no hay posts aquí.',
     homeAllPosts: 'Todos los posts',
+    menuAccount: 'Menú de la cuenta',
+    menuAdminPanel: 'Panel de administración',
+    menuSystemStatus: 'Estado del sistema',
+    myPostsFilterAll: 'Todos',
+    myPostsEmptyFilter: 'No tienes posts con este estado.',
+    viewPostBtn: 'Ver',
+    pagePrev: 'Anterior',
+    pageNext: 'Siguiente',
+    paginationLabel: 'Paginación',
   },
   en: {
     siteTitle: 'Anthony Ruiz',
@@ -629,6 +647,15 @@ export const translations: Record<Language, Translations> = {
     homeBrowseByTagSub: 'Every topic across all sections',
     homeSectionEmpty: 'No posts here yet.',
     homeAllPosts: 'All posts',
+    menuAccount: 'Account menu',
+    menuAdminPanel: 'Admin panel',
+    menuSystemStatus: 'System status',
+    myPostsFilterAll: 'All',
+    myPostsEmptyFilter: 'You have no posts with this status.',
+    viewPostBtn: 'View',
+    pagePrev: 'Previous',
+    pageNext: 'Next',
+    paginationLabel: 'Pagination',
   },
   pt: {
     siteTitle: 'Anthony Ruiz',
@@ -837,6 +864,15 @@ export const translations: Record<Language, Translations> = {
     homeBrowseByTagSub: 'Todos os temas de todas as seções',
     homeSectionEmpty: 'Ainda não há posts aqui.',
     homeAllPosts: 'Todos os posts',
+    menuAccount: 'Menu da conta',
+    menuAdminPanel: 'Painel de administração',
+    menuSystemStatus: 'Status do sistema',
+    myPostsFilterAll: 'Todos',
+    myPostsEmptyFilter: 'Você não tem posts com este status.',
+    viewPostBtn: 'Ver',
+    pagePrev: 'Anterior',
+    pageNext: 'Próximo',
+    paginationLabel: 'Paginação',
   },
   fr: {
     siteTitle: 'Anthony Ruiz',
@@ -1045,6 +1081,15 @@ export const translations: Record<Language, Translations> = {
     homeBrowseByTagSub: 'Tous les sujets de toutes les sections',
     homeSectionEmpty: 'Pas encore d\'articles ici.',
     homeAllPosts: 'Tous les articles',
+    menuAccount: 'Menu du compte',
+    menuAdminPanel: 'Panneau d\'administration',
+    menuSystemStatus: 'État du système',
+    myPostsFilterAll: 'Tous',
+    myPostsEmptyFilter: 'Vous n\'avez aucun article avec ce statut.',
+    viewPostBtn: 'Voir',
+    pagePrev: 'Précédent',
+    pageNext: 'Suivant',
+    paginationLabel: 'Pagination',
   },
 };
 
