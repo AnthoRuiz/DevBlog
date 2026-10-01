@@ -197,6 +197,8 @@ erDiagram
         string color_hex
         string icon
         int sort_order
+        string theme "default, calm, vivid"
+        text footer_markdown "shown below every post"
     }
 
     POSTS {
@@ -207,6 +209,7 @@ erDiagram
         string title
         string language "es, en, pt, fr"
         string summary
+        string content_notice "optional, shown before the body"
         text content_markdown
         string cover_image_url
         int reading_time_minutes
@@ -449,6 +452,10 @@ Unknown paths and unknown section slugs render the client-side 404 page. Section
 
 ### 5.4 Key UI Behaviour
 
+#### Section personality (`ArticleView.tsx`, `index.css`)
+- The post page takes its section's `theme`: **calm** (Mental Health) uses a softer palette, larger line height, sans-serif metadata and no neon markers; **vivid** tints headings and quotes with the section color.
+- `posts.content_notice` shows a dismissible notice before the body; `sections.footer_markdown` is rendered below every post of the section. Mental Health starts with a personal-experience disclaimer pointing to findahelpline.com (editable in the admin Sections tab).
+
 #### Public home without telemetry
 - The public home shows no telemetry or statistics; hardware data lives only in the admin `/status` modal (`/stats/telemetry`, `/stats/status`). Signed-in users get **New post** and **My posts** in the navbar.
 
@@ -518,7 +525,7 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | `GET` | `/sections` | Public | Sections in display order with published post counts |
-| `PUT` | `/admin/sections/{section_id}` | Admin | Edit name, description or color |
+| `PUT` | `/admin/sections/{section_id}` | Admin | Edit name, description, color, `theme` (`default`/`calm`/`vivid`) or `footer_markdown` |
 
 ### 6.2d Series
 | Method | Endpoint | Auth | Description |
