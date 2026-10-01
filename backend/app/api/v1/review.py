@@ -49,6 +49,47 @@ async def review_count(current_admin: User = Depends(get_current_admin), db: Asy
     return {"pending": count}
 
 
+MAX_FEATURED_PER_SECTION = 2
+
+
+@router.post("/posts/{post_id}/feature", response_model=PostRead)
+async def feature_post(
+    post_id: uuid.UUID,
+    current_admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Feature a published post in its section (at most two per section). ADMIN only."""
+    post = await _get_post_or_404(db, post_id)
+    if post.status != PostStatus.PUBLISHED:
+        raise HTTPException(status_code=400, detail="Only published posts can be featured")
+    if post.featured_at is None:
+        featured_count = (
+            await db.execute(
+                select(func.count(Post.id)).where(Post.section_id == post.section_id, Post.featured_at.is_not(None))
+            )
+        ).scalar_one()
+        if featured_count >= MAX_FEATURED_PER_SECTION:
+            raise HTTPException(
+                status_code=409,
+                detail=f"This section already has {MAX_FEATURED_PER_SECTION} featured posts. Unfeature one first.",
+            )
+        post.featured_at = datetime.now(timezone.utc)
+        await db.commit()
+    return PostRead.model_validate(await _get_post_or_404(db, post_id))
+
+
+@router.delete("/posts/{post_id}/feature", response_model=PostRead)
+async def unfeature_post(
+    post_id: uuid.UUID,
+    current_admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    post = await _get_post_or_404(db, post_id)
+    post.featured_at = None
+    await db.commit()
+    return PostRead.model_validate(await _get_post_or_404(db, post_id))
+
+
 @router.post("/posts/{post_id}/approve", response_model=PostRead)
 async def approve_post(
     post_id: uuid.UUID,

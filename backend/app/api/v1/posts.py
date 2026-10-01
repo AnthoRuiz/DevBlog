@@ -95,6 +95,7 @@ async def _get_section_or_400(db: AsyncSession, section_id: uuid.UUID) -> Sectio
 async def list_posts(
     section: Optional[str] = Query(None, description="Filter by section slug"),
     tag: Optional[str] = Query(None, description="Filter by tag slug"),
+    featured: Optional[bool] = Query(None, description="Only featured posts (true) or only the rest (false)"),
     q: Optional[str] = Query(None, max_length=200, description="Full-text search over title, summary and content"),
     sort: str = Query("recent", regex="^(recent|top_voted|trending|relevance)$"),
     limit: int = Query(12, ge=1, le=100),
@@ -108,6 +109,11 @@ async def list_posts(
 
     if tag:
         query = query.join(Post.tags).where(Tag.slug == tag)
+
+    if featured is True:
+        query = query.where(Post.featured_at.is_not(None))
+    elif featured is False:
+        query = query.where(Post.featured_at.is_(None))
 
     rank = None
     ts_query = _search_tsquery(q)
@@ -128,7 +134,9 @@ async def list_posts(
 
     query = query.options(selectinload(Post.tags))
 
-    if sort == "relevance" and rank is not None:
+    if featured:
+        query = query.order_by(desc(Post.featured_at))
+    elif sort == "relevance" and rank is not None:
         query = query.order_by(desc(rank), desc(Post.published_at))
     elif sort == "top_voted":
         query = query.order_by(desc(Post.upvotes_count), desc(Post.created_at))
@@ -475,7 +483,11 @@ async def update_post(
 
     if post_update.section_id is not None:
         # Assign the object too: the already-loaded relationship would otherwise keep the old section
-        post.section = await _get_section_or_400(db, post_update.section_id)
+        new_section = await _get_section_or_400(db, post_update.section_id)
+        if new_section.id != post.section_id:
+            # Featured slots are per section: moving a post gives its slot up
+            post.featured_at = None
+        post.section = new_section
     if post_update.summary is not None:
         post.summary = post_update.summary
     if post_update.content_markdown is not None:
@@ -503,6 +515,9 @@ async def update_post(
         post.review_note = None
         if not post.published_at:
             post.published_at = datetime.now(timezone.utc)
+    else:
+        # Only live posts can be featured
+        post.featured_at = None
 
     if post_update.tag_ids is not None:
         tag_res = await db.execute(select(Tag).where(Tag.id.in_(post_update.tag_ids)))

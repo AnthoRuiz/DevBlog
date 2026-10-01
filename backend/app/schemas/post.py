@@ -83,6 +83,7 @@ class PostRead(BaseModel):
     views_count: int
     status: PostStatus
     review_note: Optional[str] = None
+    featured_at: Optional[datetime] = None
     published_at: Optional[datetime] = None
     created_at: datetime
     section: Optional[SectionRead] = None

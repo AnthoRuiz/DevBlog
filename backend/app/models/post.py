@@ -83,6 +83,8 @@ class Post(Base):
     )
     # Reason given by the admin when a post is rejected
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Set while an admin features the post (max two per section, enforced in the API)
+    featured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
