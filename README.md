@@ -13,6 +13,7 @@ The personal blog of Anthony Ruiz: a self-hosted blog engine and Homelab observa
 
 ## 🌟 Features
 
+- **Magazine home:** a lead story with the latest posts beside it, one block per section (lead post + two more), *Browse by tag*, and the full post grid below.
 - **Technical digest feed:** two-column post grid with reading time, views, upvotes and bookmarks, paginated 12 posts at a time with **Load more**.
 - **Markdown editor:** Word-style toolbar, live preview, syntax highlighting (highlight.js), dark-themed **Mermaid.js** diagrams, and one-click image upload that embeds `![alt](/uploads/...)` in the post body.
 - **Multilingual UI (i18n):** 🇪🇸 Español (`es`) · 🇺🇸 English (`en`) · 🇧🇷 Português (`pt`) · 🇫🇷 Français (`fr`), plus an original-language badge on every post.

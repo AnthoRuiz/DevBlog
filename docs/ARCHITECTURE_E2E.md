@@ -406,7 +406,8 @@ frontend/src/
 ├── pages/
 │   ├── PostPage.tsx            # /posts/:slug — loads the post, 404 state, tab title
 │   ├── SearchPage.tsx          # /search — results, section filter, highlights, load more
-│   └── SeriesPage.tsx          # /series/:slug — ordered posts, progress, owner tools
+│   ├── SeriesPage.tsx          # /series/:slug — ordered posts, progress, owner tools
+│   └── HomeMagazine.tsx        # / — lead story, latest, section blocks, browse by tag
 ├── index.css                   # Tailwind layers and custom styles
 ├── vite-env.d.ts               # Vite env typings (VITE_ENABLE_ROLE_TESTING)
 ├── i18n/index.ts               # Typed translation dictionaries (es, en, pt, fr)
@@ -439,7 +440,7 @@ The URL is the source of truth for the page and the feed filters (`App.tsx`):
 
 | Path | Page |
 |---|---|
-| `/` | Home feed |
+| `/` | Magazine home: lead story (most recently featured, else latest) with a *Latest* column, one block per section (lead + two more + *View all*), *Browse by tag*, then *All posts* with sort and Load more |
 | `/:section` | Section feed (`tech`, `ai`, `career`, `mental-health`, `gaming`) with a *Featured* band (up to two posts) and its series above the rest; `?tag=` filters by a tag of that section |
 | `/tags/:tag` | Tag feed across sections |
 | `/posts/:slug` | Post page (canonical post URL, used by feeds and previews) |
@@ -507,6 +508,7 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | `GET` | `/posts` | Public | Paginated published posts (`section`, `tag`, `featured=true\|false`, `q` (full-text, prefix-aware), `sort=recent\|top_voted\|trending\|relevance`, `limit` 1–100 default 12, `offset`); returns `{items, total, limit, offset, has_more}` |
+| `GET` | `/posts/home` | Public | Magazine home data in one call: `featured`, `latest` (4), and per section `lead` (featured, else latest) + `rest` (2) with post counts |
 | `GET` | `/posts/mine` | Creator | The current user's posts in every status |
 | `GET` | `/posts/{slug}` | Optional | Post detail (increments views); unpublished posts only for their author and admins |
 | `POST` | `/posts` | Creator | Create a post (`section_id` required; `submit` publishes or sends to review, `false` saves a draft) |
