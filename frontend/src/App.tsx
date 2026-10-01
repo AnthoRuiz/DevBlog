@@ -8,6 +8,7 @@ import { setPageTitle, setTitleBadge } from './utils/pageTitle';
 import { PostPage } from './pages/PostPage';
 import { SearchPage } from './pages/SearchPage';
 import { SeriesPage } from './pages/SeriesPage';
+import { HomeMagazine } from './pages/HomeMagazine';
 import { LoginModal } from './components/LoginModal';
 import { NewPostModal } from './components/NewPostModal';
 import { SystemStatusModal } from './components/SystemStatusModal';
@@ -55,6 +56,8 @@ export function App() {
   const adminMatch = matchPath('/admin/:panel', location.pathname);
   const isBookmarksRoute = location.pathname === '/bookmarks';
   const isSearchRoute = location.pathname === '/search';
+  // The magazine home: only the bare / (admin modals keep the plain feed behind them)
+  const isHome = location.pathname === '/';
   const seriesMatch = matchPath('/series/:seriesSlug', location.pathname);
   const sectionMatch =
     !postMatch && !tagMatch && !adminMatch && !isBookmarksRoute && !isSearchRoute && !seriesMatch
@@ -365,6 +368,7 @@ export function App() {
       if (post.featured_at) await unfeaturePost(post.id, userToken);
       else await featurePost(post.id, userToken);
       loadData();
+      setPostRefreshKey((k) => k + 1);
     } catch (err: any) {
       alert(err.message || 'Failed to update the featured posts');
     }
@@ -375,6 +379,7 @@ export function App() {
     try {
       await deletePost(postId, userToken);
       loadData();
+      setPostRefreshKey((k) => k + 1);
     } catch (err: any) {
       alert(err.message || 'Failed to delete post');
       throw err;
@@ -666,7 +671,34 @@ export function App() {
           </nav>
         )}
 
-        {/* Category, tag and sort filter bar */}
+        {/* Magazine home (approved design): lead story, latest, section blocks, browse by tag */}
+        {isHome && (
+          <>
+            <HomeMagazine t={t} currentLang={currentLang} sections={sections} tags={tags} refreshKey={postRefreshKey} />
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-[#1e293b] pb-4">
+              <h2 className="text-xl font-extrabold tracking-tight text-[#F8FAFC]">{t.homeAllPosts}</h2>
+              <div className="flex items-center gap-3 text-xs font-mono text-[#94A3B8]">
+                <Link to="/bookmarks" className="inline-flex items-center gap-1.5 hover:text-[#F8FAFC] transition-colors">
+                  <Bookmark className="w-3.5 h-3.5" />
+                  {t.bookmarksTab} ({bookmarkedIds.size})
+                </Link>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  aria-label={t.sortByRecent}
+                  className="bg-[#0b0f19] border border-[#1e293b] rounded-lg px-2.5 py-1.5 text-[#F8FAFC] focus:outline-none focus:border-[#22D3EE]"
+                >
+                  <option value="recent">{t.sortByRecent}</option>
+                  <option value="top_voted">{t.sortByTopVoted}</option>
+                  <option value="trending">{t.sortByTrending}</option>
+                </select>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Category, tag and sort filter bar (feeds other than the home) */}
+        {!isHome && (
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-[#1e293b] pb-4">
           <div className="flex flex-wrap items-center gap-1.5">
             <button
@@ -810,6 +842,7 @@ export function App() {
             </select>
           </div>
         </div>
+        )}
 
         {/* Active filter indicator with clear button */}
         {isFiltering && (

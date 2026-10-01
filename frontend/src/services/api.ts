@@ -1,4 +1,4 @@
-import { Post, PostDetail, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions, ReviewItem, Series, SeriesDetail } from '../types';
+import { Post, PostDetail, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions, ReviewItem, Series, SeriesDetail, HomeData } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -663,4 +663,10 @@ export function reorderSeries(seriesId: string, postIds: string[], token: string
 
 export function deleteSeries(seriesId: string, token: string): Promise<{ deleted: boolean }> {
   return authJson(`/series/${seriesId}`, token, 'Failed to delete the series', { method: 'DELETE' });
+}
+
+export async function fetchHome(): Promise<HomeData> {
+  const res = await fetch(`${API_BASE}/posts/home`);
+  if (!res.ok) throw new Error('Failed to load the home page');
+  return res.json();
 }

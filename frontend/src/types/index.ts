@@ -141,6 +141,13 @@ export interface Series {
   post_count: number;
 }
 
+// GET /posts/home: everything the magazine home needs
+export interface HomeData {
+  featured: Post | null;
+  latest: Post[];
+  sections: { section: SectionWithCount; lead: Post | null; rest: Post[] }[];
+}
+
 export interface SeriesDetail extends Series {
   posts: Post[];
   can_edit: boolean;

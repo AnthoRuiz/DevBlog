@@ -204,6 +204,13 @@ export interface Translations {
   contentNoticeDismiss: string;
   rssSiteFeed: string;
   rssSectionFeed: string;
+  homeLatest: string;
+  homeReadPost: string;
+  homeViewAll: string;
+  homeBrowseByTag: string;
+  homeBrowseByTagSub: string;
+  homeSectionEmpty: string;
+  homeAllPosts: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -407,6 +414,13 @@ export const translations: Record<Language, Translations> = {
     contentNoticeDismiss: 'Ocultar aviso',
     rssSiteFeed: 'Suscríbete por RSS',
     rssSectionFeed: 'RSS de esta sección',
+    homeLatest: 'Lo último',
+    homeReadPost: 'Leer post',
+    homeViewAll: 'Ver todo',
+    homeBrowseByTag: 'Explorar por tag',
+    homeBrowseByTagSub: 'Todos los temas de todas las secciones',
+    homeSectionEmpty: 'Todavía no hay posts aquí.',
+    homeAllPosts: 'Todos los posts',
   },
   en: {
     siteTitle: 'Anthony Ruiz',
@@ -608,6 +622,13 @@ export const translations: Record<Language, Translations> = {
     contentNoticeDismiss: 'Dismiss notice',
     rssSiteFeed: 'Subscribe via RSS',
     rssSectionFeed: 'RSS feed for this section',
+    homeLatest: 'Latest',
+    homeReadPost: 'Read post',
+    homeViewAll: 'View all',
+    homeBrowseByTag: 'Browse by tag',
+    homeBrowseByTagSub: 'Every topic across all sections',
+    homeSectionEmpty: 'No posts here yet.',
+    homeAllPosts: 'All posts',
   },
   pt: {
     siteTitle: 'Anthony Ruiz',
@@ -809,6 +830,13 @@ export const translations: Record<Language, Translations> = {
     contentNoticeDismiss: 'Ocultar aviso',
     rssSiteFeed: 'Assine via RSS',
     rssSectionFeed: 'RSS desta seção',
+    homeLatest: 'Mais recentes',
+    homeReadPost: 'Ler post',
+    homeViewAll: 'Ver tudo',
+    homeBrowseByTag: 'Explorar por tag',
+    homeBrowseByTagSub: 'Todos os temas de todas as seções',
+    homeSectionEmpty: 'Ainda não há posts aqui.',
+    homeAllPosts: 'Todos os posts',
   },
   fr: {
     siteTitle: 'Anthony Ruiz',
@@ -1010,6 +1038,13 @@ export const translations: Record<Language, Translations> = {
     contentNoticeDismiss: 'Masquer l\'avertissement',
     rssSiteFeed: 'S\'abonner via RSS',
     rssSectionFeed: 'Flux RSS de cette section',
+    homeLatest: 'Derniers',
+    homeReadPost: 'Lire l\'article',
+    homeViewAll: 'Tout voir',
+    homeBrowseByTag: 'Parcourir par tag',
+    homeBrowseByTagSub: 'Tous les sujets de toutes les sections',
+    homeSectionEmpty: 'Pas encore d\'articles ici.',
+    homeAllPosts: 'Tous les articles',
   },
 };
 
