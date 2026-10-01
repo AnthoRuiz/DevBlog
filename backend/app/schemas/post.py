@@ -108,6 +108,20 @@ class PostReject(BaseModel):
     reason: str = Field(..., min_length=3, max_length=1000)
 
 
+class HomeSection(BaseModel):
+    section: SectionWithCount
+    # The section's featured post, or its latest when none is featured
+    lead: Optional[PostRead] = None
+    rest: list[PostRead] = []
+
+
+class HomePage(BaseModel):
+    """Everything the magazine home needs in one response."""
+    featured: Optional[PostRead] = None
+    latest: list[PostRead] = []
+    sections: list[HomeSection] = []
+
+
 class PostPage(BaseModel):
     """One page of posts plus what the client needs to request the next one."""
     items: list[PostRead]

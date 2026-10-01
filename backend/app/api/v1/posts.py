@@ -22,6 +22,9 @@ from app.models.user import User, UserRole
 from app.schemas.post import (
     PostRead,
     PostPage,
+    HomePage,
+    HomeSection,
+    SectionWithCount,
     PostDetailRead,
     PostCreate,
     PostUpdate,
@@ -358,6 +361,50 @@ async def ai_translate_post(
             headers={"Retry-After": str(e.retry_after)} if quota and e.retry_after else None,
         )
     return PostTranslateResponse(**res)
+
+@router.get("/home", response_model=HomePage)
+async def home_page(db: AsyncSession = Depends(get_db)):
+    """Magazine home: the lead story (most recently featured, else the latest post), the next four
+    latest posts, and per section a lead (featured, else latest) plus two more."""
+    published = select(Post).where(Post.status == PostStatus.PUBLISHED).options(selectinload(Post.tags))
+    newest = (desc(Post.published_at), desc(Post.created_at), desc(Post.id))
+
+    async def first(query):
+        return (await db.execute(query.limit(1))).scalars().first()
+
+    async def many(query, n):
+        return list((await db.execute(query.limit(n))).scalars().all())
+
+    featured = await first(published.where(Post.featured_at.is_not(None)).order_by(desc(Post.featured_at)))
+    featured = featured or await first(published.order_by(*newest))
+    latest_query = published.order_by(*newest)
+    if featured:
+        latest_query = latest_query.where(Post.id != featured.id)
+    latest = await many(latest_query, 4)
+
+    counts = dict(
+        (await db.execute(
+            select(Post.section_id, func.count(Post.id)).where(Post.status == PostStatus.PUBLISHED).group_by(Post.section_id)
+        )).all()
+    )
+    blocks = []
+    for section in (await db.execute(select(Section).order_by(Section.sort_order, Section.name))).scalars().all():
+        in_section = published.where(Post.section_id == section.id)
+        lead = await first(in_section.where(Post.featured_at.is_not(None)).order_by(desc(Post.featured_at)))
+        lead = lead or await first(in_section.order_by(*newest))
+        rest = await many(in_section.where(Post.id != lead.id).order_by(*newest), 2) if lead else []
+        blocks.append(HomeSection(
+            section=SectionWithCount(**SectionRead.model_validate(section).model_dump(), post_count=counts.get(section.id, 0)),
+            lead=PostRead.model_validate(lead) if lead else None,
+            rest=[PostRead.model_validate(p) for p in rest],
+        ))
+
+    return HomePage(
+        featured=PostRead.model_validate(featured) if featured else None,
+        latest=[PostRead.model_validate(p) for p in latest],
+        sections=blocks,
+    )
+
 
 @router.get("/mine", response_model=list[PostRead])
 async def list_my_posts(
