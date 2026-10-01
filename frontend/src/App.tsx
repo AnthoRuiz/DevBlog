@@ -6,6 +6,7 @@ import { DigestCard } from './components/DigestCard';
 import { NotFound } from './components/NotFound';
 import { setPageTitle, setTitleBadge } from './utils/pageTitle';
 import { PostPage } from './pages/PostPage';
+import { SearchPage } from './pages/SearchPage';
 import { LoginModal } from './components/LoginModal';
 import { NewPostModal } from './components/NewPostModal';
 import { SystemStatusModal } from './components/SystemStatusModal';
@@ -40,7 +41,7 @@ export function App() {
   //   /:section         section feed         /tags/:tag      tag feed (any section)
   //   /:section?tag=x   tag within section   /bookmarks      saved posts
   //   /admin/status, /admin/backups          admin modals over the feed
-  //   ?q=               search within the current feed
+  //   /search?q=&section=                    full-text search results
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -48,15 +49,20 @@ export function App() {
   const tagMatch = matchPath('/tags/:tagSlug', location.pathname);
   const adminMatch = matchPath('/admin/:panel', location.pathname);
   const isBookmarksRoute = location.pathname === '/bookmarks';
+  const isSearchRoute = location.pathname === '/search';
   const sectionMatch =
-    !postMatch && !tagMatch && !adminMatch && !isBookmarksRoute ? matchPath('/:sectionSlug', location.pathname) : null;
+    !postMatch && !tagMatch && !adminMatch && !isBookmarksRoute && !isSearchRoute
+      ? matchPath('/:sectionSlug', location.pathname)
+      : null;
   const isKnownRoute =
-    location.pathname === '/' || Boolean(postMatch || tagMatch || adminMatch || isBookmarksRoute || sectionMatch);
+    location.pathname === '/' ||
+    Boolean(postMatch || tagMatch || adminMatch || isBookmarksRoute || isSearchRoute || sectionMatch);
   const selectedSection = sectionMatch?.params.sectionSlug;
   const selectedTag = isBookmarksRoute
     ? BOOKMARKS
     : tagMatch?.params.tagSlug ?? (sectionMatch ? searchParams.get('tag') ?? undefined : undefined);
-  const urlQuery = searchParams.get('q') ?? '';
+  // The navbar search box mirrors ?q= on the search page
+  const urlQuery = isSearchRoute ? searchParams.get('q') ?? '' : '';
 
   const [posts, setPosts] = useState<Post[]>([]);
   // Pagination of the main feed (not used by the bookmarks view)
@@ -200,21 +206,23 @@ export function App() {
     }
   };
 
-  // Debounce live search into ?q= (replace, so typing does not flood the history)
-  const debouncedSearch = urlQuery;
+  // Typing in the navbar opens /search (scoped to the section being browsed); further typing
+  // replaces the history entry so it is not flooded
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchQuery.trim() === urlQuery) return;
-      // Searching from a post or admin page goes back to the home feed
-      if (postMatch || adminMatch || !isKnownRoute) {
-        if (searchQuery.trim()) navigate(`/?q=${encodeURIComponent(searchQuery.trim())}`);
-        return;
+      const term = searchQuery.trim();
+      if (term === urlQuery) return;
+      if (isSearchRoute) {
+        const next = new URLSearchParams(searchParams);
+        if (term) next.set('q', term);
+        else next.delete('q');
+        setSearchParams(next, { replace: true });
+      } else if (term) {
+        const params = new URLSearchParams({ q: term });
+        if (selectedSectionObject) params.set('section', selectedSectionObject.slug);
+        navigate(`/search?${params.toString()}`);
       }
-      const next = new URLSearchParams(searchParams);
-      if (searchQuery.trim()) next.set('q', searchQuery.trim());
-      else next.delete('q');
-      setSearchParams(next, { replace: true });
-    }, 250);
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -225,7 +233,7 @@ export function App() {
 
   useEffect(() => {
     loadData();
-  }, [selectedSection, selectedTag, sortBy, debouncedSearch]);
+  }, [selectedSection, selectedTag, sortBy]);
 
   const loadData = async () => {
     const requestId = ++feedRequestId.current;
@@ -250,7 +258,7 @@ export function App() {
         if (tagsData.length > 0) setTags(tagsData);
       } else {
         const [page, tagsData, sectionsData] = await Promise.all([
-          fetchPosts({ section: selectedSection, tag: selectedTag, sort: sortBy, query: debouncedSearch }),
+          fetchPosts({ section: selectedSection, tag: selectedTag, sort: sortBy }),
           fetchAllTags().catch(() => []),
           fetchSections().catch(() => []),
         ]);
@@ -277,7 +285,6 @@ export function App() {
         section: selectedSection,
         tag: selectedTag,
         sort: sortBy,
-        query: debouncedSearch,
         offset: posts.length,
         limit: POSTS_PAGE_SIZE,
       });
@@ -378,10 +385,9 @@ export function App() {
   const handleOpenStatus = () => openAdminPanel('status');
   const handleCloseStatus = closeAdminPanel;
 
-  // Build a feed URL, keeping the current search
+  // Build a feed URL
   const goToFeed = (section: string | undefined, tag: string | undefined) => {
     const params = new URLSearchParams();
-    if (urlQuery) params.set('q', urlQuery);
     let path = '/';
     if (tag === BOOKMARKS) {
       path = '/bookmarks';
@@ -428,7 +434,7 @@ export function App() {
     setPageTitle(selectedSectionObject ? `${selectedSectionObject.name} — ${SITE_NAME}` : DEFAULT_TITLE);
   }, [location.pathname, selectedSectionObject?.name]);
 
-  const isFiltering = selectedSection !== undefined || selectedTag !== undefined || Boolean(searchQuery);
+  const isFiltering = selectedSection !== undefined || selectedTag !== undefined;
 
   // Only the selected section's tags are offered as filters
   const visibleTags = selectedSectionObject ? tags.filter((tg) => tg.section_id === selectedSectionObject.id) : tags;
@@ -563,6 +569,8 @@ export function App() {
             onEditPost={handleEditPost}
             onDeletePost={handleDeletePost}
           />
+        ) : isSearchRoute ? (
+          <SearchPage t={t} currentLang={currentLang} sections={sections} />
         ) : !isKnownRoute || isUnknownSection ? (
           <NotFound t={t} />
         ) : (
@@ -764,7 +772,6 @@ export function App() {
                   : selectedTag
                   ? `${t.activeTagFilter}: #${selectedTag}`
                   : ''}
-                {searchQuery ? ` • Search: "${searchQuery}"` : ''}
               </span>
             </div>
             <button

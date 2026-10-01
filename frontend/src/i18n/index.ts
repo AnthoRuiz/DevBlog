@@ -166,6 +166,14 @@ export interface Translations {
   refreshNow: string;
   viewSystemStatus: string;
   footerText: string;
+  searchEyebrow: string;
+  searchEmptyPrompt: string;
+  searchEmptyHint: string;
+  searchResultsCount: string;
+  searchInSection: string;
+  searchNoResults: string;
+  searchNoResultsHint: string;
+  searchAllSections: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -331,6 +339,14 @@ export const translations: Record<Language, Translations> = {
     refreshNow: 'Actualizar',
     viewSystemStatus: 'Ver Estado del Servidor',
     footerText: '© 2026 Anthony Ruiz · Las opiniones son mías y no representan a mi empleador.',
+    searchEyebrow: 'Búsqueda',
+    searchEmptyPrompt: 'Busca en el blog',
+    searchEmptyHint: 'Escribe en la barra de búsqueda para encontrar posts por título, resumen o contenido.',
+    searchResultsCount: '{count} resultados',
+    searchInSection: 'Sección',
+    searchNoResults: 'Sin resultados',
+    searchNoResultsHint: 'Prueba con otras palabras o con menos términos.',
+    searchAllSections: 'Buscar en todas las secciones',
   },
   en: {
     siteTitle: 'Anthony Ruiz',
@@ -494,6 +510,14 @@ export const translations: Record<Language, Translations> = {
     refreshNow: 'Refresh',
     viewSystemStatus: 'View System Status',
     footerText: '© 2026 Anthony Ruiz · Views are my own and don\'t represent my employer.',
+    searchEyebrow: 'Search',
+    searchEmptyPrompt: 'Search the blog',
+    searchEmptyHint: 'Type in the search bar to find posts by title, summary or content.',
+    searchResultsCount: '{count} results',
+    searchInSection: 'Section',
+    searchNoResults: 'No results',
+    searchNoResultsHint: 'Try different words or fewer terms.',
+    searchAllSections: 'Search all sections',
   },
   pt: {
     siteTitle: 'Anthony Ruiz',
@@ -657,6 +681,14 @@ export const translations: Record<Language, Translations> = {
     refreshNow: 'Atualizar',
     viewSystemStatus: 'Ver Status do Servidor',
     footerText: '© 2026 Anthony Ruiz · As opiniões são minhas e não representam meu empregador.',
+    searchEyebrow: 'Busca',
+    searchEmptyPrompt: 'Pesquise no blog',
+    searchEmptyHint: 'Digite na barra de busca para encontrar posts por título, resumo ou conteúdo.',
+    searchResultsCount: '{count} resultados',
+    searchInSection: 'Seção',
+    searchNoResults: 'Nenhum resultado',
+    searchNoResultsHint: 'Tente outras palavras ou menos termos.',
+    searchAllSections: 'Buscar em todas as seções',
   },
   fr: {
     siteTitle: 'Anthony Ruiz',
@@ -820,6 +852,14 @@ export const translations: Record<Language, Translations> = {
     refreshNow: 'Actualiser',
     viewSystemStatus: 'Voir l\'État du Serveur',
     footerText: '© 2026 Anthony Ruiz · Les opinions exprimées sont les miennes et ne représentent pas mon employeur.',
+    searchEyebrow: 'Recherche',
+    searchEmptyPrompt: 'Rechercher dans le blog',
+    searchEmptyHint: 'Tapez dans la barre de recherche pour trouver des articles par titre, résumé ou contenu.',
+    searchResultsCount: '{count} résultats',
+    searchInSection: 'Section',
+    searchNoResults: 'Aucun résultat',
+    searchNoResultsHint: 'Essayez d\'autres mots ou moins de termes.',
+    searchAllSections: 'Rechercher dans toutes les sections',
   },
 };
 
