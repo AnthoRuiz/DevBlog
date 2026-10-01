@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { ArrowBigUp, Bookmark, Clock, Eye, Calendar, Terminal, Edit3, Trash2, Star } from 'lucide-react';
-import { Post } from '../types';
-import { SectionIcon } from './SectionIcon';
-import { Language, Translations, getLanguageFlag, getLanguageName } from '../i18n';
+import { Post } from '../../shared/types';
+import { SectionIcon } from '../../shared/ui/SectionIcon';
+import { Language, Translations, getLanguageFlag, getLanguageName } from '../../shared/i18n/translations';
 
 interface DigestCardProps {
   post: Post;

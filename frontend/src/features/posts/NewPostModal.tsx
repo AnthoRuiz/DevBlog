@@ -12,8 +12,8 @@ import {
   Plus,
   Tag as TagIcon,
 } from 'lucide-react';
-import { Tag, Post, PostDetail, Section, Series, TagValidation, AIStatus } from '../types';
-import { Language, Translations, languageFlags, languageNames } from '../i18n';
+import { Tag, Post, PostDetail, Section, Series, TagValidation, AIStatus } from '../../shared/types';
+import { Language, Translations, languageFlags, languageNames } from '../../shared/i18n/translations';
 import {
   uploadImage,
   createPost,
@@ -26,10 +26,10 @@ import {
   suggestTagsWithAi,
   fetchMySeries,
   createSeries,
-} from '../services/api';
+} from '../../shared/api/client';
 import { MarkdownToolbar } from './MarkdownToolbar';
-import { SectionIcon } from './SectionIcon';
-import { MarkdownRenderer } from './MarkdownRenderer';
+import { SectionIcon } from '../../shared/ui/SectionIcon';
+import { MarkdownRenderer } from '../../shared/ui/MarkdownRenderer';
 
 interface NewPostModalProps {
   isOpen: boolean;

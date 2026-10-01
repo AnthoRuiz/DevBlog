@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { SectionsAdmin } from './SectionsAdmin';
 import { ReviewQueue } from './ReviewQueue';
-import { BackupItem, BackupsResponse, MediaStats, ReviewItem, User, UserRole } from '../types';
+import { BackupItem, BackupsResponse, MediaStats, ReviewItem, User, UserRole } from '../../shared/types';
 import {
   fetchAdminBackups,
   createAdminBackup,
@@ -33,7 +33,7 @@ import {
   fetchMediaStats,
   cleanupMedia,
   ROLE_TESTING_ENABLED,
-} from '../services/api';
+} from '../../shared/api/client';
 
 interface BackupsModalProps {
   isOpen: boolean;

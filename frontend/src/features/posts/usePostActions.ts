@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { Post } from '../../types';
-import { deletePost, featurePost, toggleUpvote, unfeaturePost } from '../../services/api';
+import { Post } from '../../shared/types';
+import { deletePost, featurePost, toggleUpvote, unfeaturePost } from '../../shared/api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useShell } from '../../app/ShellContext';
 

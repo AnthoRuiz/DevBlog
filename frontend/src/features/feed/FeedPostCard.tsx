@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Post } from '../../types';
-import { DigestCard } from '../../components/DigestCard';
+import { Post } from '../../shared/types';
+import { DigestCard } from '../posts/DigestCard';
 import { useAuth } from '../auth/AuthContext';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
 import { usePostActions } from '../posts/usePostActions';

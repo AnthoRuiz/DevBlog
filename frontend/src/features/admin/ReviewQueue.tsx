@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { FC } from 'react';
 import { CheckCircle, ExternalLink, RefreshCw, XCircle } from 'lucide-react';
-import { ReviewItem } from '../types';
-import { approvePost, fetchReviewQueue, rejectPost } from '../services/api';
+import { ReviewItem } from '../../shared/types';
+import { approvePost, fetchReviewQueue, rejectPost } from '../../shared/api/client';
 
 interface ReviewQueueProps {
   token?: string;

@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import type { FC } from 'react';
 import { Link } from 'react-router-dom';
-import { useLanguage } from '../shared/i18n/LanguageContext';
+import { useLanguage } from '../i18n/LanguageContext';
 import { setPageTitle } from '../utils/pageTitle';
-import { DEFAULT_TITLE } from '../shared/site';
+import { DEFAULT_TITLE } from '../site';
 
 // Client-side 404: the SPA cannot return a real 404 status for unknown routes
 export const NotFound: FC = () => {

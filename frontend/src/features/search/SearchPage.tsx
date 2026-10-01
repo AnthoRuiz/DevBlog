@@ -2,15 +2,15 @@ import { useEffect } from 'react';
 import type { FC, ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
-import { Post } from '../types';
-import { fetchPosts, POSTS_PAGE_SIZE } from '../services/api';
-import { formatPostDate } from '../components/DigestCard';
-import { useLanguage } from '../shared/i18n/LanguageContext';
-import { useSections } from '../shared/api/queries';
-import { queryKeys } from '../shared/api/queryKeys';
+import { Post } from '../../shared/types';
+import { fetchPosts, POSTS_PAGE_SIZE } from '../../shared/api/client';
+import { formatPostDate } from '../posts/DigestCard';
+import { useLanguage } from '../../shared/i18n/LanguageContext';
+import { useSections } from '../../shared/api/queries';
+import { queryKeys } from '../../shared/api/queryKeys';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { setPageTitle } from '../utils/pageTitle';
-import { DEFAULT_TITLE } from '../shared/site';
+import { setPageTitle } from '../../shared/utils/pageTitle';
+import { DEFAULT_TITLE } from '../../shared/site';
 
 // Wrap the query words in <mark> where a word starts with them (prefix match, like the backend)
 function highlight(text: string, words: string[]): ReactNode {

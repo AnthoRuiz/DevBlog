@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { FC, ReactNode } from 'react';
-import { toggleBookmark } from '../../services/api';
+import { toggleBookmark } from '../../shared/api/client';
 
 const KEY = 'devblog_bookmarks';
 

@@ -1,10 +1,10 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { Layout } from './Layout';
 import { FeedPage } from '../features/feed/FeedPage';
-import { PostPage } from '../pages/PostPage';
-import { SeriesPage } from '../pages/SeriesPage';
-import { SearchPage } from '../pages/SearchPage';
-import { NotFound } from '../components/NotFound';
+import { PostPage } from '../features/posts/PostPage';
+import { SeriesPage } from '../features/series/SeriesPage';
+import { SearchPage } from '../features/search/SearchPage';
+import { NotFound } from '../shared/ui/NotFound';
 
 /**
  * Every route of the SPA (Nginx serves index.html for unknown paths). Static segments outrank

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
 import { ArrowUpDown, Bookmark, ChevronDown, Search, Tag as TagIcon, X } from 'lucide-react';
-import { Tag } from '../../types';
+import { Tag } from '../../shared/types';
 import { useLanguage } from '../../shared/i18n/LanguageContext';
 import { SortSelect } from './SortSelect';
 

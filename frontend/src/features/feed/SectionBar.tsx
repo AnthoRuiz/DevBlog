@@ -1,6 +1,6 @@
 import type { FC } from 'react';
-import { SectionWithCount } from '../../types';
-import { SectionIcon } from '../../components/SectionIcon';
+import { SectionWithCount } from '../../shared/types';
+import { SectionIcon } from '../../shared/ui/SectionIcon';
 import { useLanguage } from '../../shared/i18n/LanguageContext';
 
 interface SectionBarProps {

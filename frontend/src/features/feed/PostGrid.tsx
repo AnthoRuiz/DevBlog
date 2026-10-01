@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import { Sparkles } from 'lucide-react';
-import { Post } from '../../types';
+import { Post } from '../../shared/types';
 import { useLanguage } from '../../shared/i18n/LanguageContext';
 import { FeedPostCard } from './FeedPostCard';
 

@@ -7,7 +7,11 @@ import { router } from './app/router';
 import { AuthProvider } from './features/auth/AuthContext';
 import { BookmarksProvider } from './features/bookmarks/BookmarksContext';
 import { LanguageProvider } from './shared/i18n/LanguageContext';
+import { initGlobalErrorListeners } from './shared/api/logger';
 import './index.css';
+
+// Report uncaught errors and unhandled promise rejections to the backend log
+initGlobalErrorListeners();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

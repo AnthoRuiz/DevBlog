@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { FC } from 'react';
 import { Edit3, FileText, RefreshCw, X } from 'lucide-react';
-import { Post, PostStatus } from '../types';
-import { Translations } from '../i18n';
-import { fetchMyPosts } from '../services/api';
+import { Post, PostStatus } from '../../shared/types';
+import { Translations } from '../../shared/i18n/translations';
+import { fetchMyPosts } from '../../shared/api/client';
 
 interface MyPostsModalProps {
   isOpen: boolean;

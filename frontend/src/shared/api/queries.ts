@@ -1,6 +1,6 @@
 import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
-import { fetchAllTags, fetchSections } from '../../services/api';
+import { fetchAllTags, fetchSections } from './client';
 import { queryKeys } from './queryKeys';
 
 export const queryClient = new QueryClient({

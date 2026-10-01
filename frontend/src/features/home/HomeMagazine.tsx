@@ -2,12 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import type { FC } from 'react';
 import { Link } from 'react-router-dom';
 import { ImageIcon } from 'lucide-react';
-import { Post, SectionWithCount, Tag } from '../types';
-import { Language, Translations } from '../i18n';
-import { fetchHome } from '../services/api';
-import { queryKeys } from '../shared/api/queryKeys';
-import { formatPostDate } from '../components/DigestCard';
-import { SectionIcon } from '../components/SectionIcon';
+import { Post, SectionWithCount, Tag } from '../../shared/types';
+import { Language, Translations } from '../../shared/i18n/translations';
+import { fetchHome } from '../../shared/api/client';
+import { queryKeys } from '../../shared/api/queryKeys';
+import { formatPostDate } from '../posts/DigestCard';
+import { SectionIcon } from '../../shared/ui/SectionIcon';
 
 interface HomeMagazineProps {
   t: Translations;

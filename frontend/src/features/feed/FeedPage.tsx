@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { FC } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { NotFound } from '../../components/NotFound';
-import { HomeMagazine } from '../../pages/HomeMagazine';
+import { NotFound } from '../../shared/ui/NotFound';
+import { HomeMagazine } from '../home/HomeMagazine';
 import { useSections, useTags } from '../../shared/api/queries';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
 import { useLanguage } from '../../shared/i18n/LanguageContext';
-import { setPageTitle } from '../../utils/pageTitle';
+import { setPageTitle } from '../../shared/utils/pageTitle';
 import { DEFAULT_TITLE, SITE_NAME } from '../../shared/site';
 import { useFeed } from './useFeed';
 import { SectionBar } from './SectionBar';

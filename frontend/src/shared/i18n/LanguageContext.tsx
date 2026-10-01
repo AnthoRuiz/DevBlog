@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState } from 'react';
 import type { FC, ReactNode } from 'react';
-import { Language, Translations, translations } from '../../i18n';
+import { Language, Translations, translations } from './translations';
 
 interface LanguageState {
   lang: Language;

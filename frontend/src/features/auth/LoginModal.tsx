@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { X, Lock, Mail, User as UserIcon, ShieldCheck } from 'lucide-react';
-import { Translations } from '../i18n';
-import { registerUser, loginUser } from '../services/api';
-import { User } from '../types';
+import { Translations } from '../../shared/i18n/translations';
+import { registerUser, loginUser } from '../../shared/api/client';
+import { User } from '../../shared/types';
 
 interface LoginModalProps {
   isOpen: boolean;

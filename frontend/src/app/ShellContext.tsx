@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { FC, ReactNode } from 'react';
-import { Post, PostDetail } from '../types';
-import { fetchPostBySlug } from '../services/api';
+import { Post, PostDetail } from '../shared/types';
+import { fetchPostBySlug } from '../shared/api/client';
 import { useInvalidatePosts } from '../shared/api/queries';
 
 interface ShellState {

@@ -19,7 +19,7 @@ import {
   HelpCircle,
   X,
 } from 'lucide-react';
-import { Translations } from '../i18n';
+import { Translations } from '../../shared/i18n/translations';
 
 interface MarkdownToolbarProps {
   textareaRef: React.RefObject<HTMLTextAreaElement>;

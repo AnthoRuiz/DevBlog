@@ -1,6 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Trash2, Terminal } from 'lucide-react';
-import { sendClientLog } from '../services/logger';
+import { sendClientLog } from '../api/logger';
 
 interface Props {
   children: ReactNode;

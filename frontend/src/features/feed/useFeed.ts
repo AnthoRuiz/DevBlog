@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { Post } from '../../types';
-import { fetchBookmarkedPosts, fetchPosts, fetchSeriesList, POSTS_PAGE_SIZE } from '../../services/api';
+import { Post } from '../../shared/types';
+import { fetchBookmarkedPosts, fetchPosts, fetchSeriesList, POSTS_PAGE_SIZE } from '../../shared/api/client';
 import { queryKeys } from '../../shared/api/queryKeys';
 
 export interface FeedFilters {

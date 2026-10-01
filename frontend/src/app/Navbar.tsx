@@ -1,9 +1,9 @@
 import type { FC } from 'react';
 import { Link } from 'react-router-dom';
 import { PenLine, User as UserIcon, Search, Globe, LogOut, X, Activity, Database, FileText } from 'lucide-react';
-import { Language, Translations, languageFlags, languageNames } from '../i18n';
-import { User, UserRole } from '../types';
-import { BrandMark } from './BrandMark';
+import { Language, Translations, languageFlags, languageNames } from '../shared/i18n/translations';
+import { User, UserRole } from '../shared/types';
+import { BrandMark } from '../shared/ui/BrandMark';
 
 interface NavbarProps {
   onSearch: (q: string) => void;

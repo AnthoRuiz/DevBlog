@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchReviewCount } from '../../services/api';
+import { fetchReviewCount } from '../../shared/api/client';
 import { queryKeys } from '../../shared/api/queryKeys';
-import { setTitleBadge } from '../../utils/pageTitle';
+import { setTitleBadge } from '../../shared/utils/pageTitle';
 import { useAuth } from '../auth/AuthContext';
 
 /**

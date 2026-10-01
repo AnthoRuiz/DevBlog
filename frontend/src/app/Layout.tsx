@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
 import { Outlet, useLocation, useMatch, useNavigate, useSearchParams } from 'react-router-dom';
-import { Navbar } from '../components/Navbar';
-import { LoginModal } from '../components/LoginModal';
-import { NewPostModal } from '../components/NewPostModal';
-import { SystemStatusModal } from '../components/SystemStatusModal';
-import { BackupsModal } from '../components/BackupsModal';
-import { MyPostsModal } from '../components/MyPostsModal';
+import { Navbar } from './Navbar';
+import { LoginModal } from '../features/auth/LoginModal';
+import { NewPostModal } from '../features/posts/NewPostModal';
+import { SystemStatusModal } from '../features/admin/SystemStatusModal';
+import { BackupsModal } from '../features/admin/BackupsModal';
+import { MyPostsModal } from '../features/posts/MyPostsModal';
 import { RoleTestingBar } from '../features/admin/RoleTestingBar';
 import { useReviewBadge } from '../features/admin/useReviewBadge';
 import { useAuth } from '../features/auth/AuthContext';
 import { useLanguage } from '../shared/i18n/LanguageContext';
 import { SiteFooter } from '../shared/ui/SiteFooter';
-import { ROLE_TESTING_ENABLED } from '../services/api';
+import { ErrorBoundary } from '../shared/ui/ErrorBoundary';
+import { ROLE_TESTING_ENABLED } from '../shared/api/client';
 import { ShellProvider, useShell } from './ShellContext';
 import { useSections, useTags } from '../shared/api/queries';
 
@@ -114,7 +115,10 @@ const LayoutFrame: FC = () => {
       />
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
-        <Outlet />
+        {/* A crashing page shows the diagnostics screen (and reports the error) without taking down the app */}
+        <ErrorBoundary key={location.pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
 
       <SiteFooter />

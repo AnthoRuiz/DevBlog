@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { Link } from 'react-router-dom';
 import { Rss } from 'lucide-react';
-import { Post, SectionWithCount, Series } from '../../types';
+import { Post, SectionWithCount, Series } from '../../shared/types';
 import { useLanguage } from '../../shared/i18n/LanguageContext';
 import { FeedPostCard } from './FeedPostCard';
 

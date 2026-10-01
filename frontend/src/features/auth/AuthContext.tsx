@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { FC, ReactNode } from 'react';
-import { Post, User, UserRole } from '../../types';
-import { fetchCurrentUser, updateMyRole } from '../../services/api';
+import { Post, User, UserRole } from '../../shared/types';
+import { fetchCurrentUser, updateMyRole } from '../../shared/api/client';
 
 interface AuthState {
   token: string | null;

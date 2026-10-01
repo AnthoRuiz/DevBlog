@@ -3,17 +3,17 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FC } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, Check, ListOrdered, Pencil, Trash2 } from 'lucide-react';
-import { SeriesDetail } from '../types';
-import { deleteSeries, fetchSeriesBySlug, reorderSeries, updateSeries } from '../services/api';
-import { formatPostDate } from '../components/DigestCard';
-import { NotFound } from '../components/NotFound';
-import { setPageTitle } from '../utils/pageTitle';
-import { getReadPosts } from '../utils/readPosts';
-import { queryKeys } from '../shared/api/queryKeys';
-import { useInvalidatePosts } from '../shared/api/queries';
-import { SITE_NAME } from '../shared/site';
-import { useLanguage } from '../shared/i18n/LanguageContext';
-import { useAuth } from '../features/auth/AuthContext';
+import { SeriesDetail } from '../../shared/types';
+import { deleteSeries, fetchSeriesBySlug, reorderSeries, updateSeries } from '../../shared/api/client';
+import { formatPostDate } from '../posts/DigestCard';
+import { NotFound } from '../../shared/ui/NotFound';
+import { setPageTitle } from '../../shared/utils/pageTitle';
+import { getReadPosts } from '../../shared/utils/readPosts';
+import { queryKeys } from '../../shared/api/queryKeys';
+import { useInvalidatePosts } from '../../shared/api/queries';
+import { SITE_NAME } from '../../shared/site';
+import { useLanguage } from '../../shared/i18n/LanguageContext';
+import { useAuth } from '../auth/AuthContext';
 
 const STATUS_LABEL_KEYS = {
   draft: 'statusDraft',

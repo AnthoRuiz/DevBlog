@@ -1,8 +1,8 @@
 import { FC, useEffect, useState } from 'react';
 import { RefreshCw, Save } from 'lucide-react';
-import { SectionWithCount } from '../types';
-import { fetchSections, updateSection } from '../services/api';
-import { SectionIcon } from './SectionIcon';
+import { SectionWithCount } from '../../shared/types';
+import { fetchSections, updateSection } from '../../shared/api/client';
+import { SectionIcon } from '../../shared/ui/SectionIcon';
 
 interface SectionsAdminProps {
   token?: string;

@@ -2,18 +2,18 @@ import { useEffect } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { fetchPostBySlug } from '../services/api';
-import { queryKeys } from '../shared/api/queryKeys';
-import { ArticleView } from '../components/ArticleView';
-import { NotFound } from '../components/NotFound';
-import { setPageTitle } from '../utils/pageTitle';
-import { markPostRead } from '../utils/readPosts';
-import { SITE_NAME } from '../shared/site';
-import { useLanguage } from '../shared/i18n/LanguageContext';
-import { useAuth } from '../features/auth/AuthContext';
-import { useBookmarks } from '../features/bookmarks/BookmarksContext';
-import { usePostActions } from '../features/posts/usePostActions';
-import { useShell } from '../app/ShellContext';
+import { fetchPostBySlug } from '../../shared/api/client';
+import { queryKeys } from '../../shared/api/queryKeys';
+import { ArticleView } from './ArticleView';
+import { NotFound } from '../../shared/ui/NotFound';
+import { setPageTitle } from '../../shared/utils/pageTitle';
+import { markPostRead } from '../../shared/utils/readPosts';
+import { SITE_NAME } from '../../shared/site';
+import { useLanguage } from '../../shared/i18n/LanguageContext';
+import { useAuth } from '../auth/AuthContext';
+import { useBookmarks } from '../bookmarks/BookmarksContext';
+import { usePostActions } from './usePostActions';
+import { useShell } from '../../app/ShellContext';
 
 // /posts/:slug
 export const PostPage: FC = () => {

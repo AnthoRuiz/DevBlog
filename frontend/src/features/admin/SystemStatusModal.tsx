@@ -16,9 +16,9 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
-import { SystemStatusResponse } from '../types';
-import { Translations } from '../i18n';
-import { fetchSystemStatus } from '../services/api';
+import { SystemStatusResponse } from '../../shared/types';
+import { Translations } from '../../shared/i18n/translations';
+import { fetchSystemStatus } from '../../shared/api/client';
 
 interface SystemStatusModalProps {
   isOpen: boolean;

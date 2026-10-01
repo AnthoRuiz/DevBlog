@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, ListOrdered, Info, X, Clock, Calendar, ArrowBigUp, Share2, Bookmark, MessageSquare, Send, Edit3, Trash2 } from 'lucide-react';
-import { PostDetail, Comment, Post } from '../types';
-import { Language, Translations } from '../i18n';
-import { fetchComments, createComment } from '../services/api';
-import { MarkdownRenderer } from './MarkdownRenderer';
+import { PostDetail, Comment, Post } from '../../shared/types';
+import { Language, Translations } from '../../shared/i18n/translations';
+import { fetchComments, createComment } from '../../shared/api/client';
+import { MarkdownRenderer } from '../../shared/ui/MarkdownRenderer';
 
 interface ArticleViewProps {
   post: PostDetail;
