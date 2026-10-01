@@ -1,22 +1,16 @@
 import { useEffect, useState } from 'react';
 import type { FC } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, Check, ListOrdered, Pencil, Trash2 } from 'lucide-react';
 import { SeriesDetail } from '../types';
-import { Language, Translations } from '../i18n';
 import { deleteSeries, fetchSeriesBySlug, reorderSeries, updateSeries } from '../services/api';
 import { formatPostDate } from '../components/DigestCard';
 import { NotFound } from '../components/NotFound';
 import { setPageTitle } from '../utils/pageTitle';
 import { getReadPosts } from '../utils/readPosts';
-
-interface SeriesPageProps {
-  slug: string;
-  t: Translations;
-  currentLang: Language;
-  token: string | null;
-  siteName: string;
-}
+import { SITE_NAME } from '../shared/site';
+import { useLanguage } from '../shared/i18n/LanguageContext';
+import { useAuth } from '../features/auth/AuthContext';
 
 const STATUS_LABEL_KEYS = {
   draft: 'statusDraft',
@@ -25,8 +19,11 @@ const STATUS_LABEL_KEYS = {
 } as const;
 
 // /series/:slug — ordered posts, reading progress, and reorder/edit tools for its owner
-export const SeriesPage: FC<SeriesPageProps> = ({ slug, t, currentLang, token, siteName }) => {
+export const SeriesPage: FC = () => {
+  const { slug = '' } = useParams();
   const navigate = useNavigate();
+  const { lang: currentLang, t } = useLanguage();
+  const { token } = useAuth();
   const [series, setSeries] = useState<SeriesDetail | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'missing'>('loading');
   const [isEditing, setIsEditing] = useState(false);
@@ -44,7 +41,7 @@ export const SeriesPage: FC<SeriesPageProps> = ({ slug, t, currentLang, token, s
         if (cancelled) return;
         setSeries(data);
         setState('ready');
-        setPageTitle(`${data.title} — ${siteName}`);
+        setPageTitle(`${data.title} — ${SITE_NAME}`);
       })
       .catch(() => !cancelled && setState('missing'));
     return () => {
@@ -52,7 +49,7 @@ export const SeriesPage: FC<SeriesPageProps> = ({ slug, t, currentLang, token, s
     };
   }, [slug, token]);
 
-  if (state === 'missing') return <NotFound t={t} />;
+  if (state === 'missing') return <NotFound />;
   if (state === 'loading' || !series) {
     return <div className="max-w-3xl mx-auto h-72 rounded-2xl bg-[#0b0f19] border border-[#1e293b] animate-pulse" />;
   }

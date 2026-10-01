@@ -2,16 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { FC, ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
-import { Post, SectionWithCount } from '../types';
-import { Language, Translations } from '../i18n';
+import { Post } from '../types';
 import { fetchPosts, POSTS_PAGE_SIZE } from '../services/api';
 import { formatPostDate } from '../components/DigestCard';
-
-interface SearchPageProps {
-  t: Translations;
-  currentLang: Language;
-  sections: SectionWithCount[];
-}
+import { useLanguage } from '../shared/i18n/LanguageContext';
+import { useShell } from '../app/ShellContext';
+import { setPageTitle } from '../utils/pageTitle';
+import { DEFAULT_TITLE } from '../shared/site';
 
 // Wrap the query words in <mark> where a word starts with them (prefix match, like the backend)
 function highlight(text: string, words: string[]): ReactNode {
@@ -30,7 +27,9 @@ function highlight(text: string, words: string[]): ReactNode {
 }
 
 // /search?q=&section=
-export const SearchPage: FC<SearchPageProps> = ({ t, currentLang, sections }) => {
+export const SearchPage: FC = () => {
+  const { lang: currentLang, t } = useLanguage();
+  const { sections } = useShell();
   const [searchParams, setSearchParams] = useSearchParams();
   const q = (searchParams.get('q') ?? '').trim();
   const section = searchParams.get('section') ?? '';
@@ -73,6 +72,8 @@ export const SearchPage: FC<SearchPageProps> = ({ t, currentLang, sections }) =>
   useEffect(() => {
     load(0);
   }, [q, section]);
+
+  useEffect(() => setPageTitle(DEFAULT_TITLE), []);
 
   const setSection = (slug: string) => {
     const next = new URLSearchParams(searchParams);

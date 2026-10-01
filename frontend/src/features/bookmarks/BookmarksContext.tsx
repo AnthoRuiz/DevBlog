@@ -1,7 +1,16 @@
-import { useCallback, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import type { FC, ReactNode } from 'react';
 import { toggleBookmark } from '../../services/api';
 
 const KEY = 'devblog_bookmarks';
+
+interface BookmarksState {
+  bookmarkedIds: Set<string>;
+  isBookmarked: (postId: string) => boolean;
+  toggle: (postId: string) => Promise<void>;
+}
+
+const BookmarksContext = createContext<BookmarksState | null>(null);
 
 const readStored = (): Set<string> => {
   try {
@@ -13,7 +22,7 @@ const readStored = (): Set<string> => {
 };
 
 /** Bookmarks cached locally (works for anonymous readers) and synced with the backend. */
-export function useBookmarks() {
+export const BookmarksProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(readStored);
 
   const toggle = useCallback(async (postId: string) => {
@@ -31,5 +40,15 @@ export function useBookmarks() {
     }
   }, []);
 
-  return { bookmarkedIds, isBookmarked: (postId: string) => bookmarkedIds.has(postId), toggle };
+  const value = useMemo(
+    () => ({ bookmarkedIds, isBookmarked: (postId: string) => bookmarkedIds.has(postId), toggle }),
+    [bookmarkedIds, toggle]
+  );
+  return <BookmarksContext.Provider value={value}>{children}</BookmarksContext.Provider>;
+};
+
+export function useBookmarks(): BookmarksState {
+  const ctx = useContext(BookmarksContext);
+  if (!ctx) throw new Error('useBookmarks must be used inside <BookmarksProvider>');
+  return ctx;
 }
