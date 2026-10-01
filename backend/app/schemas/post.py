@@ -65,6 +65,8 @@ class PostBase(BaseModel):
     submit: bool = True
     section_id: uuid.UUID
     tag_ids: list[uuid.UUID] = []
+    # Optional series (same section, owned by the user or any series for admins); appended at the end
+    series_id: Optional[uuid.UUID] = None
 
 class PostCreate(PostBase):
     pass
@@ -84,6 +86,8 @@ class PostRead(BaseModel):
     status: PostStatus
     review_note: Optional[str] = None
     featured_at: Optional[datetime] = None
+    series_id: Optional[uuid.UUID] = None
+    series_position: Optional[int] = None
     published_at: Optional[datetime] = None
     created_at: datetime
     section: Optional[SectionRead] = None
@@ -120,9 +124,64 @@ class CommentRead(BaseModel):
     content: str
     created_at: datetime
 
+class SeriesNeighbor(BaseModel):
+    slug: str
+    title: str
+
+
+class PostSeriesInfo(BaseModel):
+    """Where a post sits in its series. Readers count published posts only."""
+    id: uuid.UUID
+    slug: str
+    title: str
+    position: int
+    total: int
+    prev: Optional[SeriesNeighbor] = None
+    next: Optional[SeriesNeighbor] = None
+
+
 class PostDetailRead(PostRead):
     content_markdown: str
     comments: list[CommentRead] = []
+    series: Optional[PostSeriesInfo] = None
+
+
+class SeriesCreate(BaseModel):
+    title: str = Field(..., min_length=3, max_length=200)
+    description: str = Field("", max_length=2000)
+    section_id: uuid.UUID
+    cover_image_url: Optional[str] = Field(None, max_length=500)
+
+
+class SeriesUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=3, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
+    # Only while the series has no posts (every post must share the series' section)
+    section_id: Optional[uuid.UUID] = None
+    cover_image_url: Optional[str] = Field(None, max_length=500)
+
+
+class SeriesRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    title: str
+    slug: str
+    description: str
+    cover_image_url: Optional[str] = None
+    created_by: Optional[uuid.UUID] = None
+    created_at: datetime
+    section: SectionRead
+    # Published posts for readers; every post in /series/mine
+    post_count: int = 0
+
+
+class SeriesDetail(SeriesRead):
+    posts: list[PostRead] = []
+    can_edit: bool = False
+
+
+class SeriesOrder(BaseModel):
+    post_ids: list[uuid.UUID] = Field(..., min_length=1, max_length=200)
 
 class PostUpdate(BaseModel):
     title: Optional[str] = Field(None, max_length=255)
@@ -131,6 +190,8 @@ class PostUpdate(BaseModel):
     cover_image_url: Optional[str] = None
     language: Optional[str] = None
     reading_time_minutes: Optional[int] = Field(None, ge=1)
+    # Send null to take the post out of its series; leave it out to keep the series unchanged
+    series_id: Optional[uuid.UUID] = None
     # True: publish or (re)submit for review; False: move back to draft; None: keep the status
     submit: Optional[bool] = None
     section_id: Optional[uuid.UUID] = None

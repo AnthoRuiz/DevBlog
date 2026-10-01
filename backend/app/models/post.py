@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 import enum
-from sqlalchemy import String, Text, Integer, Boolean, DateTime, ForeignKey, Table, Column, Computed, Index, Enum as SQLEnum
+from sqlalchemy import String, Text, Integer, Boolean, DateTime, ForeignKey, Table, Column, Computed, Index, UniqueConstraint, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
@@ -47,9 +47,31 @@ class Tag(Base):
     section: Mapped[Section] = relationship("Section", back_populates="tags")
     posts: Mapped[list["Post"]] = relationship("Post", secondary=post_tags, back_populates="tags")
 
+class Series(Base):
+    """An ordered learning path of posts within one section, owned by the creator who made it."""
+    __tablename__ = "series"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    slug: Mapped[str] = mapped_column(String(220), unique=True, index=True, nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    section_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("sections.id", ondelete="RESTRICT"), index=True, nullable=False)
+    cover_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    section: Mapped[Section] = relationship("Section", lazy="selectin")
+    posts: Mapped[list["Post"]] = relationship("Post", back_populates="parent_series", order_by="Post.series_position")
+
+
 class Post(Base):
     __tablename__ = "posts"
-    __table_args__ = (Index("ix_posts_search_vector", "search_vector", postgresql_using="gin"),)
+    __table_args__ = (
+        Index("ix_posts_search_vector", "search_vector", postgresql_using="gin"),
+        # Deferred so a reorder can swap positions inside one transaction
+        UniqueConstraint("series_id", "series_position", name="uq_posts_series_position", deferrable=True, initially="DEFERRED"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     author_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -85,11 +107,16 @@ class Post(Base):
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Set while an admin features the post (max two per section, enforced in the API)
     featured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    # Optional series membership; positions are ordered but may have gaps
+    series_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("series.id", ondelete="SET NULL"), index=True, nullable=True)
+    series_position: Mapped[int | None] = mapped_column(Integer, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     author: Mapped["User"] = relationship("User", back_populates="posts")
+    # Not named "series": PostDetailRead.series is the computed "part N of M" info
+    parent_series: Mapped[Series | None] = relationship("Series", back_populates="posts")
     # Always loaded with the post: every API response that returns a post includes its section
     section: Mapped[Section] = relationship("Section", back_populates="posts", lazy="selectin")
     tags: Mapped[list[Tag]] = relationship("Tag", secondary=post_tags, back_populates="posts")

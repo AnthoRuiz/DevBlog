@@ -7,6 +7,7 @@ from app.api.v1.backups import router as backups_router
 from app.api.v1.media import router as media_router
 from app.api.v1.sections import router as sections_router
 from app.api.v1.review import router as review_router
+from app.api.v1.series import router as series_router
 
 api_router = APIRouter()
 
@@ -19,3 +20,4 @@ api_router.include_router(backups_router)
 api_router.include_router(media_router)
 api_router.include_router(sections_router)
 api_router.include_router(review_router)
+api_router.include_router(series_router)

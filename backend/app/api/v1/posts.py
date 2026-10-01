@@ -49,6 +49,7 @@ from app.services.ai_features import (
 from app.services.llm import LLMUnavailable, configured_providers
 from app.services import media_service, tag_classifier
 from app.core import quotas
+from app.services import series_service
 from app.api.deps import get_current_admin, get_current_creator_or_admin, get_current_user_optional, get_client_hash
 from app.core.limiter import limiter
 
@@ -393,7 +394,9 @@ async def get_post_by_slug(
         await db.commit()
         await db.refresh(post)
 
-    return PostDetailRead.model_validate(post)
+    detail = PostDetailRead.model_validate(post)
+    detail.series = await series_service.series_info(db, post, include_unpublished=can_preview)
+    return detail
 
 @router.post("", response_model=PostDetailRead, status_code=status.HTTP_201_CREATED)
 async def create_post(
@@ -439,13 +442,17 @@ async def create_post(
         published_at=datetime.now(timezone.utc) if post_status == PostStatus.PUBLISHED else None,
         tags=tags
     )
+    if post_in.series_id:
+        await series_service.assign_post_to_series(db, new_post, post_in.series_id, current_user)
     db.add(new_post)
     await db.commit()
     res = await db.execute(
         select(Post).where(Post.id == new_post.id).options(selectinload(Post.tags), selectinload(Post.comments))
     )
     loaded_post = res.scalar_one()
-    return PostDetailRead.model_validate(loaded_post)
+    detail = PostDetailRead.model_validate(loaded_post)
+    detail.series = await series_service.series_info(db, loaded_post, include_unpublished=True)
+    return detail
 
 @router.put("/{post_id}", response_model=PostDetailRead)
 async def update_post(
@@ -485,9 +492,13 @@ async def update_post(
         # Assign the object too: the already-loaded relationship would otherwise keep the old section
         new_section = await _get_section_or_400(db, post_update.section_id)
         if new_section.id != post.section_id:
-            # Featured slots are per section: moving a post gives its slot up
+            # Featured slots and series are per section: moving a post gives both up
             post.featured_at = None
+            await series_service.assign_post_to_series(db, post, None, current_user)
         post.section = new_section
+        post.section_id = new_section.id
+    if "series_id" in post_update.model_fields_set:
+        await series_service.assign_post_to_series(db, post, post_update.series_id, current_user)
     if post_update.summary is not None:
         post.summary = post_update.summary
     if post_update.content_markdown is not None:
@@ -528,7 +539,9 @@ async def update_post(
         select(Post).where(Post.id == post.id).options(selectinload(Post.tags), selectinload(Post.comments))
     )
     loaded_post = res.scalar_one()
-    return PostDetailRead.model_validate(loaded_post)
+    detail = PostDetailRead.model_validate(loaded_post)
+    detail.series = await series_service.series_info(db, loaded_post, include_unpublished=True)
+    return detail
 
 @router.delete("/{post_id}")
 async def delete_post(
