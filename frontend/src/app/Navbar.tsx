@@ -140,6 +140,7 @@ export const Navbar: FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenLogin}
+              aria-label={t.authorLogin}
               className="flex items-center gap-1.5 h-9 px-3 rounded-[10px] border border-[#475569] hover:border-[#22D3EE] text-sm text-[#F8FAFC] transition-colors"
             >
               <UserIcon className="w-4 h-4 text-[#94A3B8]" />
