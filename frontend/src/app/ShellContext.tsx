@@ -1,14 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { FC, ReactNode } from 'react';
-import { Post, PostDetail, SectionWithCount, Tag } from '../types';
-import { fetchAllTags, fetchPostBySlug, fetchSections } from '../services/api';
+import { Post, PostDetail } from '../types';
+import { fetchPostBySlug } from '../services/api';
+import { useInvalidatePosts } from '../shared/api/queries';
 
 interface ShellState {
-  /** Sections (with published counts) and tags, shared by every page and the editor */
-  sections: SectionWithCount[];
-  tags: Tag[];
-  /** Bumped whenever posts change (publish, edit, delete, feature, review); pages reload on it */
-  dataVersion: number;
+  /** Refresh everything that depends on posts (TanStack Query invalidation) */
   notifyPostsChanged: () => void;
   /** Editor modal */
   editor: { isOpen: boolean; post: Post | PostDetail | null };
@@ -21,21 +18,11 @@ interface ShellState {
 
 const ShellContext = createContext<ShellState | null>(null);
 
-// App-wide UI state that lives with the layout: shared catalog, editor and sign-in modals
+// App-wide UI state that lives with the layout: the editor and sign-in modals
 export const ShellProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const [sections, setSections] = useState<SectionWithCount[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [dataVersion, setDataVersion] = useState(0);
+  const notifyPostsChanged = useInvalidatePosts();
   const [editor, setEditor] = useState<ShellState['editor']>({ isOpen: false, post: null });
   const [isLoginOpen, setLoginOpen] = useState(false);
-
-  // Post counts and new tags change with posts, so the catalog reloads with them
-  useEffect(() => {
-    fetchSections().then((data) => data.length > 0 && setSections(data)).catch(() => {});
-    fetchAllTags().then((data) => data.length > 0 && setTags(data)).catch(() => {});
-  }, [dataVersion]);
-
-  const notifyPostsChanged = useCallback(() => setDataVersion((v) => v + 1), []);
 
   const openEditor = useCallback(async (post?: Post) => {
     if (!post) {
@@ -53,8 +40,8 @@ export const ShellProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const closeEditor = useCallback(() => setEditor({ isOpen: false, post: null }), []);
 
   const value = useMemo(
-    () => ({ sections, tags, dataVersion, notifyPostsChanged, editor, openEditor, closeEditor, isLoginOpen, setLoginOpen }),
-    [sections, tags, dataVersion, notifyPostsChanged, editor, openEditor, closeEditor, isLoginOpen]
+    () => ({ notifyPostsChanged, editor, openEditor, closeEditor, isLoginOpen, setLoginOpen }),
+    [notifyPostsChanged, editor, openEditor, closeEditor, isLoginOpen]
   );
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>;
 };

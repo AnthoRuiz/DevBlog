@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FC } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, Check, ListOrdered, Pencil, Trash2 } from 'lucide-react';
@@ -8,6 +9,8 @@ import { formatPostDate } from '../components/DigestCard';
 import { NotFound } from '../components/NotFound';
 import { setPageTitle } from '../utils/pageTitle';
 import { getReadPosts } from '../utils/readPosts';
+import { queryKeys } from '../shared/api/queryKeys';
+import { useInvalidatePosts } from '../shared/api/queries';
 import { SITE_NAME } from '../shared/site';
 import { useLanguage } from '../shared/i18n/LanguageContext';
 import { useAuth } from '../features/auth/AuthContext';
@@ -24,8 +27,11 @@ export const SeriesPage: FC = () => {
   const navigate = useNavigate();
   const { lang: currentLang, t } = useLanguage();
   const { token } = useAuth();
-  const [series, setSeries] = useState<SeriesDetail | null>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'missing'>('loading');
+  const queryClient = useQueryClient();
+  const invalidatePosts = useInvalidatePosts();
+  const key = queryKeys.series(slug, Boolean(token));
+  const { data: series, isPending, isError } = useQuery({ queryKey: key, queryFn: () => fetchSeriesBySlug(slug), retry: false });
+  const setSeries = (next: SeriesDetail) => queryClient.setQueryData(key, next);
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -34,23 +40,11 @@ export const SeriesPage: FC = () => {
   const readIds = getReadPosts();
 
   useEffect(() => {
-    let cancelled = false;
-    setState('loading');
-    fetchSeriesBySlug(slug)
-      .then((data) => {
-        if (cancelled) return;
-        setSeries(data);
-        setState('ready');
-        setPageTitle(`${data.title} — ${SITE_NAME}`);
-      })
-      .catch(() => !cancelled && setState('missing'));
-    return () => {
-      cancelled = true;
-    };
-  }, [slug, token]);
+    if (series) setPageTitle(`${series.title} — ${SITE_NAME}`);
+  }, [series?.title]);
 
-  if (state === 'missing') return <NotFound />;
-  if (state === 'loading' || !series) {
+  if (isError) return <NotFound />;
+  if (isPending || !series) {
     return <div className="max-w-3xl mx-auto h-72 rounded-2xl bg-[#0b0f19] border border-[#1e293b] animate-pulse" />;
   }
 
@@ -68,6 +62,7 @@ export const SeriesPage: FC = () => {
     setError(null);
     try {
       setSeries(await reorderSeries(series.id, ids, token));
+      invalidatePosts();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reorder');
     } finally {
@@ -84,6 +79,7 @@ export const SeriesPage: FC = () => {
       setIsEditing(false);
       if (updated.slug !== series.slug) navigate(`/series/${updated.slug}`, { replace: true });
       else setSeries({ ...series, title: updated.title, description: updated.description });
+      invalidatePosts();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
     } finally {
@@ -96,6 +92,7 @@ export const SeriesPage: FC = () => {
     setIsBusy(true);
     try {
       await deleteSeries(series.id, token);
+      invalidatePosts();
       navigate(`/${series.section.slug}`, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete');

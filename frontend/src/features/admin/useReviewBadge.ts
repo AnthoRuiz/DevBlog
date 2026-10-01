@@ -1,43 +1,46 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { fetchReviewCount } from '../../services/api';
+import { queryKeys } from '../../shared/api/queryKeys';
 import { setTitleBadge } from '../../utils/pageTitle';
 import { useAuth } from '../auth/AuthContext';
 
 /**
  * Posts waiting for review (admins only). Polled every minute, also in background tabs so the
- * "(N)" tab-title badge stays current, and refreshed when the tab regains focus.
+ * "(N)" tab-title badge stays current, and refreshed when the tab regains focus. Post changes
+ * invalidate it too (useInvalidatePosts).
  */
 export function useReviewBadge() {
   const { token, isAdmin } = useAuth();
-  const [pending, setPending] = useState(0);
+  const enabled = Boolean(token) && isAdmin;
+  const query = useQuery({
+    queryKey: queryKeys.reviewCount,
+    queryFn: () => fetchReviewCount(token as string),
+    enabled,
+    staleTime: 0,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: true,
+  });
+  const pending = enabled ? query.data ?? 0 : 0;
+  const { refetch } = query;
 
-  const refresh = useCallback(() => {
-    if (!token || !isAdmin) {
-      setPending(0);
-      return;
-    }
-    fetchReviewCount(token).then(setPending).catch(() => setPending(0));
-  }, [token, isAdmin]);
-
+  // TanStack Query only watches visibilitychange; window focus counts too
   useEffect(() => {
-    refresh();
-    if (!token || !isAdmin) return;
-    const interval = window.setInterval(refresh, 60_000);
+    if (!enabled) return;
     const onVisible = () => {
-      if (document.visibilityState === 'visible') refresh();
+      if (document.visibilityState === 'visible') refetch();
     };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
     return () => {
-      window.clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [refresh, token, isAdmin]);
+  }, [enabled, refetch]);
 
   useEffect(() => {
     setTitleBadge(pending);
   }, [pending]);
 
-  return { pending, refresh };
+  return { pending };
 }

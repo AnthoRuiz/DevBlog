@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { FC } from 'react';
 import { Link } from 'react-router-dom';
 import { ImageIcon } from 'lucide-react';
-import { HomeData, Post, SectionWithCount, Tag } from '../types';
+import { Post, SectionWithCount, Tag } from '../types';
 import { Language, Translations } from '../i18n';
 import { fetchHome } from '../services/api';
+import { queryKeys } from '../shared/api/queryKeys';
 import { formatPostDate } from '../components/DigestCard';
 import { SectionIcon } from '../components/SectionIcon';
 
@@ -13,8 +14,6 @@ interface HomeMagazineProps {
   currentLang: Language;
   sections: SectionWithCount[];
   tags: Tag[];
-  // Bumped by the parent when posts change (publish, delete, feature)
-  refreshKey: number;
 }
 
 // Cover image, or a quiet dotted placeholder in the section color
@@ -32,12 +31,8 @@ const Cover: FC<{ post: Post; className: string; color: string }> = ({ post, cla
   );
 
 // The approved magazine home: lead story + latest, one block per section, browse by tag
-export const HomeMagazine: FC<HomeMagazineProps> = ({ t, currentLang, sections, tags, refreshKey }) => {
-  const [data, setData] = useState<HomeData | null>(null);
-
-  useEffect(() => {
-    fetchHome().then(setData).catch(() => setData(null));
-  }, [refreshKey]);
+export const HomeMagazine: FC<HomeMagazineProps> = ({ t, currentLang, sections, tags }) => {
+  const { data } = useQuery({ queryKey: queryKeys.home, queryFn: fetchHome });
 
   if (!data) {
     return <div className="h-80 rounded-[20px] bg-[#0b0f19] border border-[#1e293b] animate-pulse mb-14" />;

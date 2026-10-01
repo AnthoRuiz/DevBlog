@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PostDetail } from '../types';
+import { useQuery } from '@tanstack/react-query';
 import { fetchPostBySlug } from '../services/api';
+import { queryKeys } from '../shared/api/queryKeys';
 import { ArticleView } from '../components/ArticleView';
 import { NotFound } from '../components/NotFound';
 import { setPageTitle } from '../utils/pageTitle';
@@ -19,35 +20,23 @@ export const PostPage: FC = () => {
   const { slug = '' } = useParams();
   const navigate = useNavigate();
   const { lang, t } = useLanguage();
-  const { canEditPost } = useAuth();
+  const { token, canEditPost } = useAuth();
   const { isBookmarked, toggle: toggleBookmark } = useBookmarks();
   const { remove, toggleUpvote } = usePostActions();
-  const { dataVersion, openEditor } = useShell();
-  const [post, setPost] = useState<PostDetail | null>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'missing'>('loading');
+  const { openEditor } = useShell();
 
-  // Reloads after edits elsewhere (dataVersion); keeps the current post visible meanwhile
-  useEffect(() => {
-    let cancelled = false;
-    setState((prev) => (post?.slug === slug ? prev : 'loading'));
-    fetchPostBySlug(slug)
-      .then((detail) => {
-        if (cancelled) return;
-        setPost(detail);
-        setState('ready');
-        markPostRead(detail.id);
-      })
-      .catch(() => {
-        if (!cancelled) setState('missing');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [slug, dataVersion]);
+  // Unknown or unpublished (for this reader) posts answer 404: no retries
+  const { data: post, isPending, isError } = useQuery({
+    queryKey: queryKeys.post(slug, Boolean(token)),
+    queryFn: () => fetchPostBySlug(slug),
+    retry: false,
+  });
 
   useEffect(() => {
-    if (state === 'ready' && post) setPageTitle(`${post.title} — ${SITE_NAME}`);
-  }, [state, post?.title]);
+    if (!post) return;
+    setPageTitle(`${post.title} — ${SITE_NAME}`);
+    markPostRead(post.id);
+  }, [post?.id, post?.title]);
 
   // Back to wherever the reader came from, or the home page on a direct visit
   const goBack = () => {
@@ -55,8 +44,8 @@ export const PostPage: FC = () => {
     else navigate('/');
   };
 
-  if (state === 'missing') return <NotFound />;
-  if (state === 'loading' || !post) {
+  if (isError) return <NotFound />;
+  if (isPending || !post) {
     return <div className="max-w-4xl mx-auto h-96 rounded-2xl bg-[#0b0f19] border border-[#1e293b] animate-pulse" />;
   }
 

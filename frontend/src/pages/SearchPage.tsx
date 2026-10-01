@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import type { FC, ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
@@ -6,7 +6,9 @@ import { Post } from '../types';
 import { fetchPosts, POSTS_PAGE_SIZE } from '../services/api';
 import { formatPostDate } from '../components/DigestCard';
 import { useLanguage } from '../shared/i18n/LanguageContext';
-import { useShell } from '../app/ShellContext';
+import { useSections } from '../shared/api/queries';
+import { queryKeys } from '../shared/api/queryKeys';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { setPageTitle } from '../utils/pageTitle';
 import { DEFAULT_TITLE } from '../shared/site';
 
@@ -29,49 +31,26 @@ function highlight(text: string, words: string[]): ReactNode {
 // /search?q=&section=
 export const SearchPage: FC = () => {
   const { lang: currentLang, t } = useLanguage();
-  const { sections } = useShell();
+  const sections = useSections();
   const [searchParams, setSearchParams] = useSearchParams();
   const q = (searchParams.get('q') ?? '').trim();
   const section = searchParams.get('section') ?? '';
-  const [results, setResults] = useState<Post[]>([]);
-  const [total, setTotal] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const requestId = useRef(0);
 
   const words = q.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? [];
 
-  const load = async (offset: number) => {
-    if (!q) {
-      setResults([]);
-      setTotal(0);
-      setHasMore(false);
-      return;
-    }
-    const id = offset === 0 ? ++requestId.current : requestId.current;
-    setIsLoading(true);
-    try {
-      const page = await fetchPosts({
-        query: q,
-        section: section || undefined,
-        sort: 'relevance',
-        offset,
-        limit: POSTS_PAGE_SIZE,
-      });
-      if (id !== requestId.current) return;
-      setResults((prev) => (offset === 0 ? page.items : [...prev, ...page.items]));
-      setTotal(page.total);
-      setHasMore(page.has_more);
-    } catch (err) {
-      console.error('Search failed:', err);
-    } finally {
-      if (id === requestId.current) setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load(0);
-  }, [q, section]);
+  const search = useInfiniteQuery({
+    queryKey: queryKeys.search(q, section),
+    queryFn: ({ pageParam }) =>
+      fetchPosts({ query: q, section: section || undefined, sort: 'relevance', offset: pageParam, limit: POSTS_PAGE_SIZE }),
+    initialPageParam: 0,
+    getNextPageParam: (last) => (last.has_more ? last.offset + last.items.length : undefined),
+    enabled: Boolean(q),
+  });
+  const pages = search.data?.pages ?? [];
+  const results: Post[] = q ? pages.flatMap((page) => page.items) : [];
+  const total = pages.length ? pages[pages.length - 1].total : 0;
+  const hasMore = Boolean(q && search.hasNextPage);
+  const isLoading = Boolean(q) && (search.isPending || search.isFetchingNextPage);
 
   useEffect(() => setPageTitle(DEFAULT_TITLE), []);
 
@@ -171,7 +150,7 @@ export const SearchPage: FC = () => {
           <button
             type="button"
             disabled={isLoading}
-            onClick={() => load(results.length)}
+            onClick={() => search.fetchNextPage()}
             className="px-6 py-2.5 rounded-xl border border-[#475569] hover:border-[#22D3EE] text-sm text-[#F8FAFC] transition-colors disabled:opacity-50"
           >
             {isLoading ? t.loadingMorePosts : t.loadMorePosts}

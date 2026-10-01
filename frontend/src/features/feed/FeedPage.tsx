@@ -3,7 +3,7 @@ import type { FC } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { NotFound } from '../../components/NotFound';
 import { HomeMagazine } from '../../pages/HomeMagazine';
-import { useShell } from '../../app/ShellContext';
+import { useSections, useTags } from '../../shared/api/queries';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
 import { useLanguage } from '../../shared/i18n/LanguageContext';
 import { setPageTitle } from '../../utils/pageTitle';
@@ -27,7 +27,8 @@ export const FeedPage: FC = () => {
   const [searchParams] = useSearchParams();
   const { lang, t } = useLanguage();
   const { bookmarkedIds } = useBookmarks();
-  const { sections, tags, dataVersion } = useShell();
+  const sections = useSections();
+  const tags = useTags();
   const [sort, setSort] = useState('recent');
 
   const isHome = location.pathname === '/';
@@ -44,7 +45,6 @@ export const FeedPage: FC = () => {
     sort,
     withSectionExtras: isSectionHome,
     bookmarkedIds,
-    dataVersion,
   });
 
   // Feed auto-discovery for the section being browsed (the site feed is in index.html)
@@ -95,7 +95,7 @@ export const FeedPage: FC = () => {
 
       {isHome ? (
         <>
-          <HomeMagazine t={t} currentLang={lang} sections={sections} tags={tags} refreshKey={dataVersion} />
+          <HomeMagazine t={t} currentLang={lang} sections={sections} tags={tags} />
           <HomeFeedHeader bookmarksCount={bookmarkedIds.size} sort={sort} onSort={setSort} />
         </>
       ) : (

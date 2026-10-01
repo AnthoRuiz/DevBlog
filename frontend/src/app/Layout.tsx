@@ -14,6 +14,7 @@ import { useLanguage } from '../shared/i18n/LanguageContext';
 import { SiteFooter } from '../shared/ui/SiteFooter';
 import { ROLE_TESTING_ENABLED } from '../services/api';
 import { ShellProvider, useShell } from './ShellContext';
+import { useSections, useTags } from '../shared/api/queries';
 
 // Every page renders inside this layout: navbar, footer and the app-wide modals
 export const Layout: FC = () => (
@@ -25,8 +26,10 @@ export const Layout: FC = () => (
 const LayoutFrame: FC = () => {
   const { lang, setLang, t } = useLanguage();
   const { token, user, isAdmin, canPublishDirectly, login, logout, setUser, switchRole } = useAuth();
-  const { pending: reviewPending, refresh: refreshReviewCount } = useReviewBadge();
-  const { sections, tags, notifyPostsChanged, editor, openEditor, closeEditor, isLoginOpen, setLoginOpen } = useShell();
+  const { pending: reviewPending } = useReviewBadge();
+  const { notifyPostsChanged, editor, openEditor, closeEditor, isLoginOpen, setLoginOpen } = useShell();
+  const sections = useSections();
+  const tags = useTags();
   const [isMyPostsOpen, setIsMyPostsOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -126,10 +129,7 @@ const LayoutFrame: FC = () => {
         isAdmin={isAdmin}
         canPublishDirectly={canPublishDirectly}
         token={token}
-        onPostCreated={() => {
-          notifyPostsChanged();
-          refreshReviewCount();
-        }}
+        onPostCreated={notifyPostsChanged}
         editingPost={editor.post}
         t={t}
         defaultLang={lang}
@@ -150,10 +150,7 @@ const LayoutFrame: FC = () => {
         onRoleChanged={setUser}
         onSectionsUpdated={notifyPostsChanged}
         reviewPending={reviewPending}
-        onReviewed={() => {
-          refreshReviewCount();
-          notifyPostsChanged();
-        }}
+        onReviewed={notifyPostsChanged}
         onPreviewPost={(item) => navigate(`/posts/${item.slug}`)}
       />
 
