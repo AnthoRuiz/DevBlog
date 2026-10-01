@@ -22,6 +22,7 @@ The personal blog of Anthony Ruiz: a self-hosted blog engine and Homelab observa
 - **Starter tags:** 19 tags seeded on an empty database, each assigned to its section.
 - **Two roles and a review queue:** anonymous visitors are the readers; every account is a `CREATOR` and `ADMIN` runs the site. Creators' posts wait in the admin's review queue (draft → in review → published or rejected with a reason) unless the admin marks the account as trusted. Admin posts publish directly. Creators get daily limits on AI calls (30) and uploads (20). The admin sees pending reviews as a badge on the admin panel button and as `(N)` in the browser tab title, refreshed every minute.
 - **Admin panel:** user and role management, backups (database + uploaded media, daily snapshots, 7-day rotation, one-click create/download/delete) and media storage usage with orphan cleanup.
+- **Featured posts:** the admin stars up to two published posts per section; they lead the section page in a *Featured* band.
 - **Full-text search:** PostgreSQL full-text search over title, summary and content (prefix matching while typing, ranked by relevance), filterable by section, with highlighted matches at `/search`.
 - **Real URLs:** every page has its own address (`/tech`, `/tags/docker`, `/posts/<slug>`, `/bookmarks`, `/search`) with working back/forward and shareable links.
 - **Personal brand:** name, tagline, `>ar_` monogram, colors and fonts come from the personal brand book; the site identity is served by `GET /site` (`SITE_*` settings) so the UI, feeds and previews share it.

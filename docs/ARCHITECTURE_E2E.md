@@ -212,6 +212,7 @@ erDiagram
         enum status "draft, pending_review, published, rejected"
         text review_note "rejection reason"
         tsvector search_vector "generated: title A, summary B, content C (GIN index)"
+        datetime featured_at "set while featured (max two per section)"
         datetime published_at
         datetime created_at
         datetime updated_at
@@ -418,7 +419,7 @@ The URL is the source of truth for the page and the feed filters (`App.tsx`):
 | Path | Page |
 |---|---|
 | `/` | Home feed |
-| `/:section` | Section feed (`tech`, `ai`, `career`, `mental-health`, `gaming`); `?tag=` filters by a tag of that section |
+| `/:section` | Section feed (`tech`, `ai`, `career`, `mental-health`, `gaming`) with a *Featured* band (up to two posts) above the rest; `?tag=` filters by a tag of that section |
 | `/tags/:tag` | Tag feed across sections |
 | `/posts/:slug` | Post page (canonical post URL, used by feeds and previews) |
 | `/bookmarks` | Saved posts |
@@ -479,7 +480,7 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 ### 6.2 Posts & Tags
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `GET` | `/posts` | Public | Paginated published posts (`section`, `tag`, `q` (full-text, prefix-aware), `sort=recent\|top_voted\|trending\|relevance`, `limit` 1–100 default 12, `offset`); returns `{items, total, limit, offset, has_more}` |
+| `GET` | `/posts` | Public | Paginated published posts (`section`, `tag`, `featured=true\|false`, `q` (full-text, prefix-aware), `sort=recent\|top_voted\|trending\|relevance`, `limit` 1–100 default 12, `offset`); returns `{items, total, limit, offset, has_more}` |
 | `GET` | `/posts/mine` | Creator | The current user's posts in every status |
 | `GET` | `/posts/{slug}` | Optional | Post detail (increments views); unpublished posts only for their author and admins |
 | `POST` | `/posts` | Creator | Create a post (`section_id` required; `submit` publishes or sends to review, `false` saves a draft) |
@@ -506,6 +507,8 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 | `GET` | `/admin/review` | Admin | Posts waiting for review, oldest first, with the author's name |
 | `GET` | `/admin/review/count` | Admin | `{pending}` for the admin panel badge |
 | `POST` | `/admin/posts/{post_id}/approve` | Admin | Publish a pending post |
+| `POST` | `/admin/posts/{post_id}/feature` | Admin | Feature a published post in its section (`409` when the section already has two) |
+| `DELETE` | `/admin/posts/{post_id}/feature` | Admin | Unfeature a post |
 | `POST` | `/admin/posts/{post_id}/reject` | Admin | Send a pending post back with `{reason}` |
 
 ### 6.3 Interactions
