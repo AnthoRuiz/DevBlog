@@ -4,7 +4,11 @@ import { Navbar } from './components/Navbar';
 import { SectionIcon } from './components/SectionIcon';
 import { DigestCard } from './components/DigestCard';
 import { NotFound } from './components/NotFound';
-import { setPageTitle, setTitleBadge } from './utils/pageTitle';
+import { setPageTitle } from './utils/pageTitle';
+import { useAuth } from './features/auth/AuthContext';
+import { useReviewBadge } from './features/admin/useReviewBadge';
+import { useBookmarks } from './features/bookmarks/useBookmarks';
+import { useLanguage } from './shared/i18n/LanguageContext';
 import { PostPage } from './pages/PostPage';
 import { SearchPage } from './pages/SearchPage';
 import { SeriesPage } from './pages/SeriesPage';
@@ -14,13 +18,12 @@ import { NewPostModal } from './components/NewPostModal';
 import { SystemStatusModal } from './components/SystemStatusModal';
 import { BackupsModal } from './components/BackupsModal';
 import { MyPostsModal } from './components/MyPostsModal';
-import { Post, PostDetail, SectionWithCount, Series, Tag, User, UserRole } from './types';
+import { Post, PostDetail, SectionWithCount, Series, Tag, User } from './types';
 
 const DEFAULT_TITLE = 'Anthony Ruiz — Software engineer, homelab & security';
 const SITE_NAME = 'Anthony Ruiz';
 const BOOKMARKS = '__bookmarks__';
 import {
-  fetchReviewCount,
   fetchSeriesList,
   featurePost,
   unfeaturePost,
@@ -30,15 +33,11 @@ import {
   fetchPostBySlug,
   toggleUpvote,
   fetchAllTags,
-  toggleBookmark,
   fetchBookmarkedPosts,
   deletePost,
-  fetchCurrentUser,
-  updateMyRole,
   ROLE_TESTING_ENABLED,
 } from './services/api';
 import { Sparkles, ArrowUpDown, Bookmark, Filter, X, ChevronDown, Search, Rss, Tag as TagIcon } from 'lucide-react';
-import { Language, translations } from './i18n';
 
 export function App() {
   // Routing: the URL is the source of truth for the page and the feed filters
@@ -96,19 +95,11 @@ export function App() {
   const [tagSearchQuery, setTagSearchQuery] = useState<string>('');
   const tagsDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Bookmarks stored locally and kept in sync
-  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(() => {
-    try {
-      const stored = localStorage.getItem('devblog_bookmarks');
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
-
-  // Active language and i18n
-  const [currentLang, setCurrentLang] = useState<Language>('es');
-  const t = translations[currentLang] || translations.es;
+  const { lang: currentLang, setLang: setCurrentLang, t } = useLanguage();
+  const { token: userToken, user: currentUser, login, logout, setUser, switchRole, canEditPost, canPublishDirectly } = useAuth();
+  const { pending: reviewPending, refresh: refreshReviewCount } = useReviewBadge();
+  const { bookmarkedIds, toggle: toggleBookmarkLocally } = useBookmarks();
+  const userEmail = currentUser?.email ?? null;
 
   // Modals and author authentication
   // Bumped after an edit so an open post page reloads
@@ -117,7 +108,6 @@ export function App() {
   const [isNewPostOpen, setIsNewPostOpen] = useState<boolean>(false);
   const [editingPost, setEditingPost] = useState<Post | PostDetail | null>(null);
   const [isMyPostsOpen, setIsMyPostsOpen] = useState<boolean>(false);
-  const [reviewPending, setReviewPending] = useState<number>(0);
 
   // Old #/status and #/backups links keep working
   useEffect(() => {
@@ -151,75 +141,6 @@ export function App() {
     };
   }, [isTagsDropdownOpen]);
 
-  const [userToken, setUserToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
-  const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('user_email'));
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      const stored = localStorage.getItem('current_user');
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  // Keep the user's profile and role in sync from /auth/me
-  useEffect(() => {
-    if (userToken) {
-      fetchCurrentUser(userToken)
-        .then((user) => {
-          setCurrentUser(user);
-          setUserEmail(user.email);
-          localStorage.setItem('current_user', JSON.stringify(user));
-        })
-        .catch(() => {
-          // Invalid or expired token
-          handleLogout();
-        });
-    }
-  }, [userToken]);
-
-  // Pending review counter for the admin panel badge
-  const refreshReviewCount = () => {
-    if (!userToken || currentUser?.role !== 'ADMIN') {
-      setReviewPending(0);
-      return;
-    }
-    fetchReviewCount(userToken).then(setReviewPending).catch(() => setReviewPending(0));
-  };
-  useEffect(refreshReviewCount, [userToken, currentUser?.role]);
-
-  // Admins: poll every minute (also in background tabs, so the title badge stays current) and
-  // right away when the tab becomes visible again
-  useEffect(() => {
-    if (!userToken || currentUser?.role !== 'ADMIN') return;
-    const interval = window.setInterval(refreshReviewCount, 60_000);
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') refreshReviewCount();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', onVisible);
-    return () => {
-      window.clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', onVisible);
-    };
-  }, [userToken, currentUser?.role]);
-
-  // "(N) " in the tab title while posts wait for review
-  useEffect(() => {
-    setTitleBadge(reviewPending);
-  }, [reviewPending]);
-
-  const handleSwitchRole = async (newRole: UserRole) => {
-    if (!userToken) return;
-    try {
-      const updatedUser = await updateMyRole(newRole, userToken);
-      setCurrentUser(updatedUser);
-      localStorage.setItem('current_user', JSON.stringify(updatedUser));
-    } catch (err: any) {
-      alert(err.message || 'Failed to change role');
-    }
-  };
 
   // Typing in the navbar opens /search (scoped to the section being browsed); further typing
   // replaces the history entry so it is not flooded
@@ -331,21 +252,7 @@ export function App() {
   };
 
   const handleToggleBookmark = async (postId: string) => {
-    const nextBookmarks = new Set(bookmarkedIds);
-    if (nextBookmarks.has(postId)) {
-      nextBookmarks.delete(postId);
-    } else {
-      nextBookmarks.add(postId);
-    }
-    setBookmarkedIds(nextBookmarks);
-    localStorage.setItem('devblog_bookmarks', JSON.stringify(Array.from(nextBookmarks)));
-
-    try {
-      await toggleBookmark(postId);
-    } catch (err) {
-      console.error('Failed to sync bookmark with the backend:', err);
-    }
-
+    await toggleBookmarkLocally(postId);
     if (selectedTag === BOOKMARKS) {
       loadData();
     }
@@ -387,30 +294,13 @@ export function App() {
   };
 
   const handleLoginSuccess = (token: string, user: User) => {
-    setUserToken(token);
-    setUserEmail(user.email);
-    setCurrentUser(user);
-    localStorage.setItem('auth_token', token);
-    localStorage.setItem('user_email', user.email);
-    localStorage.setItem('current_user', JSON.stringify(user));
+    login(token, user);
     loadData();
   };
 
   const handleLogout = () => {
-    setUserToken(null);
-    setUserEmail(null);
-    setCurrentUser(null);
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_email');
-    localStorage.removeItem('current_user');
+    logout();
     loadData();
-  };
-
-  // RBAC permissions
-  // Every account can write; admins can edit any post, creators only their own
-  const canEditPost = (post: Post | null | undefined): boolean => {
-    if (!post || !currentUser) return false;
-    return currentUser.role === 'ADMIN' || post.author_id === currentUser.id;
   };
 
   // Admin modals are routes; closing one returns to the page it was opened from
@@ -532,7 +422,7 @@ export function App() {
               <div className="inline-flex rounded-lg bg-[#07090e] p-0.5 border border-[#1e293b]">
                 <button
                   type="button"
-                  onClick={() => handleSwitchRole('ADMIN')}
+                  onClick={() => switchRole('ADMIN')}
                   className={`px-3 py-1 rounded text-xs font-bold transition-all ${
                     currentUser.role === 'ADMIN'
                       ? 'bg-purple-600 text-white shadow-md shadow-purple-600/40 ring-1 ring-purple-400'
@@ -544,7 +434,7 @@ export function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleSwitchRole('CREATOR')}
+                  onClick={() => switchRole('CREATOR')}
                   className={`px-3 py-1 rounded text-xs font-bold transition-all ${
                     currentUser.role === 'CREATOR'
                       ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/40 ring-1 ring-cyan-300'
@@ -585,7 +475,7 @@ export function App() {
         onLogout={handleLogout}
         onOpenStatus={handleOpenStatus}
         onOpenBackups={() => openAdminPanel('backups')}
-        onSwitchRole={ROLE_TESTING_ENABLED ? handleSwitchRole : undefined}
+        onSwitchRole={ROLE_TESTING_ENABLED ? switchRole : undefined}
         onOpenMyPosts={currentUser ? () => setIsMyPostsOpen(true) : undefined}
         onNewPost={
           currentUser
@@ -1045,7 +935,7 @@ export function App() {
         tags={tags}
         sections={sections}
         isAdmin={currentUser?.role === 'ADMIN'}
-        canPublishDirectly={currentUser?.role === 'ADMIN' || Boolean(currentUser?.is_trusted)}
+        canPublishDirectly={canPublishDirectly}
         token={userToken}
         onPostCreated={() => {
           loadData();
@@ -1071,10 +961,7 @@ export function App() {
         onClose={closeAdminPanel}
         token={userToken || undefined}
         currentUser={currentUser}
-        onRoleChanged={(updatedUser) => {
-          setCurrentUser(updatedUser);
-          localStorage.setItem('current_user', JSON.stringify(updatedUser));
-        }}
+        onRoleChanged={setUser}
         onSectionsUpdated={loadData}
         reviewPending={reviewPending}
         onReviewed={() => {

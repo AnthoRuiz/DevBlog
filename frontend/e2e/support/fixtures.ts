@@ -21,6 +21,9 @@ function adminCredentials(): { email: string; password: string } {
   return { email: env.ADMIN_EMAIL, password: env.ADMIN_PASSWORD };
 }
 
+// Tokens are cached for the whole run: login is rate limited (10/min per IP)
+const tokenCache: { admin?: string; creator?: string } = {};
+
 // A fixed creator account, registered on first use, so test runs do not pile up users
 const CREATOR = { email: 'e2e-creator@example.com', password: 'E2e!creator-pass-123', full_name: 'E2E Creator' };
 
@@ -37,7 +40,8 @@ export class Api {
   }
 
   async init() {
-    this.adminToken = (await this.call('POST', '/auth/login', adminCredentials())).access_token;
+    tokenCache.admin ??= (await this.call('POST', '/auth/login', adminCredentials())).access_token;
+    this.adminToken = tokenCache.admin as string;
   }
 
   async call(method: string, path: string, data?: Json, token?: string): Promise<any> {
@@ -51,11 +55,14 @@ export class Api {
   }
 
   async creatorToken(): Promise<string> {
-    try {
-      return (await this.call('POST', '/auth/login', { email: CREATOR.email, password: CREATOR.password })).access_token;
-    } catch {
-      return (await this.call('POST', '/auth/register', CREATOR)).access_token;
+    if (!tokenCache.creator) {
+      try {
+        tokenCache.creator = (await this.call('POST', '/auth/login', { email: CREATOR.email, password: CREATOR.password })).access_token;
+      } catch {
+        tokenCache.creator = (await this.call('POST', '/auth/register', CREATOR)).access_token;
+      }
     }
+    return tokenCache.creator as string;
   }
 
   async section(slug: string): Promise<Json> {
