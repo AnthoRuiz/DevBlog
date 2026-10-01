@@ -1,591 +1,139 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FC } from 'react';
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Sparkles, ArrowUpDown, Bookmark, Filter, X, ChevronDown, Search, Rss, Tag as TagIcon } from 'lucide-react';
-import { Post, Series } from '../../types';
-import { fetchPosts, fetchSeriesList, fetchBookmarkedPosts, POSTS_PAGE_SIZE } from '../../services/api';
-import { DigestCard } from '../../components/DigestCard';
-import { SectionIcon } from '../../components/SectionIcon';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { NotFound } from '../../components/NotFound';
 import { HomeMagazine } from '../../pages/HomeMagazine';
 import { useShell } from '../../app/ShellContext';
-import { useAuth } from '../auth/AuthContext';
 import { useBookmarks } from '../bookmarks/BookmarksContext';
-import { usePostActions } from '../posts/usePostActions';
 import { useLanguage } from '../../shared/i18n/LanguageContext';
 import { setPageTitle } from '../../utils/pageTitle';
 import { DEFAULT_TITLE, SITE_NAME } from '../../shared/site';
-
-const BOOKMARKS = '__bookmarks__';
-const PRIMARY_TAG_LIMIT = 6;
+import { useFeed } from './useFeed';
+import { SectionBar } from './SectionBar';
+import { BOOKMARKS, TagFilterBar } from './TagFilterBar';
+import { ActiveFilterBanner, HomeFeedHeader } from './FeedBanners';
+import { FeaturedBand, SectionHeader, SeriesBand } from './SectionBands';
+import { PostGrid } from './PostGrid';
 
 /**
  * Feed routes: / (magazine home + all posts), /:sectionSlug (?tag=), /tags/:tagSlug, /bookmarks,
- * and /admin/:panel (plain feed behind the admin modals). Filters come from the URL.
+ * and /admin/:panel (plain feed behind the admin modals). Filters come from the URL; changing one
+ * navigates.
  */
 export const FeedPage: FC = () => {
   const { sectionSlug, tagSlug } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { lang: currentLang, t } = useLanguage();
-  const { isAdmin, canEditPost } = useAuth();
-  const { bookmarkedIds, toggle: toggleBookmark } = useBookmarks();
-  const { remove: handleDeletePost, toggleFeatured: handleToggleFeatured, toggleUpvote } = usePostActions();
-  const { sections, tags, dataVersion, openEditor: handleEditPost } = useShell();
+  const { lang, t } = useLanguage();
+  const { bookmarkedIds } = useBookmarks();
+  const { sections, tags, dataVersion } = useShell();
+  const [sort, setSort] = useState('recent');
 
   const isHome = location.pathname === '/';
-  const isBookmarksRoute = location.pathname === '/bookmarks';
-  const selectedSection = sectionSlug;
-  const selectedTag = isBookmarksRoute ? BOOKMARKS : tagSlug ?? (sectionSlug ? searchParams.get('tag') ?? undefined : undefined);
-  // The featured band, series band and section header appear on a section page with no tag filter
-  const showsFeaturedBand = Boolean(sectionSlug) && !searchParams.get('tag');
-  const selectedSectionObject = sections.find((s) => s.slug === selectedSection);
+  const isBookmarks = location.pathname === '/bookmarks';
+  const selectedTag = isBookmarks ? BOOKMARKS : tagSlug ?? (sectionSlug ? searchParams.get('tag') ?? undefined : undefined);
+  const section = sections.find((s) => s.slug === sectionSlug);
+  // Section page with no tag filter: header, featured band and series band
+  const isSectionHome = Boolean(sectionSlug) && !searchParams.get('tag');
+
+  const feed = useFeed({
+    section: sectionSlug,
+    tag: isBookmarks ? undefined : selectedTag,
+    bookmarks: isBookmarks,
+    sort,
+    withSectionExtras: isSectionHome,
+    bookmarkedIds,
+    dataVersion,
+  });
+
+  // Feed auto-discovery for the section being browsed (the site feed is in index.html)
+  useEffect(() => {
+    if (!section) return;
+    const link = document.createElement('link');
+    link.rel = 'alternate';
+    link.type = 'application/rss+xml';
+    link.title = `${section.name} — ${SITE_NAME}`;
+    link.href = `/${section.slug}/feed.xml`;
+    document.head.appendChild(link);
+    return () => link.remove();
+  }, [section?.slug]);
+
+  useEffect(() => {
+    setPageTitle(section ? `${section.name} — ${SITE_NAME}` : DEFAULT_TITLE);
+  }, [location.pathname, section?.name]);
+
   // /:sectionSlug with a slug that is not a section
-  const isUnknownSection = Boolean(selectedSection) && sections.length > 0 && !selectedSectionObject;
+  if (sectionSlug && sections.length > 0 && !section) return <NotFound />;
 
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);
-  const [sectionSeries, setSectionSeries] = useState<Series[]>([]);
-  const [totalPosts, setTotalPosts] = useState(0);
-  const [hasMorePosts, setHasMorePosts] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [sortBy, setSortBy] = useState('recent');
-  const [isTagsDropdownOpen, setIsTagsDropdownOpen] = useState(false);
-  const [tagSearchQuery, setTagSearchQuery] = useState('');
-  const tagsDropdownRef = useRef<HTMLDivElement>(null);
-  // Incremented on every fresh load so late responses from an older filter are ignored
-  const feedRequestId = useRef(0);
-
-  const loadData = async () => {
-    const requestId = ++feedRequestId.current;
-    setIsLoading(true);
-    try {
-      if (selectedTag === BOOKMARKS) {
-        const bookmarkedPosts = await fetchBookmarkedPosts().catch(() => [] as Post[]);
-        // If the API returned nothing but we have local bookmarks, filter them from all posts
-        let items = bookmarkedPosts;
-        if (bookmarkedPosts.length === 0 && bookmarkedIds.size > 0) {
-          const allPosts = await fetchPosts({ sort: sortBy, offset: 0, limit: 100 });
-          items = allPosts.items.filter((p) => bookmarkedIds.has(p.id));
-        }
-        if (requestId !== feedRequestId.current) return;
-        setPosts(items);
-        setHasMorePosts(false);
-        setFeaturedPosts([]);
-        setSectionSeries([]);
-      } else {
-        const [page, featuredPage, seriesData] = await Promise.all([
-          fetchPosts({ section: selectedSection, tag: selectedTag, sort: sortBy, featured: showsFeaturedBand ? false : undefined }),
-          showsFeaturedBand ? fetchPosts({ section: selectedSection, featured: true, limit: 2 }).catch(() => null) : Promise.resolve(null),
-          showsFeaturedBand && selectedSection ? fetchSeriesList(selectedSection).catch(() => [] as Series[]) : Promise.resolve([] as Series[]),
-        ]);
-        if (requestId !== feedRequestId.current) return;
-        setFeaturedPosts(featuredPage?.items ?? []);
-        setSectionSeries(seriesData);
-        setPosts(page.items);
-        setTotalPosts(page.total);
-        setHasMorePosts(page.has_more);
-      }
-    } catch (err) {
-      console.error('Failed to load posts:', err);
-    } finally {
-      if (requestId === feedRequestId.current) setIsLoading(false);
-    }
+  const goToFeed = (sectionTarget: string | undefined, tag: string | undefined) => {
+    if (tag === BOOKMARKS) return navigate('/bookmarks');
+    if (sectionTarget) return navigate(tag ? `/${sectionTarget}?tag=${encodeURIComponent(tag)}` : `/${sectionTarget}`);
+    navigate(tag ? `/tags/${tag}` : '/');
   };
 
-  useEffect(() => {
-    loadData();
-  }, [selectedSection, selectedTag, sortBy, dataVersion]);
-
-  const handleLoadMore = async () => {
-    if (isLoadingMore || !hasMorePosts || selectedTag === BOOKMARKS) return;
-    const requestId = feedRequestId.current;
-    setIsLoadingMore(true);
-    try {
-      const page = await fetchPosts({
-        section: selectedSection,
-        tag: selectedTag,
-        featured: showsFeaturedBand ? false : undefined,
-        sort: sortBy,
-        offset: posts.length,
-        limit: POSTS_PAGE_SIZE,
-      });
-      // Filters changed while this page was loading: drop it
-      if (requestId !== feedRequestId.current) return;
-      setPosts((prev) => {
-        const seen = new Set(prev.map((p) => p.id));
-        return [...prev, ...page.items.filter((p) => !seen.has(p.id))];
-      });
-      setTotalPosts(page.total);
-      setHasMorePosts(page.has_more);
-    } catch (err) {
-      console.error('Failed to load more posts:', err);
-    } finally {
-      setIsLoadingMore(false);
-    }
+  // A tag outside the current section switches to the global tag page
+  const selectTag = (tag: string | undefined) => {
+    const keepSection = section && tag !== BOOKMARKS && (!tag || tags.find((tg) => tg.slug === tag)?.section_id === section.id);
+    goToFeed(keepSection ? sectionSlug : undefined, tag);
   };
 
-  const handleOpenArticle = (slug: string) => navigate(`/posts/${slug}`);
-
-  const handleToggleBookmark = async (postId: string) => {
-    await toggleBookmark(postId);
-    if (selectedTag === BOOKMARKS) loadData();
-  };
-
-  // Close the tag dropdown when clicking outside
-  useEffect(() => {
-    if (!isTagsDropdownOpen) return;
-    const handleClickOutside = (event: MouseEvent) => {
-      if (tagsDropdownRef.current && !tagsDropdownRef.current.contains(event.target as Node)) {
-        setIsTagsDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isTagsDropdownOpen]);
-
-  // Build a feed URL
-  const goToFeed = (section: string | undefined, tag: string | undefined) => {
-    let path = '/';
-    const params = new URLSearchParams();
-    if (tag === BOOKMARKS) {
-      path = '/bookmarks';
-    } else if (section) {
-      path = `/${section}`;
-      if (tag) params.set('tag', tag);
-    } else if (tag) {
-      path = `/tags/${tag}`;
-    }
-    const query = params.toString();
-    navigate(query ? `${path}?${query}` : path);
-  };
-
-  const setSelectedTag = (tag: string | undefined) => {
-    // A tag outside the selected section switches to the global tag page
-    const tagSection = tags.find((tg) => tg.slug === tag)?.section_id;
-    let keepSection = false;
-    if (selectedSectionObject && tag !== BOOKMARKS) {
-      keepSection = !tag || tagSection === selectedSectionObject.id;
-    }
-    goToFeed(keepSection ? selectedSection : undefined, tag);
-  };
-
-  const handleSelectSection = (slug: string | undefined) => {
+  // Leave bookmarks, and drop a tag filter that does not belong to the new section
+  const selectSection = (slug: string | undefined) => {
     const next = sections.find((s) => s.slug === slug);
-    // Leave bookmarks, and drop a tag filter that does not belong to the new section
     const currentTag = tags.find((tg) => tg.slug === selectedTag);
     const keepTag = selectedTag !== BOOKMARKS && currentTag && (!next || currentTag.section_id === next.id);
     goToFeed(slug, keepTag ? selectedTag : undefined);
   };
 
-  const handleClearFilters = () => navigate('/');
-
-  // Feed auto-discovery for the section being browsed (the site feed is in index.html)
-  useEffect(() => {
-    if (!selectedSectionObject) return;
-    const link = document.createElement('link');
-    link.rel = 'alternate';
-    link.type = 'application/rss+xml';
-    link.title = `${selectedSectionObject.name} — ${SITE_NAME}`;
-    link.href = `/${selectedSectionObject.slug}/feed.xml`;
-    document.head.appendChild(link);
-    return () => link.remove();
-  }, [selectedSectionObject?.slug]);
-
-  useEffect(() => {
-    setPageTitle(selectedSectionObject ? `${selectedSectionObject.name} — ${SITE_NAME}` : DEFAULT_TITLE);
-  }, [location.pathname, selectedSectionObject?.name]);
-
-  if (isUnknownSection) return <NotFound />;
-
-  const isFiltering = selectedSection !== undefined || selectedTag !== undefined;
-
-  // Only the selected section's tags are offered as filters; the rest go in a dropdown
-  const visibleTags = selectedSectionObject ? tags.filter((tg) => tg.section_id === selectedSectionObject.id) : tags;
-  const primaryTags = visibleTags.slice(0, PRIMARY_TAG_LIMIT);
-  const remainingTags = visibleTags.slice(PRIMARY_TAG_LIMIT);
-  const isSelectedInPrimary = primaryTags.some((tg) => tg.slug === selectedTag);
-  const selectedTagObject = tags.find((tg) => tg.slug === selectedTag);
-  const showPinnedSelectedTag = Boolean(selectedTag && selectedTag !== BOOKMARKS && !isSelectedInPrimary);
-  const filteredRemainingTags = remainingTags.filter(
-    (tag) =>
-      tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase()) ||
-      tag.slug.toLowerCase().includes(tagSearchQuery.toLowerCase())
-  );
+  const isFiltering = sectionSlug !== undefined || selectedTag !== undefined;
+  const visibleTags = section ? tags.filter((tg) => tg.section_id === section.id) : tags;
 
   return (
     <>
-      {/* Section bar */}
-      {sections.length > 0 && (
-        <nav aria-label={t.sectionsNavLabel} className="flex gap-2 mb-4 overflow-x-auto pb-1">
-          <button
-            type="button"
-            onClick={() => handleSelectSection(undefined)}
-            aria-pressed={selectedSection === undefined}
-            className={`flex-shrink-0 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all border ${
-              selectedSection === undefined
-                ? 'bg-[#0f1422] border-slate-500 text-white'
-                : 'bg-[#0b0f19] border-[#1e293b] text-slate-400 hover:text-white'
-            }`}
-          >
-            {t.allSections}
-          </button>
-          {sections.map((section) => {
-            const active = selectedSection === section.slug;
-            return (
-              <button
-                key={section.id}
-                type="button"
-                onClick={() => handleSelectSection(active ? undefined : section.slug)}
-                aria-pressed={active}
-                title={section.description}
-                className={`flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all border ${
-                  active ? 'bg-[#0f1422]' : 'bg-[#0b0f19] border-[#1e293b] text-slate-400 hover:text-white'
-                }`}
-                style={active ? { borderColor: section.color_hex, color: section.color_hex } : undefined}
-              >
-                <SectionIcon icon={section.icon} className="w-4 h-4" style={{ color: section.color_hex }} />
-                <span>{section.name}</span>
-                <span className="text-[11px] font-mono text-slate-500">{section.post_count}</span>
-              </button>
-            );
-          })}
-        </nav>
-      )}
+      <SectionBar sections={sections} selected={sectionSlug} onSelect={selectSection} />
 
-      {/* Magazine home (approved design): lead story, latest, section blocks, browse by tag */}
-      {isHome && (
+      {isHome ? (
         <>
-          <HomeMagazine t={t} currentLang={currentLang} sections={sections} tags={tags} refreshKey={dataVersion} />
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-[#1e293b] pb-4">
-            <h2 className="text-xl font-extrabold tracking-tight text-[#F8FAFC]">{t.homeAllPosts}</h2>
-            <div className="flex items-center gap-3 text-xs font-mono text-[#94A3B8]">
-              <Link to="/bookmarks" className="inline-flex items-center gap-1.5 hover:text-[#F8FAFC] transition-colors">
-                <Bookmark className="w-3.5 h-3.5" />
-                {t.bookmarksTab} ({bookmarkedIds.size})
-              </Link>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                aria-label={t.sortByRecent}
-                className="bg-[#0b0f19] border border-[#1e293b] rounded-lg px-2.5 py-1.5 text-[#F8FAFC] focus:outline-none focus:border-[#22D3EE]"
-              >
-                <option value="recent">{t.sortByRecent}</option>
-                <option value="top_voted">{t.sortByTopVoted}</option>
-                <option value="trending">{t.sortByTrending}</option>
-              </select>
-            </div>
-          </div>
+          <HomeMagazine t={t} currentLang={lang} sections={sections} tags={tags} refreshKey={dataVersion} />
+          <HomeFeedHeader bookmarksCount={bookmarkedIds.size} sort={sort} onSort={setSort} />
         </>
-      )}
-
-      {/* Category, tag and sort filter bar (feeds other than the home) */}
-      {!isHome && (
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6 border-b border-[#1e293b] pb-4">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            onClick={() => setSelectedTag(undefined)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all ${
-              selectedTag === undefined
-                ? 'bg-cyan-500 text-slate-950 font-bold'
-                : 'bg-[#0b0f19] text-slate-400 hover:text-white border border-[#1e293b]'
-            }`}
-          >
-            {t.allTopics}
-          </button>
-
-          {/* Bookmarks tab */}
-          <button
-            onClick={() => setSelectedTag(selectedTag === BOOKMARKS ? undefined : BOOKMARKS)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all border ${
-              selectedTag === BOOKMARKS
-                ? 'border-cyan-400 text-cyan-300 bg-cyan-500/10 font-bold'
-                : 'border-[#1e293b] text-slate-400 hover:text-white bg-[#0b0f19]'
-            }`}
-          >
-            <Bookmark className={`w-3.5 h-3.5 ${selectedTag === BOOKMARKS ? 'fill-current' : ''}`} />
-            <span>{t.bookmarksTab} ({bookmarkedIds.size})</span>
-          </button>
-
-          {/* Primary tags (capped to save screen space) */}
-          {primaryTags.map((tag) => (
-            <button
-              key={tag.id}
-              onClick={() => setSelectedTag(tag.slug === selectedTag ? undefined : tag.slug)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all border ${
-                selectedTag === tag.slug
-                  ? 'border-cyan-400 text-cyan-300 bg-cyan-500/10 font-bold'
-                  : 'border-[#1e293b] text-slate-400 hover:text-white bg-[#0b0f19]'
-              }`}
-            >
-              #{tag.name}
-            </button>
-          ))}
-
-          {/* Pinned active tag when picked from the dropdown */}
-          {showPinnedSelectedTag && selectedTagObject && (
-            <button
-              onClick={() => setSelectedTag(undefined)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all border border-cyan-400 text-cyan-300 bg-cyan-500/20 shadow-sm hover:bg-cyan-500/30"
-              title="Remove tag filter"
-            >
-              <span>#{selectedTagObject.name}</span>
-              <X className="w-3.5 h-3.5 text-cyan-400 hover:text-white" />
-            </button>
-          )}
-
-          {/* Compact dropdown for the remaining tags */}
-          {remainingTags.length > 0 && (
-            <div className="relative" ref={tagsDropdownRef}>
-              <button
-                type="button"
-                onClick={() => setIsTagsDropdownOpen(!isTagsDropdownOpen)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all border ${
-                  isTagsDropdownOpen || showPinnedSelectedTag
-                    ? 'border-cyan-400 text-cyan-300 bg-cyan-500/10'
-                    : 'border-[#1e293b] text-slate-400 hover:text-white bg-[#0b0f19]'
-                }`}
-                title="Show more tags"
-              >
-                <TagIcon className="w-3.5 h-3.5 text-cyan-400" />
-                <span>+{remainingTags.length} more</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isTagsDropdownOpen ? 'rotate-180 text-cyan-400' : ''}`} />
-              </button>
-
-              {isTagsDropdownOpen && (
-                <div className="absolute left-0 top-full mt-2 w-64 bg-[#0d131f] border border-[#1e293b] rounded-xl shadow-2xl z-40 p-2.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-150">
-                  <div className="relative mb-2">
-                    <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Search tags..."
-                      value={tagSearchQuery}
-                      onChange={(e) => setTagSearchQuery(e.target.value)}
-                      className="w-full bg-[#070a12] border border-[#1e293b] rounded-lg pl-8 pr-7 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-                      autoFocus
-                    />
-                    {tagSearchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setTagSearchQuery('')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-                    {filteredRemainingTags.length === 0 ? (
-                      <div className="p-3 text-center text-xs text-slate-500 font-mono">
-                        No tags found
-                      </div>
-                    ) : (
-                      filteredRemainingTags.map((tag) => (
-                        <button
-                          key={tag.id}
-                          onClick={() => {
-                            setSelectedTag(tag.slug === selectedTag ? undefined : tag.slug);
-                            setIsTagsDropdownOpen(false);
-                            setTagSearchQuery('');
-                          }}
-                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-mono transition-colors text-left ${
-                            selectedTag === tag.slug
-                              ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30'
-                              : 'text-slate-300 hover:bg-[#151c2d] hover:text-white'
-                          }`}
-                        >
-                          <span className="truncate">#{tag.name}</span>
-                          {selectedTag === tag.slug && (
-                            <span className="text-[10px] bg-cyan-500 text-slate-950 font-bold px-1.5 py-0.5 rounded ml-2 shrink-0">
-                              Active
-                            </span>
-                          )}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-          <ArrowUpDown className="w-3.5 h-3.5 text-cyan-400" />
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="bg-[#0b0f19] border border-[#1e293b] rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-cyan-500"
-          >
-            <option value="recent">{t.sortByRecent}</option>
-            <option value="top_voted">{t.sortByTopVoted}</option>
-            <option value="trending">{t.sortByTrending}</option>
-          </select>
-        </div>
-      </div>
-      )}
-
-      {/* Active filter indicator with clear button */}
-      {isFiltering && (
-        <div className="flex items-center justify-between bg-[#0b0f19] border border-cyan-500/30 rounded-xl px-4 py-2.5 mb-6 text-xs font-mono">
-          <div className="flex items-center gap-2 text-slate-300">
-            <Filter className="w-3.5 h-3.5 text-cyan-400" />
-            <span>
-              {selectedSectionObject && selectedTag !== BOOKMARKS ? `${selectedSectionObject.name}` : ''}
-              {selectedSectionObject && selectedTag && selectedTag !== BOOKMARKS ? ' • ' : ''}
-              {selectedTag === BOOKMARKS
-                ? `${t.bookmarksTab}`
-                : selectedTag
-                ? `${t.activeTagFilter}: #${selectedTag}`
-                : ''}
-            </span>
-          </div>
-          <button
-            onClick={handleClearFilters}
-            className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 font-bold transition-colors"
-          >
-            <X className="w-3.5 h-3.5" />
-            <span>{t.clearFilter}</span>
-          </button>
-        </div>
-      )}
-
-      {/* Section header with its feed */}
-      {selectedSectionObject && showsFeaturedBand && (
-        <header className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-[#F8FAFC]">{selectedSectionObject.name}</h1>
-            {selectedSectionObject.description && (
-              <p className="mt-1 text-sm text-[#94A3B8] max-w-[62ch]">{selectedSectionObject.description}</p>
-            )}
-          </div>
-          <a
-            href={`/${selectedSectionObject.slug}/feed.xml`}
-            className="inline-flex items-center gap-1.5 self-start sm:self-auto text-xs font-mono text-[#7C8AA0] hover:text-[#22D3EE] transition-colors"
-            title={t.rssSectionFeed}
-          >
-            <Rss className="w-3.5 h-3.5" />
-            RSS
-          </a>
-        </header>
-      )}
-
-      {/* Featured band (section pages) */}
-      {!isLoading && featuredPosts.length > 0 && (
-        <section aria-label={t.featuredLabel} className="mb-8">
-          <p className="text-xs font-mono uppercase tracking-[0.08em] text-[#22D3EE] mb-3">{t.featuredLabel}</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {featuredPosts.map((post) => (
-              <DigestCard
-                key={post.id}
-                post={post}
-                onOpen={handleOpenArticle}
-                onToggleUpvote={toggleUpvote}
-                onSelectTag={(slug) => setSelectedTag(slug)}
-                onToggleBookmark={handleToggleBookmark}
-                isBookmarked={bookmarkedIds.has(post.id)}
-                isAuthor={canEditPost(post)}
-                onEditPost={handleEditPost}
-                onDeletePost={handleDeletePost}
-                onToggleFeatured={isAdmin ? handleToggleFeatured : undefined}
-                t={t}
-                currentLang={currentLang}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Series band (section pages) */}
-      {!isLoading && showsFeaturedBand && sectionSeries.length > 0 && (
-        <section aria-label={t.seriesBandTitle} className="mb-8">
-          <p className="text-xs font-mono uppercase tracking-[0.08em] text-[#22D3EE] mb-3">{t.seriesBandTitle}</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {sectionSeries.map((sr) => (
-              <Link
-                key={sr.id}
-                to={`/series/${sr.slug}`}
-                className="block bg-[#0b0f19] border border-[#1e293b] hover:border-[rgba(34,211,238,0.35)] rounded-2xl p-4 transition-colors"
-              >
-                <span className="block font-bold text-[#F8FAFC] leading-snug">{sr.title}</span>
-                {sr.description && <span className="block text-xs text-[#94A3B8] mt-1 line-clamp-2">{sr.description}</span>}
-                <span className="block text-[11px] font-mono text-[#7C8AA0] mt-2">
-                  {t.seriesPostCount.replace('{count}', String(sr.post_count))}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Post grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-64 rounded-2xl bg-[#0b0f19] border border-[#1e293b] animate-pulse" />
-          ))}
-        </div>
-      ) : posts.length === 0 && featuredPosts.length > 0 ? null : posts.length === 0 ? (
-        <div className="text-center py-16 bg-[#0b0f19] border border-[#1e293b] rounded-2xl">
-          <Sparkles className="w-8 h-8 text-cyan-400 mx-auto mb-3" />
-          <h3 className="font-bold text-white text-base">
-            {selectedTag === BOOKMARKS ? t.noBookmarksFound : t.noArticlesFound}
-          </h3>
-          <p className="text-xs text-slate-400 mt-1">
-            {selectedTag === BOOKMARKS ? t.noBookmarksSub : t.noArticlesSub}
-          </p>
-          {isFiltering && (
-            <button
-              onClick={handleClearFilters}
-              className="mt-4 px-4 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold hover:bg-cyan-500/20 transition-colors"
-            >
-              {t.clearFilter}
-            </button>
-          )}
-        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {posts.map((post) => (
-            <DigestCard
-              key={post.id}
-              post={post}
-              onOpen={handleOpenArticle}
-              onToggleUpvote={toggleUpvote}
-              onSelectTag={(slug) => setSelectedTag(slug)}
-              onToggleBookmark={handleToggleBookmark}
-              isBookmarked={bookmarkedIds.has(post.id)}
-              isAuthor={canEditPost(post)}
-              onEditPost={handleEditPost}
-              onDeletePost={handleDeletePost}
-              onToggleFeatured={isAdmin ? handleToggleFeatured : undefined}
-              t={t}
-              currentLang={currentLang}
-            />
-          ))}
-        </div>
+        <TagFilterBar
+          tags={visibleTags}
+          selected={selectedTag}
+          bookmarksCount={bookmarkedIds.size}
+          onSelect={selectTag}
+          sort={sort}
+          onSort={setSort}
+        />
       )}
 
-      {/* Pagination: load the next page of the feed */}
-      {!isLoading && selectedTag !== BOOKMARKS && posts.length > 0 && (
-        <div className="flex flex-col items-center gap-2 mt-8">
-          {hasMorePosts && (
-            <button
-              type="button"
-              onClick={handleLoadMore}
-              disabled={isLoadingMore}
-              className="px-6 py-2.5 rounded-xl border border-cyan-500/50 text-cyan-300 bg-[#0b0f19] hover:bg-cyan-500/10 text-sm font-bold transition-colors disabled:opacity-50"
-            >
-              {isLoadingMore ? t.loadingMorePosts : t.loadMorePosts}
-            </button>
-          )}
-          <span className="text-xs font-mono text-slate-400">
-            {t.showingPostsCount.replace('{shown}', String(posts.length)).replace('{total}', String(totalPosts))}
-          </span>
-        </div>
+      {isFiltering && (
+        <ActiveFilterBanner
+          sectionName={isBookmarks ? undefined : section?.name}
+          tag={isBookmarks ? undefined : selectedTag}
+          isBookmarks={isBookmarks}
+          onClear={() => navigate('/')}
+        />
       )}
+
+      {section && isSectionHome && <SectionHeader section={section} />}
+      {!feed.isLoading && <FeaturedBand posts={feed.featured} onSelectTag={selectTag} />}
+      {!feed.isLoading && isSectionHome && <SeriesBand series={feed.series} />}
+
+      <PostGrid
+        posts={feed.posts}
+        isLoading={feed.isLoading}
+        isBookmarks={isBookmarks}
+        hasFeatured={feed.featured.length > 0}
+        total={feed.total}
+        hasMore={feed.hasMore}
+        isLoadingMore={feed.isLoadingMore}
+        onLoadMore={feed.loadMore}
+        onSelectTag={selectTag}
+        onClearFilters={isFiltering ? () => navigate('/') : undefined}
+      />
     </>
   );
 };

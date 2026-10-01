@@ -54,3 +54,15 @@ test.describe('navigation', () => {
     await expect(page).toHaveURL(/\/admin\/status$/);
   });
 });
+
+test('bookmarks: save from the post page, list them, remove from the card', async ({ page, api }) => {
+  const post = await api.createPost({ title: `E2E bookmark ${stamp()}`, section: 'tech' });
+  await page.goto(`/posts/${post.slug}`);
+  await page.getByTitle('Guardar en marcadores').click();
+
+  await page.goto('/bookmarks');
+  const card = page.locator('main article', { hasText: post.title });
+  await expect(card).toBeVisible();
+  await card.getByTitle('Guardado').click();
+  await expect(card).toHaveCount(0);
+});
