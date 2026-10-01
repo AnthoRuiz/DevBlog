@@ -174,6 +174,9 @@ export interface Translations {
   searchNoResults: string;
   searchNoResultsHint: string;
   searchAllSections: string;
+  featuredLabel: string;
+  featurePost: string;
+  unfeaturePost: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -347,6 +350,9 @@ export const translations: Record<Language, Translations> = {
     searchNoResults: 'Sin resultados',
     searchNoResultsHint: 'Prueba con otras palabras o con menos términos.',
     searchAllSections: 'Buscar en todas las secciones',
+    featuredLabel: 'Destacados',
+    featurePost: 'Destacar en la sección',
+    unfeaturePost: 'Quitar de destacados',
   },
   en: {
     siteTitle: 'Anthony Ruiz',
@@ -518,6 +524,9 @@ export const translations: Record<Language, Translations> = {
     searchNoResults: 'No results',
     searchNoResultsHint: 'Try different words or fewer terms.',
     searchAllSections: 'Search all sections',
+    featuredLabel: 'Featured',
+    featurePost: 'Feature in section',
+    unfeaturePost: 'Remove from featured',
   },
   pt: {
     siteTitle: 'Anthony Ruiz',
@@ -689,6 +698,9 @@ export const translations: Record<Language, Translations> = {
     searchNoResults: 'Nenhum resultado',
     searchNoResultsHint: 'Tente outras palavras ou menos termos.',
     searchAllSections: 'Buscar em todas as seções',
+    featuredLabel: 'Destaques',
+    featurePost: 'Destacar na seção',
+    unfeaturePost: 'Remover dos destaques',
   },
   fr: {
     siteTitle: 'Anthony Ruiz',
@@ -860,6 +872,9 @@ export const translations: Record<Language, Translations> = {
     searchNoResults: 'Aucun résultat',
     searchNoResultsHint: 'Essayez d\'autres mots ou moins de termes.',
     searchAllSections: 'Rechercher dans toutes les sections',
+    featuredLabel: 'À la une',
+    featurePost: 'Mettre à la une',
+    unfeaturePost: 'Retirer de la une',
   },
 };
 

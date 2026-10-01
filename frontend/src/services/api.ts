@@ -34,6 +34,7 @@ export const POSTS_PAGE_SIZE = 12;
 export interface PostQuery {
   section?: string;
   tag?: string;
+  featured?: boolean;
   sort?: string;
   query?: string;
   offset?: number;
@@ -43,6 +44,7 @@ export interface PostQuery {
 export async function fetchPosts({
   section,
   tag,
+  featured,
   sort = 'recent',
   query,
   offset = 0,
@@ -51,6 +53,7 @@ export async function fetchPosts({
   const params = new URLSearchParams();
   if (section) params.append('section', section);
   if (tag) params.append('tag', tag);
+  if (featured !== undefined) params.append('featured', String(featured));
   if (sort) params.append('sort', sort);
   if (query) params.append('q', query);
   params.append('offset', String(offset));
@@ -601,4 +604,12 @@ export function updateUserTrusted(userId: string, isTrusted: boolean, token: str
     method: 'PUT',
     body: JSON.stringify({ is_trusted: isTrusted }),
   });
+}
+
+export function featurePost(postId: string, token: string): Promise<Post> {
+  return authJson(`/admin/posts/${postId}/feature`, token, 'Failed to feature the post', { method: 'POST' });
+}
+
+export function unfeaturePost(postId: string, token: string): Promise<Post> {
+  return authJson(`/admin/posts/${postId}/feature`, token, 'Failed to unfeature the post', { method: 'DELETE' });
 }

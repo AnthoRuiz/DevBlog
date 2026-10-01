@@ -88,6 +88,8 @@ export interface Post {
   status: PostStatus;
   // Reason given by the admin when the post was rejected
   review_note?: string | null;
+  // Set while the admin features the post in its section (max two per section)
+  featured_at?: string | null;
   published_at?: string;
   created_at: string;
   section?: Section | null;

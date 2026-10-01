@@ -19,6 +19,8 @@ const SITE_NAME = 'Anthony Ruiz';
 const BOOKMARKS = '__bookmarks__';
 import {
   fetchReviewCount,
+  featurePost,
+  unfeaturePost,
   fetchPosts,
   fetchSections,
   POSTS_PAGE_SIZE,
@@ -58,6 +60,8 @@ export function App() {
     location.pathname === '/' ||
     Boolean(postMatch || tagMatch || adminMatch || isBookmarksRoute || isSearchRoute || sectionMatch);
   const selectedSection = sectionMatch?.params.sectionSlug;
+  // The featured band appears on a section page with no tag filter
+  const showsFeaturedBand = Boolean(sectionMatch) && !(sectionMatch && searchParams.get('tag'));
   const selectedTag = isBookmarksRoute
     ? BOOKMARKS
     : tagMatch?.params.tagSlug ?? (sectionMatch ? searchParams.get('tag') ?? undefined : undefined);
@@ -65,6 +69,8 @@ export function App() {
   const urlQuery = isSearchRoute ? searchParams.get('q') ?? '' : '';
 
   const [posts, setPosts] = useState<Post[]>([]);
+  // Section page without a tag filter: up to two featured posts shown above the grid
+  const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);
   // Pagination of the main feed (not used by the bookmarks view)
   const [totalPosts, setTotalPosts] = useState<number>(0);
   const [hasMorePosts, setHasMorePosts] = useState<boolean>(false);
@@ -254,16 +260,21 @@ export function App() {
           setPosts(bookmarkedPosts);
         }
         setHasMorePosts(false);
+        setFeaturedPosts([]);
 
         if (tagsData.length > 0) setTags(tagsData);
       } else {
-        const [page, tagsData, sectionsData] = await Promise.all([
-          fetchPosts({ section: selectedSection, tag: selectedTag, sort: sortBy }),
+        const [page, featuredPage, tagsData, sectionsData] = await Promise.all([
+          fetchPosts({ section: selectedSection, tag: selectedTag, sort: sortBy, featured: showsFeaturedBand ? false : undefined }),
+          showsFeaturedBand
+            ? fetchPosts({ section: selectedSection, featured: true, limit: 2 }).catch(() => null)
+            : Promise.resolve(null),
           fetchAllTags().catch(() => []),
           fetchSections().catch(() => []),
         ]);
         if (requestId !== feedRequestId.current) return;
         if (sectionsData.length > 0) setSections(sectionsData);
+        setFeaturedPosts(featuredPage?.items ?? []);
         setPosts(page.items);
         setTotalPosts(page.total);
         setHasMorePosts(page.has_more);
@@ -284,6 +295,7 @@ export function App() {
       const page = await fetchPosts({
         section: selectedSection,
         tag: selectedTag,
+        featured: showsFeaturedBand ? false : undefined,
         sort: sortBy,
         offset: posts.length,
         limit: POSTS_PAGE_SIZE,
@@ -336,6 +348,18 @@ export function App() {
       setEditingPost(post);
     }
     setIsNewPostOpen(true);
+  };
+
+  // Admin: feature/unfeature from the card star (the API allows two per section)
+  const handleToggleFeatured = async (post: Post) => {
+    if (!userToken) return;
+    try {
+      if (post.featured_at) await unfeaturePost(post.id, userToken);
+      else await featurePost(post.id, userToken);
+      loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update the featured posts');
+    }
   };
 
   const handleDeletePost = async (postId: string) => {
@@ -784,6 +808,32 @@ export function App() {
           </div>
         )}
 
+        {/* Featured band (section pages) */}
+        {!isLoading && featuredPosts.length > 0 && (
+          <section aria-label={t.featuredLabel} className="mb-8">
+            <p className="text-xs font-mono uppercase tracking-[0.08em] text-[#22D3EE] mb-3">{t.featuredLabel}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {featuredPosts.map((post) => (
+                <DigestCard
+                  key={post.id}
+                  post={post}
+                  onOpen={handleOpenArticle}
+                  onToggleUpvote={toggleUpvote}
+                  onSelectTag={(slug) => setSelectedTag(slug)}
+                  onToggleBookmark={handleToggleBookmark}
+                  isBookmarked={bookmarkedIds.has(post.id)}
+                  isAuthor={canEditPost(post)}
+                  onEditPost={handleEditPost}
+                  onDeletePost={handleDeletePost}
+                  onToggleFeatured={currentUser?.role === 'ADMIN' ? handleToggleFeatured : undefined}
+                  t={t}
+                  currentLang={currentLang}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Post grid */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -791,7 +841,7 @@ export function App() {
               <div key={i} className="h-64 rounded-2xl bg-[#0b0f19] border border-[#1e293b] animate-pulse" />
             ))}
           </div>
-        ) : posts.length === 0 ? (
+        ) : posts.length === 0 && featuredPosts.length > 0 ? null : posts.length === 0 ? (
           <div className="text-center py-16 bg-[#0b0f19] border border-[#1e293b] rounded-2xl">
             <Sparkles className="w-8 h-8 text-cyan-400 mx-auto mb-3" />
             <h3 className="font-bold text-white text-base">
@@ -823,6 +873,7 @@ export function App() {
                 isAuthor={canEditPost(post)}
                 onEditPost={handleEditPost}
                 onDeletePost={handleDeletePost}
+                onToggleFeatured={currentUser?.role === 'ADMIN' ? handleToggleFeatured : undefined}
                 t={t}
                 currentLang={currentLang}
               />

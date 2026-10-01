@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowBigUp, Bookmark, Clock, Eye, Calendar, Terminal, Edit3, Trash2 } from 'lucide-react';
+import { ArrowBigUp, Bookmark, Clock, Eye, Calendar, Terminal, Edit3, Trash2, Star } from 'lucide-react';
 import { Post } from '../types';
 import { SectionIcon } from './SectionIcon';
 import { Language, Translations, getLanguageFlag, getLanguageName } from '../i18n';
@@ -14,6 +14,8 @@ interface DigestCardProps {
   isAuthor?: boolean;
   onEditPost?: (post: Post) => void;
   onDeletePost?: (postId: string) => void;
+  // Admin only: feature/unfeature the post in its section
+  onToggleFeatured?: (post: Post) => void;
   t: Translations;
   currentLang?: Language;
 }
@@ -46,6 +48,7 @@ export const DigestCard: React.FC<DigestCardProps> = ({
   isAuthor = false,
   onEditPost,
   onDeletePost,
+  onToggleFeatured,
   t,
   currentLang = 'es',
 }) => {
@@ -256,6 +259,23 @@ export const DigestCard: React.FC<DigestCardProps> = ({
           </button>
 
           <div className="flex items-center gap-2">
+            {onToggleFeatured && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFeatured(post);
+                }}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  post.featured_at ? 'text-amber-300 bg-amber-400/10' : 'text-slate-400 hover:text-amber-300 hover:bg-amber-400/10'
+                }`}
+                title={post.featured_at ? t.unfeaturePost : t.featurePost}
+                aria-pressed={Boolean(post.featured_at)}
+              >
+                <Star className={`w-3.5 h-3.5 ${post.featured_at ? 'fill-current' : ''}`} />
+              </button>
+            )}
+
             {/* Author controls (edit and delete) */}
             {isAuthor && (
               <div className="flex items-center gap-1 mr-2 border-r border-[#1e293b] pr-2">
