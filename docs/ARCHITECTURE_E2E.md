@@ -380,7 +380,7 @@ Every sign-up (email or Google) is a `CREATOR`; the admin account comes from `AD
 
 **Daily quotas (`app/core/quotas.py`):** per-user, in-memory counters that reset at UTC midnight (and on restart): AI calls 30/day, image uploads 20/day, real-time tag checks 200/day. Admins are exempt. Exceeding a quota returns `429`.
 
-**Review alerts:** there is no email; admins see the pending count (`GET /admin/review/count`) as a badge on the navbar's admin panel button and as a `(N)` prefix in the tab title. It is polled every 60 s (also in background tabs) and refreshed when the tab regains focus. `PUT /auth/me/role` (self role switch) returns `403` unless `ALLOW_ROLE_SELF_SWITCH=True`, which is meant for local testing only.
+**Review alerts:** there is no email; admins see the pending count (`GET /admin/review/count`) as a badge on the navbar's account button (and on *Admin panel* inside its menu) and as a `(N)` prefix in the tab title. It is polled every 60 s (also in background tabs) and refreshed when the tab regains focus. `PUT /auth/me/role` (self role switch) returns `403` unless `ALLOW_ROLE_SELF_SWITCH=True`, which is meant for local testing only.
 
 **Route dependencies (`backend/app/api/deps.py`):**
 - `get_current_user_optional` — decodes the Bearer JWT if present, otherwise `None`.
@@ -484,7 +484,7 @@ frontend/src/
 │   ├── router.tsx               # Every route (createBrowserRouter), see §5.3
 │   ├── Layout.tsx               # Navbar + <Outlet/> (inside ErrorBoundary) + footer + app-wide modals; navbar search; hash redirects
 │   ├── ShellContext.tsx         # Editor and sign-in modal state; notifyPostsChanged (query invalidation)
-│   └── Navbar.tsx               # Brand, search, status, language, New post, My posts, admin panel + review badge
+│   └── Navbar.tsx               # Brand, search, ES/EN/PT/FR switch, New post, account menu (My posts, Admin panel, System status, sign out) + review badge
 ├── features/
 │   ├── admin/                   # BackupsModal (admin panel), ReviewQueue, SectionsAdmin, SystemStatusModal, RoleTestingBar, useReviewBadge
 │   ├── auth/                    # AuthContext (useAuth: token, user, login/logout, permissions), LoginModal
@@ -535,8 +535,15 @@ Unknown paths and unknown section slugs render the client-side 404 page. Section
 - The post page takes its section's `theme`: **calm** (Mental Health) uses a softer palette, larger line height, sans-serif metadata and no neon markers; **vivid** tints headings and quotes with the section color.
 - `posts.content_notice` shows a dismissible notice before the body; `sections.footer_markdown` is rendered below every post of the section. Mental Health starts with a personal-experience disclaimer pointing to findahelpline.com (editable in the admin Sections tab).
 
+#### Header (`app/Navbar.tsx`)
+- Follows the brand book nav: `>ar_` mark + name on the left, search in the middle (its own row below `md`), and on the right only a compact mono language switch, the primary **New post** button (icon only on phones) and an **account button** (initials). Visitors see **Sign in** instead of the last two.
+- The account button opens a menu (closes on outside click and Escape) with the user's name, email and role, **My posts**, and for admins **Admin panel** (with the pending-review count) and **System status**; the testing role switch (when enabled) and **Sign out** close it. The pending count also shows as a badge on the account button.
+
+#### My posts (`features/posts/MyPostsModal.tsx`)
+- The signed-in user's posts as mini cards (cover or section-colored placeholder, status badge, section, date or rejection reason, *Edit* and *View*), with status filter tabs showing counts (All, Draft, In review, Published, Rejected) and pagination of 6 per page (page numbers with gaps on wider screens, `n / total` on phones). Data comes from the `['posts', 'mine']` query, so it refreshes after any post change.
+
 #### Public home without telemetry
-- The public home shows no telemetry or statistics; hardware data lives only in the admin `/status` modal (`/stats/telemetry`, `/stats/status`). Signed-in users get **New post** and **My posts** in the navbar.
+- The public home shows no telemetry or statistics; hardware data lives only in the admin `/status` modal (`/stats/telemetry`, `/stats/status`). Signed-in users get **New post** and the account menu in the header.
 
 #### Markdown rendering (`MarkdownRenderer.tsx`)
 - In-house parser for headings, lists, quotes, tables, inline formatting and fenced code (highlight.js), with ` ```mermaid ` blocks delegated to `MermaidRenderer`.
@@ -562,7 +569,7 @@ Unknown paths and unknown section slugs render the client-side 404 page. Section
 - Tabs: **Review (N)** (default; approve, reject with a reason, preview opens the post page), **Users & roles** (role select, *Trusted* checkbox for creators, self role switch only in testing mode), **Backups** (create, download, delete, media usage and orphan cleanup) and **Sections** (name, description, color, theme, footer). The panel's own labels are English only (admin-facing).
 
 #### Admin features on public pages
-- A star on each post card features/unfeatures it (max two per section; the API's 409 message is shown). Pending-review count: navbar badge + `(N)` tab title, polled every 60 s.
+- A star on each post card features/unfeatures it (max two per section; the API's 409 message is shown). Pending-review count: badge on the account button and the *Admin panel* menu item + `(N)` tab title, polled every 60 s.
 
 #### Role testing switcher
 - Hidden unless the frontend is built with `VITE_ENABLE_ROLE_TESTING=true` **and** the backend allows `ALLOW_ROLE_SELF_SWITCH=True`. Switches the signed-in user between `ADMIN` and `CREATOR` (development only).
