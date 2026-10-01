@@ -203,7 +203,19 @@ export const DigestCard: React.FC<DigestCardProps> = ({
           </div>
 
           <h3 className="font-bold text-base text-slate-100 group-hover:text-cyan-400 transition-colors leading-snug line-clamp-2">
-            {post.title}
+            {/* Real link for new tabs, crawlers and screen readers; plain clicks are handled by the card */}
+            <a
+              href={`/posts/${post.slug}`}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) {
+                  e.stopPropagation();
+                  return;
+                }
+                e.preventDefault();
+              }}
+            >
+              {post.title}
+            </a>
           </h3>
 
           <p className="text-xs text-slate-400 mt-2 line-clamp-2 leading-relaxed">

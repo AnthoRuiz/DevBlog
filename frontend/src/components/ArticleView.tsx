@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, Clock, Calendar, ArrowBigUp, Share2, Bookmark, MessageSquare, Send, Edit3, Trash2 } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, ArrowBigUp, Share2, Bookmark, MessageSquare, Send, Edit3, Trash2 } from 'lucide-react';
 import { PostDetail, Comment, Post } from '../types';
 import { Language, Translations } from '../i18n';
 import { fetchComments, createComment } from '../services/api';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
-interface ArticleModalProps {
-  post: PostDetail | null;
-  isOpen: boolean;
-  onClose: () => void;
+interface ArticleViewProps {
+  post: PostDetail;
+  // Back to the feed (the post page's only way out besides the browser's back button)
+  onBack: () => void;
   onToggleUpvote: (postId: string) => Promise<{ upvoted: boolean; new_upvotes_count: number }>;
   onSelectTag?: (tagSlug: string) => void;
   onToggleBookmark?: (postId: string) => void;
@@ -20,10 +20,10 @@ interface ArticleModalProps {
   currentLang?: Language;
 }
 
-export const ArticleModal: React.FC<ArticleModalProps> = ({
+// Full post page: article, reactions and comments (served at /posts/:slug)
+export const ArticleView: React.FC<ArticleViewProps> = ({
   post,
-  isOpen,
-  onClose,
+  onBack,
   onToggleUpvote,
   onSelectTag,
   onToggleBookmark,
@@ -45,23 +45,21 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
   const [commentError, setCommentError] = useState('');
 
   useEffect(() => {
-    if (post && isOpen) {
-      setUpvotes(post.upvotes_count ?? 0);
-      setHasUpvoted(false);
-      loadComments(post.id);
-    }
-  }, [post?.id, isOpen]);
+    setUpvotes(post.upvotes_count ?? 0);
+    setHasUpvoted(false);
+    // Unpublished previews have no public comments
+    if (post.status === 'published') loadComments(post.id);
+    else setComments([]);
+  }, [post.id]);
 
   const loadComments = async (postId: string) => {
     try {
       const data = await fetchComments(postId);
       setComments(data);
     } catch {
-      setComments(post?.comments || []);
+      setComments(post.comments || []);
     }
   };
-
-  if (!isOpen || !post) return null;
 
   const handleUpvote = async () => {
     try {
@@ -92,10 +90,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
   };
 
   const handleTagClick = (slug: string) => {
-    if (onSelectTag) {
-      onSelectTag(slug);
-      onClose();
-    }
+    onSelectTag?.(slug);
   };
 
   const formatDate = (dateString?: string) => {
@@ -110,23 +105,25 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex justify-center p-4 sm:p-6 animate-fadeIn">
-      <div className="relative w-full max-w-4xl bg-[#0b0f19] border border-[#1e293b] rounded-2xl shadow-2xl my-auto overflow-hidden">
-        
-        {/* Modal header */}
-        <div className="sticky top-0 bg-[#0b0f19]/95 backdrop-blur border-b border-[#1e293b] p-4 flex items-center justify-between z-20">
+    <div className="w-full max-w-4xl mx-auto">
+      <article className="relative w-full bg-[#0b0f19] border border-[#1e293b] rounded-2xl overflow-hidden">
+
+        {/* Post toolbar */}
+        <div className="border-b border-[#1e293b] p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-md border border-cyan-500/20">
-              {t.readingMode}
-            </span>
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex items-center gap-1.5 text-xs font-mono text-[#94A3B8] hover:text-[#F8FAFC] transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>{t.backToFeed}</span>
+            </button>
 
             {isAuthor && (
               <div className="flex items-center gap-1 ml-2">
                 <button
-                  onClick={() => {
-                    onClose();
-                    if (onEditPost) onEditPost(post);
-                  }}
+                  onClick={() => onEditPost?.(post)}
                   className="flex items-center gap-1 text-xs font-mono text-slate-300 hover:text-cyan-400 bg-[#121622] hover:bg-[#1a2030] border border-[#1e293b] px-2.5 py-1 rounded-md transition-colors"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
@@ -135,7 +132,6 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
                 <button
                   onClick={() => {
                     if (onDeletePost && window.confirm(t.confirmDeletePost)) {
-                      onClose();
                       onDeletePost(post.id);
                     }
                   }}
@@ -159,12 +155,6 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
               title={isBookmarked ? t.bookmarked : t.bookmarkSave}
             >
               <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
-            </button>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1e293b] transition-colors"
-            >
-              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -264,7 +254,8 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
             </button>
           </div>
 
-          {/* COMMENTS SECTION */}
+          {/* COMMENTS SECTION (published posts only) */}
+          {post.status === 'published' && (
           <section className="mt-14 pt-8 border-t border-[#1e293b]">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
@@ -350,9 +341,10 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
               )}
             </div>
           </section>
+          )}
 
         </div>
-      </div>
+      </article>
     </div>
   );
 };

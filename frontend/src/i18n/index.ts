@@ -37,7 +37,10 @@ export interface Translations {
   noArticlesSub: string;
   noBookmarksFound: string;
   noBookmarksSub: string;
-  readingMode: string;
+  backToFeed: string;
+  notFoundTitle: string;
+  notFoundBody: string;
+  goHome: string;
   byAuthor: string;
   publishedOn: string;
   summaryLabel: string;
@@ -203,7 +206,10 @@ export const translations: Record<Language, Translations> = {
     noArticlesSub: 'Intenta seleccionar otro filtro o buscar un término diferente.',
     noBookmarksFound: 'No tienes artículos guardados aún',
     noBookmarksSub: 'Haz clic en el icono de marcador en cualquier tarjeta para guardarlo aquí.',
-    readingMode: 'Modo Lectura',
+    backToFeed: 'Volver',
+    notFoundTitle: 'Página no encontrada',
+    notFoundBody: 'Esta página no existe o el post ya no está publicado.',
+    goHome: 'Ir al inicio',
     byAuthor: 'Por Ingeniero de Software',
     publishedOn: 'Publicado el',
     summaryLabel: 'Resumen Ejecutivo:',
@@ -363,7 +369,10 @@ export const translations: Record<Language, Translations> = {
     noArticlesSub: 'Try selecting another filter or searching for a different keyword.',
     noBookmarksFound: 'No saved articles yet',
     noBookmarksSub: 'Click the bookmark icon on any card to save it here for later reading.',
-    readingMode: 'Reading Mode',
+    backToFeed: 'Back',
+    notFoundTitle: 'Page not found',
+    notFoundBody: 'This page doesn\'t exist or the post is no longer published.',
+    goHome: 'Go to the home page',
     byAuthor: 'By Software Engineer',
     publishedOn: 'Published on',
     summaryLabel: 'Executive Summary:',
@@ -523,7 +532,10 @@ export const translations: Record<Language, Translations> = {
     noArticlesSub: 'Tente selecionar outro filtro ou limpar a pesquisa.',
     noBookmarksFound: 'Nenhum artigo salvo ainda',
     noBookmarksSub: 'Clique no ícone de favorito em qualquer post para guardá-lo aqui.',
-    readingMode: 'Modo Leitura',
+    backToFeed: 'Voltar',
+    notFoundTitle: 'Página não encontrada',
+    notFoundBody: 'Esta página não existe ou o post não está mais publicado.',
+    goHome: 'Ir para o início',
     byAuthor: 'Por Engenheiro de Software',
     publishedOn: 'Publicado em',
     summaryLabel: 'Resumo:',
@@ -683,7 +695,10 @@ export const translations: Record<Language, Translations> = {
     noArticlesSub: 'Essayez de sélectionner un autre filtre ou d\'effacer la recherche.',
     noBookmarksFound: 'Aucun article enregistré pour le moment',
     noBookmarksSub: 'Cliquez sur l\'icône de marque-page sur n\'importe quelle carte pour le retrouver ici.',
-    readingMode: 'Mode Lecture',
+    backToFeed: 'Retour',
+    notFoundTitle: 'Page introuvable',
+    notFoundBody: 'Cette page n\'existe pas ou l\'article n\'est plus publié.',
+    goHome: 'Aller à l\'accueil',
     byAuthor: 'Par Ingénieur Logiciel',
     publishedOn: 'Publié le',
     summaryLabel: 'Résumé :',

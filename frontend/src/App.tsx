@@ -1,14 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
+import { matchPath, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { SectionIcon } from './components/SectionIcon';
 import { DigestCard } from './components/DigestCard';
-import { ArticleModal } from './components/ArticleModal';
+import { NotFound } from './components/NotFound';
+import { setPageTitle, setTitleBadge } from './utils/pageTitle';
+import { PostPage } from './pages/PostPage';
 import { LoginModal } from './components/LoginModal';
 import { NewPostModal } from './components/NewPostModal';
 import { SystemStatusModal } from './components/SystemStatusModal';
 import { BackupsModal } from './components/BackupsModal';
 import { MyPostsModal } from './components/MyPostsModal';
 import { Post, PostDetail, SectionWithCount, Tag, User, UserRole } from './types';
+
+const DEFAULT_TITLE = 'Anthony Ruiz — Software engineer, homelab & security';
+const SITE_NAME = 'Anthony Ruiz';
+const BOOKMARKS = '__bookmarks__';
 import {
   fetchReviewCount,
   fetchPosts,
@@ -28,6 +35,29 @@ import { Sparkles, ArrowUpDown, Bookmark, Filter, X, ChevronDown, Search, Tag as
 import { Language, translations } from './i18n';
 
 export function App() {
+  // Routing: the URL is the source of truth for the page and the feed filters
+  //   /                 home feed            /posts/:slug    post page
+  //   /:section         section feed         /tags/:tag      tag feed (any section)
+  //   /:section?tag=x   tag within section   /bookmarks      saved posts
+  //   /admin/status, /admin/backups          admin modals over the feed
+  //   ?q=               search within the current feed
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const postMatch = matchPath('/posts/:slug', location.pathname);
+  const tagMatch = matchPath('/tags/:tagSlug', location.pathname);
+  const adminMatch = matchPath('/admin/:panel', location.pathname);
+  const isBookmarksRoute = location.pathname === '/bookmarks';
+  const sectionMatch =
+    !postMatch && !tagMatch && !adminMatch && !isBookmarksRoute ? matchPath('/:sectionSlug', location.pathname) : null;
+  const isKnownRoute =
+    location.pathname === '/' || Boolean(postMatch || tagMatch || adminMatch || isBookmarksRoute || sectionMatch);
+  const selectedSection = sectionMatch?.params.sectionSlug;
+  const selectedTag = isBookmarksRoute
+    ? BOOKMARKS
+    : tagMatch?.params.tagSlug ?? (sectionMatch ? searchParams.get('tag') ?? undefined : undefined);
+  const urlQuery = searchParams.get('q') ?? '';
+
   const [posts, setPosts] = useState<Post[]>([]);
   // Pagination of the main feed (not used by the bookmarks view)
   const [totalPosts, setTotalPosts] = useState<number>(0);
@@ -37,11 +67,9 @@ export function App() {
   const feedRequestId = useRef(0);
   const [tags, setTags] = useState<Tag[]>([]);
   const [sections, setSections] = useState<SectionWithCount[]>([]);
-  // Section filter (slug); undefined = all sections
-  const [selectedSection, setSelectedSection] = useState<string | undefined>(undefined);
-  const [selectedTag, setSelectedTag] = useState<string | undefined>(undefined);
   const [sortBy, setSortBy] = useState<string>('recent');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  // What the user is typing; pushed to ?q= after a short debounce
+  const [searchQuery, setSearchQuery] = useState<string>(urlQuery);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isTagsDropdownOpen, setIsTagsDropdownOpen] = useState<boolean>(false);
   const [tagSearchQuery, setTagSearchQuery] = useState<string>('');
@@ -62,30 +90,30 @@ export function App() {
   const t = translations[currentLang] || translations.es;
 
   // Modals and author authentication
-  const [activeArticle, setActiveArticle] = useState<PostDetail | null>(null);
-  const [isArticleOpen, setIsArticleOpen] = useState<boolean>(false);
+  // Bumped after an edit so an open post page reloads
+  const [postRefreshKey, setPostRefreshKey] = useState<number>(0);
   const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
   const [isNewPostOpen, setIsNewPostOpen] = useState<boolean>(false);
-  const [isStatusOpen, setIsStatusOpen] = useState<boolean>(false);
-  const [isBackupsModalOpen, setIsBackupsModalOpen] = useState<boolean>(false);
   const [editingPost, setEditingPost] = useState<Post | PostDetail | null>(null);
   const [isMyPostsOpen, setIsMyPostsOpen] = useState<boolean>(false);
   const [reviewPending, setReviewPending] = useState<number>(0);
 
-  // Direct support for #/status and #/backups URL hashes
+  // Old #/status and #/backups links keep working
   useEffect(() => {
     const handleHashChange = () => {
-      if (window.location.hash === '#/status' || window.location.hash === '#status') {
-        setIsStatusOpen(true);
-      }
-      if (window.location.hash === '#/backups' || window.location.hash === '#backups') {
-        setIsBackupsModalOpen(true);
-      }
+      const hash = window.location.hash;
+      if (hash === '#/status' || hash === '#status') navigate('/admin/status', { replace: true });
+      if (hash === '#/backups' || hash === '#backups') navigate('/admin/backups', { replace: true });
     };
     handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  // New page: start at the top (filters and ?q= changes keep the scroll position)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   // Close the tag dropdown when clicking outside
   useEffect(() => {
@@ -139,6 +167,28 @@ export function App() {
   };
   useEffect(refreshReviewCount, [userToken, currentUser?.role]);
 
+  // Admins: poll every minute (also in background tabs, so the title badge stays current) and
+  // right away when the tab becomes visible again
+  useEffect(() => {
+    if (!userToken || currentUser?.role !== 'ADMIN') return;
+    const interval = window.setInterval(refreshReviewCount, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshReviewCount();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [userToken, currentUser?.role]);
+
+  // "(N) " in the tab title while posts wait for review
+  useEffect(() => {
+    setTitleBadge(reviewPending);
+  }, [reviewPending]);
+
   const handleSwitchRole = async (newRole: UserRole) => {
     if (!userToken) return;
     try {
@@ -150,14 +200,28 @@ export function App() {
     }
   };
 
-  // Debounce live search
-  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
+  // Debounce live search into ?q= (replace, so typing does not flood the history)
+  const debouncedSearch = urlQuery;
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
+      if (searchQuery.trim() === urlQuery) return;
+      // Searching from a post or admin page goes back to the home feed
+      if (postMatch || adminMatch || !isKnownRoute) {
+        if (searchQuery.trim()) navigate(`/?q=${encodeURIComponent(searchQuery.trim())}`);
+        return;
+      }
+      const next = new URLSearchParams(searchParams);
+      if (searchQuery.trim()) next.set('q', searchQuery.trim());
+      else next.delete('q');
+      setSearchParams(next, { replace: true });
     }, 250);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Keep the input in sync when the URL changes (back/forward, links)
+  useEffect(() => {
+    if (urlQuery !== searchQuery.trim()) setSearchQuery(urlQuery);
+  }, [urlQuery]);
 
   useEffect(() => {
     loadData();
@@ -167,7 +231,7 @@ export function App() {
     const requestId = ++feedRequestId.current;
     setIsLoading(true);
     try {
-      if (selectedTag === '__bookmarks__') {
+      if (selectedTag === BOOKMARKS) {
         const [bookmarkedPosts, tagsData] = await Promise.all([
           fetchBookmarkedPosts().catch(() => []),
           fetchAllTags().catch(() => []),
@@ -205,7 +269,7 @@ export function App() {
   };
 
   const handleLoadMore = async () => {
-    if (isLoadingMore || !hasMorePosts || selectedTag === '__bookmarks__') return;
+    if (isLoadingMore || !hasMorePosts || selectedTag === BOOKMARKS) return;
     const requestId = feedRequestId.current;
     setIsLoadingMore(true);
     try {
@@ -232,14 +296,8 @@ export function App() {
     }
   };
 
-  const handleOpenArticle = async (slug: string) => {
-    try {
-      const detail = await fetchPostBySlug(slug);
-      setActiveArticle(detail);
-      setIsArticleOpen(true);
-    } catch (err) {
-      console.error('Failed to open post:', err);
-    }
+  const handleOpenArticle = (slug: string) => {
+    navigate(`/posts/${slug}`);
   };
 
   const handleToggleBookmark = async (postId: string) => {
@@ -258,7 +316,7 @@ export function App() {
       console.error('Failed to sync bookmark with the backend:', err);
     }
 
-    if (selectedTag === '__bookmarks__') {
+    if (selectedTag === BOOKMARKS) {
       loadData();
     }
   };
@@ -280,6 +338,7 @@ export function App() {
       loadData();
     } catch (err: any) {
       alert(err.message || 'Failed to delete post');
+      throw err;
     }
   };
 
@@ -310,35 +369,64 @@ export function App() {
     return currentUser.role === 'ADMIN' || post.author_id === currentUser.id;
   };
 
-  const handleOpenStatus = () => {
-    window.location.hash = '#/status';
-    setIsStatusOpen(true);
+  // Admin modals are routes; closing one returns to the page it was opened from
+  const isStatusOpen = adminMatch?.params.panel === 'status';
+  const isBackupsModalOpen = adminMatch?.params.panel === 'backups' && currentUser?.role === 'ADMIN';
+  const openAdminPanel = (panel: 'status' | 'backups') =>
+    navigate(`/admin/${panel}`, { state: { from: adminMatch ? '/' : location.pathname + location.search } });
+  const closeAdminPanel = () => navigate((location.state as { from?: string } | null)?.from || '/');
+  const handleOpenStatus = () => openAdminPanel('status');
+  const handleCloseStatus = closeAdminPanel;
+
+  // Build a feed URL, keeping the current search
+  const goToFeed = (section: string | undefined, tag: string | undefined) => {
+    const params = new URLSearchParams();
+    if (urlQuery) params.set('q', urlQuery);
+    let path = '/';
+    if (tag === BOOKMARKS) {
+      path = '/bookmarks';
+    } else if (section) {
+      path = `/${section}`;
+      if (tag) params.set('tag', tag);
+    } else if (tag) {
+      path = `/tags/${tag}`;
+    }
+    const query = params.toString();
+    navigate(query ? `${path}?${query}` : path);
   };
 
-  const handleCloseStatus = () => {
-    if (window.location.hash === '#/status' || window.location.hash === '#status') {
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  const setSelectedTag = (tag: string | undefined) => {
+    // A tag outside the selected section switches to the global tag page
+    const tagSection = tags.find((tg) => tg.slug === tag)?.section_id;
+    let keepSection = false;
+    if (selectedSectionObject && tag !== BOOKMARKS) {
+      keepSection = !tag || tagSection === selectedSectionObject.id;
     }
-    setIsStatusOpen(false);
+    goToFeed(keepSection ? selectedSection : undefined, tag);
   };
 
   const handleClearFilters = () => {
-    setSelectedSection(undefined);
-    setSelectedTag(undefined);
     setSearchQuery('');
+    navigate('/');
   };
 
   const selectedSectionObject = sections.find((s) => s.slug === selectedSection);
+  // /:section with a slug that is not a section
+  const isUnknownSection = Boolean(selectedSection) && sections.length > 0 && !selectedSectionObject;
 
   const handleSelectSection = (slug: string | undefined) => {
     const next = sections.find((s) => s.slug === slug);
-    setSelectedSection(slug);
     // Leave bookmarks, and drop a tag filter that does not belong to the new section
     const currentTag = tags.find((tg) => tg.slug === selectedTag);
-    if (selectedTag === '__bookmarks__' || (next && currentTag && currentTag.section_id !== next.id)) {
-      setSelectedTag(undefined);
-    }
+    const keepTag = selectedTag !== BOOKMARKS && currentTag && (!next || currentTag.section_id === next.id);
+    goToFeed(slug, keepTag ? selectedTag : undefined);
   };
+
+  // Tab title per page (the post page sets its own)
+  useEffect(() => {
+    if (postMatch) return;
+    setPageTitle(selectedSectionObject ? `${selectedSectionObject.name} — ${SITE_NAME}` : DEFAULT_TITLE);
+  }, [location.pathname, selectedSectionObject?.name]);
 
   const isFiltering = selectedSection !== undefined || selectedTag !== undefined || Boolean(searchQuery);
 
@@ -351,7 +439,7 @@ export function App() {
   const remainingTags = visibleTags.slice(PRIMARY_TAG_LIMIT);
   const isSelectedInPrimary = primaryTags.some((t) => t.slug === selectedTag);
   const selectedTagObject = tags.find((t) => t.slug === selectedTag);
-  const showPinnedSelectedTag = Boolean(selectedTag && selectedTag !== '__bookmarks__' && !isSelectedInPrimary);
+  const showPinnedSelectedTag = Boolean(selectedTag && selectedTag !== BOOKMARKS && !isSelectedInPrimary);
 
   const filteredRemainingTags = remainingTags.filter((tag) =>
     tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase()) ||
@@ -415,7 +503,7 @@ export function App() {
 
               <button
                 type="button"
-                onClick={() => setIsBackupsModalOpen(true)}
+                onClick={() => openAdminPanel('backups')}
                 className="flex items-center gap-1.5 px-3 py-1 rounded-lg border border-purple-500/40 text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 text-xs font-bold transition-colors"
                 title="Open admin and backups panel"
               >
@@ -441,7 +529,7 @@ export function App() {
         onOpenLogin={() => setIsLoginOpen(true)}
         onLogout={handleLogout}
         onOpenStatus={handleOpenStatus}
-        onOpenBackups={() => setIsBackupsModalOpen(true)}
+        onOpenBackups={() => openAdminPanel('backups')}
         onSwitchRole={ROLE_TESTING_ENABLED ? handleSwitchRole : undefined}
         onOpenMyPosts={currentUser ? () => setIsMyPostsOpen(true) : undefined}
         onNewPost={
@@ -461,6 +549,24 @@ export function App() {
       />
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
+        {postMatch ? (
+          <PostPage
+            slug={postMatch.params.slug ?? ''}
+            t={t}
+            currentLang={currentLang}
+            siteName={SITE_NAME}
+            refreshKey={postRefreshKey}
+            onToggleUpvote={toggleUpvote}
+            onToggleBookmark={handleToggleBookmark}
+            isBookmarked={(id) => bookmarkedIds.has(id)}
+            canEdit={canEditPost}
+            onEditPost={handleEditPost}
+            onDeletePost={handleDeletePost}
+          />
+        ) : !isKnownRoute || isUnknownSection ? (
+          <NotFound t={t} />
+        ) : (
+        <>
 
         {/* Section bar */}
         {sections.length > 0 && (
@@ -516,14 +622,14 @@ export function App() {
 
             {/* Bookmarks tab */}
             <button
-              onClick={() => setSelectedTag(selectedTag === '__bookmarks__' ? undefined : '__bookmarks__')}
+              onClick={() => setSelectedTag(selectedTag === BOOKMARKS ? undefined : BOOKMARKS)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all border ${
-                selectedTag === '__bookmarks__'
+                selectedTag === BOOKMARKS
                   ? 'border-cyan-400 text-cyan-300 bg-cyan-500/10 font-bold'
                   : 'border-[#1e293b] text-slate-400 hover:text-white bg-[#0b0f19]'
               }`}
             >
-              <Bookmark className={`w-3.5 h-3.5 ${selectedTag === '__bookmarks__' ? 'fill-current' : ''}`} />
+              <Bookmark className={`w-3.5 h-3.5 ${selectedTag === BOOKMARKS ? 'fill-current' : ''}`} />
               <span>{t.bookmarksTab} ({bookmarkedIds.size})</span>
             </button>
 
@@ -651,9 +757,9 @@ export function App() {
             <div className="flex items-center gap-2 text-slate-300">
               <Filter className="w-3.5 h-3.5 text-cyan-400" />
               <span>
-                {selectedSectionObject && selectedTag !== '__bookmarks__' ? `${selectedSectionObject.name}` : ''}
-                {selectedSectionObject && selectedTag && selectedTag !== '__bookmarks__' ? ' • ' : ''}
-                {selectedTag === '__bookmarks__'
+                {selectedSectionObject && selectedTag !== BOOKMARKS ? `${selectedSectionObject.name}` : ''}
+                {selectedSectionObject && selectedTag && selectedTag !== BOOKMARKS ? ' • ' : ''}
+                {selectedTag === BOOKMARKS
                   ? `${t.bookmarksTab}`
                   : selectedTag
                   ? `${t.activeTagFilter}: #${selectedTag}`
@@ -682,10 +788,10 @@ export function App() {
           <div className="text-center py-16 bg-[#0b0f19] border border-[#1e293b] rounded-2xl">
             <Sparkles className="w-8 h-8 text-cyan-400 mx-auto mb-3" />
             <h3 className="font-bold text-white text-base">
-              {selectedTag === '__bookmarks__' ? t.noBookmarksFound : t.noArticlesFound}
+              {selectedTag === BOOKMARKS ? t.noBookmarksFound : t.noArticlesFound}
             </h3>
             <p className="text-xs text-slate-400 mt-1">
-              {selectedTag === '__bookmarks__' ? t.noBookmarksSub : t.noArticlesSub}
+              {selectedTag === BOOKMARKS ? t.noBookmarksSub : t.noArticlesSub}
             </p>
             {isFiltering && (
               <button
@@ -718,7 +824,7 @@ export function App() {
         )}
 
         {/* Pagination: load the next page of the feed */}
-        {!isLoading && selectedTag !== '__bookmarks__' && posts.length > 0 && (
+        {!isLoading && selectedTag !== BOOKMARKS && posts.length > 0 && (
           <div className="flex flex-col items-center gap-2 mt-8">
             {hasMorePosts && (
               <button
@@ -734,6 +840,8 @@ export function App() {
               {t.showingPostsCount.replace('{shown}', String(posts.length)).replace('{total}', String(totalPosts))}
             </span>
           </div>
+        )}
+        </>
         )}
       </main>
 
@@ -753,22 +861,6 @@ export function App() {
           </nav>
         </div>
       </footer>
-
-      {/* Reader modal with comments and actions */}
-      <ArticleModal
-        post={activeArticle}
-        isOpen={isArticleOpen}
-        onClose={() => setIsArticleOpen(false)}
-        onToggleUpvote={toggleUpvote}
-        onSelectTag={(slug) => setSelectedTag(slug)}
-        onToggleBookmark={handleToggleBookmark}
-        isBookmarked={activeArticle ? bookmarkedIds.has(activeArticle.id) : false}
-        isAuthor={canEditPost(activeArticle)}
-        onEditPost={handleEditPost}
-        onDeletePost={handleDeletePost}
-        t={t}
-        currentLang={currentLang}
-      />
 
       {/* Login / sign-up modal */}
       <LoginModal
@@ -793,6 +885,7 @@ export function App() {
         onPostCreated={() => {
           loadData();
           refreshReviewCount();
+          setPostRefreshKey((k) => k + 1);
         }}
         editingPost={editingPost}
         t={t}
@@ -810,7 +903,7 @@ export function App() {
       {/* PostgreSQL backups and roles modal */}
       <BackupsModal
         isOpen={isBackupsModalOpen}
-        onClose={() => setIsBackupsModalOpen(false)}
+        onClose={closeAdminPanel}
         token={userToken || undefined}
         currentUser={currentUser}
         onRoleChanged={(updatedUser) => {
@@ -823,10 +916,7 @@ export function App() {
           refreshReviewCount();
           loadData();
         }}
-        onPreviewPost={(item) => {
-          setIsBackupsModalOpen(false);
-          handleOpenArticle(item.slug);
-        }}
+        onPreviewPost={(item) => handleOpenArticle(item.slug)}
       />
 
       {/* The signed-in user's own posts with their review status */}

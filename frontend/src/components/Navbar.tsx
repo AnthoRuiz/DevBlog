@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Link } from 'react-router-dom';
 import { PenLine, User as UserIcon, Search, Globe, LogOut, X, Activity, Database, FileText } from 'lucide-react';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
 import { User, UserRole } from '../types';
@@ -46,13 +47,13 @@ export const Navbar: FC<NavbarProps> = ({
     <header className="sticky top-0 z-40 bg-[#07090e]/90 backdrop-blur-md border-b border-[#1e293b]">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
         {/* Brand (personal brand book: >ar_ mark + name) */}
-        <a href="/" className="flex items-center gap-3 min-w-0" aria-label={t.siteTitle}>
+        <Link to="/" className="flex items-center gap-3 min-w-0" aria-label={t.siteTitle}>
           <BrandMark size={32} />
           <div className="min-w-0">
             <span className="block font-bold tracking-tight text-[#F8FAFC] text-[15px] leading-tight">{t.siteTitle}</span>
             <span className="hidden md:block text-[11px] font-mono text-[#7C8AA0] truncate">{t.siteTagline}</span>
           </div>
-        </a>
+        </Link>
 
         {/* Central search */}
         <div className="flex-1 max-w-md hidden sm:block">
