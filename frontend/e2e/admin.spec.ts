@@ -17,7 +17,9 @@ test.describe('admin', () => {
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await expect(page).toHaveTitle(/^\(\d+\) /);
 
-    await page.getByRole('button', { name: /Panel Admin/ }).first().click();
+    // The account menu shows the pending count and opens the admin panel
+    await page.getByRole('button', { name: /Menú de la cuenta \(\d+/ }).click();
+    await page.getByRole('menuitem', { name: /Panel de administración/ }).click();
     await expect(page).toHaveURL(/\/admin\/backups$/);
     const row = page.locator('div.p-4', { hasText: pending.title });
     await row.getByRole('button', { name: 'Approve' }).click();
@@ -49,7 +51,10 @@ test.describe('admin', () => {
     await page.locator('form textarea').last().fill('Draft body');
     await page.getByRole('button', { name: 'Guardar borrador' }).click();
 
-    await page.getByRole('button', { name: /Mis posts/ }).first().click();
+    await page.getByRole('button', { name: 'Menú de la cuenta' }).click();
+    await page.getByRole('menuitem', { name: 'Mis posts' }).click();
+    // Filter by status: the new draft is on the first page of "Borrador"
+    await page.getByRole('tab', { name: /Borrador/ }).click();
     const item = page.locator('li', { hasText: title });
     await expect(item.getByText('Borrador')).toBeVisible();
 

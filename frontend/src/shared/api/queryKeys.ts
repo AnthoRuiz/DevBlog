@@ -8,6 +8,7 @@ export const queryKeys = {
   home: ['posts', 'home'] as const,
   feed: (filters: { section?: string; tag?: string; sort: string; featured?: boolean }) => ['posts', 'feed', filters] as const,
   featured: (section: string) => ['posts', 'featured', section] as const,
+  myPosts: ['posts', 'mine'] as const,
   bookmarks: (ids: string[]) => ['posts', 'bookmarks', ids] as const,
   search: (q: string, section: string) => ['posts', 'search', q, section] as const,
   // The token decides whether unpublished posts are visible (author/admin preview)
