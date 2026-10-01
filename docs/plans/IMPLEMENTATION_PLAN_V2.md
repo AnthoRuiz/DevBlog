@@ -1,7 +1,7 @@
 # Implementation Plan v2: Roles, Routing, Discovery and Section Identity
 
 **Project:** SYS.BLOG (blog.anthoruiz.dev)  
-**Status:** Approved — all decisions taken (2026-09-30); executing phase by phase with a backup and deploy after each phase  
+**Status:** Done — phases A–I implemented and deployed on 2026-10-01, each with a backup and deploy (migrations 0004–0008)
 **Date:** 2026-09-30  
 **Builds on:** Phase 1 (pagination) and Phase 2 (sections, Alembic, AI tag validation), both deployed.
 
