@@ -370,14 +370,17 @@ Every sign-up (email or Google) is a `CREATOR`; the admin account comes from `AD
 - **Code highlighting:** highlight.js.
 - **Diagrams:** Mermaid 12 (dark theme, `securityLevel: 'strict'`).
 - **Icons:** lucide-react.
+- **Routing:** React Router 6 (`BrowserRouter`); Nginx serves `index.html` for unknown paths.
 - **HTTP:** native `fetch` wrapped in `src/services/api.ts`.
 
 ### 5.2 Component Tree
 
 ```
 frontend/src/
-├── App.tsx                     # App shell, state orchestration, tag filter bar, modals
-├── main.tsx                    # React root
+├── App.tsx                     # App shell: routes, feed filters from the URL, tag filter bar, modals
+├── main.tsx                    # React root inside BrowserRouter
+├── pages/
+│   └── PostPage.tsx            # /posts/:slug — loads the post, 404 state, tab title
 ├── index.css                   # Tailwind layers and custom styles
 ├── vite-env.d.ts               # Vite env typings (VITE_ENABLE_ROLE_TESTING)
 ├── i18n/index.ts               # Typed translation dictionaries (es, en, pt, fr)
@@ -390,7 +393,8 @@ frontend/src/
     ├── Navbar.tsx              # Top bar: search, language switcher, status, admin panel
     ├── BrandMark.tsx           # >ar_ monogram (inline SVG from the brand book)
     ├── DigestCard.tsx          # Post card (cover, language badge, metadata, actions)
-    ├── ArticleModal.tsx        # Post reader with comments, upvotes and bookmarks
+    ├── ArticleView.tsx         # Post page body: article, reactions and comments
+    ├── NotFound.tsx            # Client-side 404 page
     ├── NewPostModal.tsx        # Editor: cover upload, tags, AI translate/suggest/estimate
     ├── MarkdownToolbar.tsx     # Formatting toolbar, inline image upload and quick guide
     ├── MarkdownRenderer.tsx    # In-house markdown renderer with sanitized links and images
@@ -403,7 +407,23 @@ frontend/src/
     └── ErrorBoundary.tsx       # Crash screen with automatic error reporting
 ```
 
-### 5.3 Key UI Behaviour
+### 5.3 Routes
+
+The URL is the source of truth for the page and the feed filters (`App.tsx`):
+
+| Path | Page |
+|---|---|
+| `/` | Home feed |
+| `/:section` | Section feed (`tech`, `ai`, `career`, `mental-health`, `gaming`); `?tag=` filters by a tag of that section |
+| `/tags/:tag` | Tag feed across sections |
+| `/posts/:slug` | Post page (canonical post URL, used by feeds and previews) |
+| `/bookmarks` | Saved posts |
+| `/admin/status`, `/admin/backups` | Admin modals over the feed (old `#/status` and `#/backups` links redirect here) |
+| `?q=` | Search within the current feed (debounced, replaces the history entry) |
+
+Unknown paths and unknown section slugs render the client-side 404 page. Section slugs are fixed and must never be `posts`, `tags`, `bookmarks`, `admin`, `search` or `series`.
+
+### 5.4 Key UI Behaviour
 
 #### Public home without telemetry
 - The public home shows no telemetry or statistics; hardware data lives only in the admin `/status` modal (`/stats/telemetry`, `/stats/status`). Signed-in users get **New post** and **My posts** in the navbar.
@@ -603,7 +623,7 @@ When reading, analyzing or extending this repository:
 1. **Language:** all code, comments, messages, commits and docs are in English. User-facing strings belong in `frontend/src/i18n/index.ts` (es/en/pt/fr). Spanish keywords in `backend/app/services/ai_features.py` are intentional matching data for Spanish-language posts.
 2. **Environments:** never point development tooling at production. Use `docker-compose.dev.yml` + `.env.dev`; Vite already proxies to port 8001.
 3. **Secrets:** never add defaults for secrets in `docker-compose*.yml` or `config.py`; required values use `${VAR:?...}`. Never commit `.env*` files (other than the templates) or anything in `backend/backups/`.
-4. **Routing:** Nginx proxies `/api/` to `backend:8000/api/`; client routes live in `frontend/src/App.tsx` (hash routes `#/status`, `#/backups`).
+4. **Routing:** Nginx proxies `/api/` to `backend:8000/api/`; any other path falls back to `index.html` and React Router renders it (see §5.3).
 5. **Schema changes:** models live in `backend/app/models/`; every schema change needs an Alembic migration in `backend/migrations/versions/` (autogenerate, then review and add data backfills). Migrations run automatically on startup. Never go back to `create_all`.
 6. **Seed data:** starter tags and demo posts are defined in `backend/app/main.py`; anything that must exist in a fresh database belongs there, not only in a live database.
 7. **CORS:** add new public hostnames to `BACKEND_CORS_ORIGINS` in `backend/app/core/config.py`.
