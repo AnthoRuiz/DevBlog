@@ -14,6 +14,8 @@ class SectionRead(BaseModel):
     color_hex: str
     icon: str
     sort_order: int
+    theme: str = "default"
+    footer_markdown: str = ""
 
 class SectionWithCount(SectionRead):
     post_count: int = 0
@@ -22,6 +24,8 @@ class SectionUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=60)
     description: Optional[str] = Field(None, max_length=255)
     color_hex: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
+    theme: Optional[str] = Field(None, pattern="^(default|calm|vivid)$")
+    footer_markdown: Optional[str] = Field(None, max_length=4000)
 
 class TagRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -59,6 +63,7 @@ class PostBase(BaseModel):
     summary: str = Field(..., max_length=500)
     content_markdown: str
     cover_image_url: Optional[str] = None
+    content_notice: Optional[str] = Field(None, max_length=300)
     language: str = "es"
     reading_time_minutes: Optional[int] = Field(default=None, ge=1)
     # True: publish (admins, trusted creators) or send to review (other creators). False: save as draft
@@ -79,6 +84,7 @@ class PostRead(BaseModel):
     title: str
     summary: str
     cover_image_url: Optional[str] = None
+    content_notice: Optional[str] = None
     language: str
     reading_time_minutes: int
     upvotes_count: int
@@ -188,6 +194,8 @@ class PostUpdate(BaseModel):
     summary: Optional[str] = Field(None, max_length=500)
     content_markdown: Optional[str] = None
     cover_image_url: Optional[str] = None
+    # Empty string removes the notice
+    content_notice: Optional[str] = Field(None, max_length=300)
     language: Optional[str] = None
     reading_time_minutes: Optional[int] = Field(None, ge=1)
     # Send null to take the post out of its series; leave it out to keep the series unchanged

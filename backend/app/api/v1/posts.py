@@ -437,6 +437,7 @@ async def create_post(
         summary=post_in.summary,
         content_markdown=post_in.content_markdown,
         cover_image_url=post_in.cover_image_url,
+        content_notice=(post_in.content_notice or "").strip() or None,
         reading_time_minutes=reading_time,
         status=post_status,
         published_at=datetime.now(timezone.utc) if post_status == PostStatus.PUBLISHED else None,
@@ -505,6 +506,8 @@ async def update_post(
         post.content_markdown = post_update.content_markdown
     if post_update.cover_image_url is not None:
         post.cover_image_url = post_update.cover_image_url
+    if post_update.content_notice is not None:
+        post.content_notice = post_update.content_notice.strip() or None
     if post_update.reading_time_minutes is not None:
         post.reading_time_minutes = post_update.reading_time_minutes
     elif post_update.content_markdown is not None or post_update.title is not None:
@@ -515,7 +518,8 @@ async def update_post(
     content_changed = any(
         value is not None
         for value in (post_update.title, post_update.summary, post_update.content_markdown,
-                      post_update.cover_image_url, post_update.section_id, post_update.tag_ids)
+                      post_update.cover_image_url, post_update.content_notice, post_update.section_id,
+                      post_update.tag_ids)
     )
     if post_update.submit is not None:
         post.status = _submitted_status(current_user) if post_update.submit else PostStatus.DRAFT

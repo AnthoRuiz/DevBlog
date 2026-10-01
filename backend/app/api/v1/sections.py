@@ -55,6 +55,10 @@ async def update_section(
         section.description = section_in.description.strip()
     if section_in.color_hex is not None:
         section.color_hex = section_in.color_hex.lower()
+    if section_in.theme is not None:
+        section.theme = section_in.theme
+    if section_in.footer_markdown is not None:
+        section.footer_markdown = section_in.footer_markdown.strip()
 
     await db.commit()
     await db.refresh(section)
