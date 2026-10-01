@@ -559,6 +559,15 @@ Posts take an optional `series_id` on create and update (`null` removes it); a p
 | `GET` | `/posts/{post_id}/comments` | Public | List comments |
 | `POST` | `/posts/{post_id}/comments` | Optional | Add a comment (honeypot-protected) |
 
+### 6.3b Feeds & Social Previews
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/feed.xml` | Public | RSS 2.0 feed: latest 20 published posts (summary + canonical link, tags as `<category>`, cover as `media:content`) |
+| `GET` | `/sections/{slug}/feed.xml` | Public | Same feed for one section |
+| `GET` | `/share/posts/{slug}` | Public | Minimal HTML with OpenGraph/Twitter tags for a published post (served to social bots by Nginx) |
+
+Nginx serves the feeds at `/feed.xml` and `/<section>/feed.xml`, and answers `/posts/<slug>` from `/share/posts/<slug>` when the `User-Agent` is a social bot (LinkedIn, X, Slack, Discord, WhatsApp, Facebook, Telegram…), so shared links render a card with title, summary and cover. Everyone else gets the SPA. Feeds and previews are cached for 10 minutes and use `SITE_URL` for absolute links.
+
 ### 6.4 Stats, Backups & Logs
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
@@ -669,7 +678,7 @@ When reading, analyzing or extending this repository:
 1. **Language:** all code, comments, messages, commits and docs are in English. User-facing strings belong in `frontend/src/i18n/index.ts` (es/en/pt/fr). Spanish keywords in `backend/app/services/ai_features.py` are intentional matching data for Spanish-language posts.
 2. **Environments:** never point development tooling at production. Use `docker-compose.dev.yml` + `.env.dev`; Vite already proxies to port 8001.
 3. **Secrets:** never add defaults for secrets in `docker-compose*.yml` or `config.py`; required values use `${VAR:?...}`. Never commit `.env*` files (other than the templates) or anything in `backend/backups/`.
-4. **Routing:** Nginx proxies `/api/` to `backend:8000/api/`; any other path falls back to `index.html` and React Router renders it (see §5.3).
+4. **Routing:** Nginx proxies `/api/` to `backend:8000/api/`, `/feed.xml` and `/<section>/feed.xml` to the feed endpoints, and `/posts/<slug>` for social bots to the preview page; any other path falls back to `index.html` and React Router renders it (see §5.3).
 5. **Schema changes:** models live in `backend/app/models/`; every schema change needs an Alembic migration in `backend/migrations/versions/` (autogenerate, then review and add data backfills). Migrations run automatically on startup. Never go back to `create_all`.
 6. **Seed data:** starter tags and demo posts are defined in `backend/app/main.py`; anything that must exist in a fresh database belongs there, not only in a live database.
 7. **CORS:** add new public hostnames to `BACKEND_CORS_ORIGINS` in `backend/app/core/config.py`.
