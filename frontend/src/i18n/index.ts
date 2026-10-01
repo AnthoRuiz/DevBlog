@@ -202,6 +202,8 @@ export interface Translations {
   contentNoticePlaceholder: string;
   contentNoticeTitle: string;
   contentNoticeDismiss: string;
+  rssSiteFeed: string;
+  rssSectionFeed: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -403,6 +405,8 @@ export const translations: Record<Language, Translations> = {
     contentNoticePlaceholder: 'Ej.: Este post habla de ansiedad y burnout',
     contentNoticeTitle: 'Aviso de contenido',
     contentNoticeDismiss: 'Ocultar aviso',
+    rssSiteFeed: 'Suscríbete por RSS',
+    rssSectionFeed: 'RSS de esta sección',
   },
   en: {
     siteTitle: 'Anthony Ruiz',
@@ -602,6 +606,8 @@ export const translations: Record<Language, Translations> = {
     contentNoticePlaceholder: 'E.g. This post discusses anxiety and burnout',
     contentNoticeTitle: 'Content notice',
     contentNoticeDismiss: 'Dismiss notice',
+    rssSiteFeed: 'Subscribe via RSS',
+    rssSectionFeed: 'RSS feed for this section',
   },
   pt: {
     siteTitle: 'Anthony Ruiz',
@@ -801,6 +807,8 @@ export const translations: Record<Language, Translations> = {
     contentNoticePlaceholder: 'Ex.: Este post fala sobre ansiedade e burnout',
     contentNoticeTitle: 'Aviso de conteúdo',
     contentNoticeDismiss: 'Ocultar aviso',
+    rssSiteFeed: 'Assine via RSS',
+    rssSectionFeed: 'RSS desta seção',
   },
   fr: {
     siteTitle: 'Anthony Ruiz',
@@ -1000,6 +1008,8 @@ export const translations: Record<Language, Translations> = {
     contentNoticePlaceholder: 'Ex. : Cet article parle d\'anxiété et de burn-out',
     contentNoticeTitle: 'Avertissement de contenu',
     contentNoticeDismiss: 'Masquer l\'avertissement',
+    rssSiteFeed: 'S\'abonner via RSS',
+    rssSectionFeed: 'Flux RSS de cette section',
   },
 };
 

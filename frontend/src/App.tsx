@@ -36,7 +36,7 @@ import {
   updateMyRole,
   ROLE_TESTING_ENABLED,
 } from './services/api';
-import { Sparkles, ArrowUpDown, Bookmark, Filter, X, ChevronDown, Search, Tag as TagIcon } from 'lucide-react';
+import { Sparkles, ArrowUpDown, Bookmark, Filter, X, ChevronDown, Search, Rss, Tag as TagIcon } from 'lucide-react';
 import { Language, translations } from './i18n';
 
 export function App() {
@@ -460,6 +460,18 @@ export function App() {
     goToFeed(slug, keepTag ? selectedTag : undefined);
   };
 
+  // Feed auto-discovery for the section being browsed (the site feed is in index.html)
+  useEffect(() => {
+    if (!selectedSectionObject) return;
+    const link = document.createElement('link');
+    link.rel = 'alternate';
+    link.type = 'application/rss+xml';
+    link.title = `${selectedSectionObject.name} — ${SITE_NAME}`;
+    link.href = `/${selectedSectionObject.slug}/feed.xml`;
+    document.head.appendChild(link);
+    return () => link.remove();
+  }, [selectedSectionObject?.slug]);
+
   // Tab title per page (the post page sets its own)
   useEffect(() => {
     if (postMatch) return;
@@ -824,6 +836,26 @@ export function App() {
           </div>
         )}
 
+        {/* Section header with its feed */}
+        {selectedSectionObject && showsFeaturedBand && (
+          <header className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-extrabold tracking-tight text-[#F8FAFC]">{selectedSectionObject.name}</h1>
+              {selectedSectionObject.description && (
+                <p className="mt-1 text-sm text-[#94A3B8] max-w-[62ch]">{selectedSectionObject.description}</p>
+              )}
+            </div>
+            <a
+              href={`/${selectedSectionObject.slug}/feed.xml`}
+              className="inline-flex items-center gap-1.5 self-start sm:self-auto text-xs font-mono text-[#7C8AA0] hover:text-[#22D3EE] transition-colors"
+              title={t.rssSectionFeed}
+            >
+              <Rss className="w-3.5 h-3.5" />
+              RSS
+            </a>
+          </header>
+        )}
+
         {/* Featured band (section pages) */}
         {!isLoading && featuredPosts.length > 0 && (
           <section aria-label={t.featuredLabel} className="mb-8">
@@ -946,6 +978,10 @@ export function App() {
           <p>{t.footerText}</p>
           <nav className="flex items-center gap-4">
             <a href="https://anthoruiz.dev" className="hover:text-[#F8FAFC] transition-colors">anthoruiz.dev</a>
+            <a href="/feed.xml" className="inline-flex items-center gap-1 hover:text-[#F8FAFC] transition-colors" title={t.rssSiteFeed}>
+              <Rss className="w-3 h-3" />
+              RSS
+            </a>
             <a
               href="https://www.linkedin.com/in/anthoruiz/"
               target="_blank"

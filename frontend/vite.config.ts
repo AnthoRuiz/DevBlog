@@ -19,6 +19,17 @@ export default defineConfig({
       '/uploads': {
         target: apiTarget,
         changeOrigin: true
+      },
+      // Same feed URLs as Nginx in production
+      '^/feed\\.xml$': {
+        target: apiTarget,
+        changeOrigin: true,
+        rewrite: () => '/api/v1/feed.xml'
+      },
+      '^/[a-z0-9-]+/feed\\.xml$': {
+        target: apiTarget,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/([a-z0-9-]+)\/feed\.xml$/, '/api/v1/sections/$1/feed.xml')
       }
     }
   }
