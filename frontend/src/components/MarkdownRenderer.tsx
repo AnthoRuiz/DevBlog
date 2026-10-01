@@ -100,7 +100,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   const paragraphs = content.split(/\n\n+/);
 
   return (
-    <div className="space-y-4 text-slate-300 text-sm font-sans leading-relaxed">
+    <div className="md-body space-y-4 text-slate-300 text-sm font-sans leading-relaxed">
       {paragraphs.map((block, idx) => {
         const trimmed = block.trim();
 

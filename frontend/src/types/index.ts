@@ -26,7 +26,13 @@ export interface Section {
   color_hex: string;
   icon: SectionIcon | string;
   sort_order: number;
+  // Visual personality of the section's posts
+  theme: SectionTheme;
+  // Admin-editable markdown shown below every post of the section
+  footer_markdown: string;
 }
+
+export type SectionTheme = 'default' | 'calm' | 'vivid';
 
 export interface SectionWithCount extends Section {
   post_count: number;
@@ -81,6 +87,8 @@ export interface Post {
   title: string;
   summary: string;
   cover_image_url?: string;
+  // Optional notice shown before the body ("This post discusses anxiety")
+  content_notice?: string | null;
   language: string;
   reading_time_minutes: number;
   upvotes_count: number;

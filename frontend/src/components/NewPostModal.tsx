@@ -69,6 +69,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const [sectionId, setSectionId] = useState<string>('');
   // Optional series ('' = none); only series of the selected section are offered
   const [seriesId, setSeriesId] = useState<string>('');
+  const [contentNotice, setContentNotice] = useState<string>('');
   const [mySeries, setMySeries] = useState<Series[]>([]);
   const [newSeriesTitle, setNewSeriesTitle] = useState<string>('');
   const [isCreatingSeries, setIsCreatingSeries] = useState(false);
@@ -111,6 +112,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setSelectedTagIds(editingPost.tags ? editingPost.tags.map((tg) => tg.id) : []);
       setSectionId(editingPost.section?.id || '');
       setSeriesId(editingPost.series_id || '');
+      setContentNotice(editingPost.content_notice || '');
       setContentMarkdown('content_markdown' in editingPost ? (editingPost as PostDetail).content_markdown : '');
     } else {
       setTitle('');
@@ -120,6 +122,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setSelectedTagIds([]);
       setSectionId('');
       setSeriesId('');
+      setContentNotice('');
       setContentMarkdown('');
     }
     setEditorTab('write');
@@ -437,6 +440,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             tag_ids: selectedTagIds,
             section_id: sectionId,
             submit,
+            content_notice: contentNotice.trim(),
             // Only send a change, so editing never moves the post within its series
             ...(seriesId !== (editingPost.series_id || '') ? { series_id: seriesId || null } : {}),
           },
@@ -454,6 +458,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             section_id: sectionId,
             submit,
             series_id: seriesId || undefined,
+            content_notice: contentNotice.trim() || undefined,
           },
           token
         );
@@ -626,6 +631,21 @@ export const NewPostModal: FC<NewPostModalProps> = ({
               onChange={(e) => setSummary(e.target.value)}
               placeholder={t.postSummaryPlaceholder}
               className="w-full bg-[#07090e] border border-[#1e293b] rounded-xl px-4 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500 resize-none"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="post-content-notice" className="block text-xs font-mono text-slate-400 mb-1.5">
+              {t.contentNoticeLabel}
+            </label>
+            <input
+              id="post-content-notice"
+              type="text"
+              value={contentNotice}
+              onChange={(e) => setContentNotice(e.target.value)}
+              maxLength={300}
+              placeholder={t.contentNoticePlaceholder}
+              className="w-full bg-[#07090e] border border-[#1e293b] rounded-xl px-4 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500"
             />
           </div>
 

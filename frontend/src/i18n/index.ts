@@ -198,6 +198,10 @@ export interface Translations {
   seriesEmpty: string;
   seriesBandTitle: string;
   seriesPostCount: string;
+  contentNoticeLabel: string;
+  contentNoticePlaceholder: string;
+  contentNoticeTitle: string;
+  contentNoticeDismiss: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -395,6 +399,10 @@ export const translations: Record<Language, Translations> = {
     seriesEmpty: 'Esta serie aún no tiene posts.',
     seriesBandTitle: 'Series',
     seriesPostCount: '{count} posts',
+    contentNoticeLabel: 'Aviso de contenido (opcional)',
+    contentNoticePlaceholder: 'Ej.: Este post habla de ansiedad y burnout',
+    contentNoticeTitle: 'Aviso de contenido',
+    contentNoticeDismiss: 'Ocultar aviso',
   },
   en: {
     siteTitle: 'Anthony Ruiz',
@@ -590,6 +598,10 @@ export const translations: Record<Language, Translations> = {
     seriesEmpty: 'This series has no posts yet.',
     seriesBandTitle: 'Series',
     seriesPostCount: '{count} posts',
+    contentNoticeLabel: 'Content notice (optional)',
+    contentNoticePlaceholder: 'E.g. This post discusses anxiety and burnout',
+    contentNoticeTitle: 'Content notice',
+    contentNoticeDismiss: 'Dismiss notice',
   },
   pt: {
     siteTitle: 'Anthony Ruiz',
@@ -785,6 +797,10 @@ export const translations: Record<Language, Translations> = {
     seriesEmpty: 'Esta série ainda não tem posts.',
     seriesBandTitle: 'Séries',
     seriesPostCount: '{count} posts',
+    contentNoticeLabel: 'Aviso de conteúdo (opcional)',
+    contentNoticePlaceholder: 'Ex.: Este post fala sobre ansiedade e burnout',
+    contentNoticeTitle: 'Aviso de conteúdo',
+    contentNoticeDismiss: 'Ocultar aviso',
   },
   fr: {
     siteTitle: 'Anthony Ruiz',
@@ -980,6 +996,10 @@ export const translations: Record<Language, Translations> = {
     seriesEmpty: 'Cette série n\'a pas encore d\'articles.',
     seriesBandTitle: 'Séries',
     seriesPostCount: '{count} articles',
+    contentNoticeLabel: 'Avertissement de contenu (facultatif)',
+    contentNoticePlaceholder: 'Ex. : Cet article parle d\'anxiété et de burn-out',
+    contentNoticeTitle: 'Avertissement de contenu',
+    contentNoticeDismiss: 'Masquer l\'avertissement',
   },
 };
 

@@ -10,7 +10,7 @@ interface SectionsAdminProps {
   onSectionsUpdated?: () => void;
 }
 
-type Draft = { name: string; description: string; color_hex: string };
+type Draft = { name: string; description: string; color_hex: string; theme: string; footer_markdown: string };
 
 // Admin editor for section name, description and color (slugs stay fixed: they are used in URLs)
 export const SectionsAdmin: FC<SectionsAdminProps> = ({ token, onMessage, onSectionsUpdated }) => {
@@ -24,7 +24,14 @@ export const SectionsAdmin: FC<SectionsAdminProps> = ({ token, onMessage, onSect
     try {
       const data = await fetchSections();
       setSections(data);
-      setDrafts(Object.fromEntries(data.map((s) => [s.id, { name: s.name, description: s.description, color_hex: s.color_hex }])));
+      setDrafts(
+        Object.fromEntries(
+          data.map((s) => [
+            s.id,
+            { name: s.name, description: s.description, color_hex: s.color_hex, theme: s.theme, footer_markdown: s.footer_markdown },
+          ])
+        )
+      );
     } catch (err: any) {
       onMessage({ text: err?.message || 'Failed to load sections', type: 'error' });
     } finally {
@@ -41,7 +48,14 @@ export const SectionsAdmin: FC<SectionsAdminProps> = ({ token, onMessage, onSect
 
   const isDirty = (s: SectionWithCount) => {
     const d = drafts[s.id];
-    return Boolean(d) && (d.name !== s.name || d.description !== s.description || d.color_hex.toLowerCase() !== s.color_hex.toLowerCase());
+    return (
+      Boolean(d) &&
+      (d.name !== s.name ||
+        d.description !== s.description ||
+        d.color_hex.toLowerCase() !== s.color_hex.toLowerCase() ||
+        d.theme !== s.theme ||
+        d.footer_markdown !== s.footer_markdown)
+    );
   };
 
   const handleSave = async (s: SectionWithCount) => {
@@ -53,7 +67,11 @@ export const SectionsAdmin: FC<SectionsAdminProps> = ({ token, onMessage, onSect
     }
     setSavingId(s.id);
     try {
-      const updated = await updateSection(s.id, { name: d.name, description: d.description, color_hex: d.color_hex }, token);
+      const updated = await updateSection(
+        s.id,
+        { name: d.name, description: d.description, color_hex: d.color_hex, theme: d.theme, footer_markdown: d.footer_markdown },
+        token
+      );
       setSections((prev) => prev.map((x) => (x.id === s.id ? { ...x, ...updated } : x)));
       onMessage({ text: `Section "${updated.name}" saved.`, type: 'success' });
       onSectionsUpdated?.();
@@ -125,6 +143,30 @@ export const SectionsAdmin: FC<SectionsAdminProps> = ({ token, onMessage, onSect
                     value={d.color_hex}
                     onChange={(e) => updateDraft(s.id, { color_hex: e.target.value })}
                     className="h-9 w-14 bg-[#0b0f19] border border-[#1e293b] rounded-lg cursor-pointer"
+                  />
+                </label>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3">
+                <label className="flex flex-col gap-1 text-[11px] font-mono text-slate-400">
+                  Theme
+                  <select
+                    value={d.theme}
+                    onChange={(e) => updateDraft(s.id, { theme: e.target.value })}
+                    className="bg-[#0b0f19] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="default">Default</option>
+                    <option value="calm">Calm (softer, no neon)</option>
+                    <option value="vivid">Vivid (section color accents)</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-[11px] font-mono text-slate-400">
+                  Footer below every post (markdown, optional)
+                  <textarea
+                    value={d.footer_markdown}
+                    maxLength={4000}
+                    rows={3}
+                    onChange={(e) => updateDraft(s.id, { footer_markdown: e.target.value })}
+                    className="bg-[#0b0f19] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 resize-y"
                   />
                 </label>
               </div>

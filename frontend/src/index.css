@@ -28,3 +28,49 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #334155;
 }
+
+/* Section personality (sections.theme), applied to the post page */
+.theme-calm .md-body {
+  font-size: 1.0625rem;
+  line-height: 1.85;
+  color: #cbd5e1;
+}
+.theme-calm .md-body p,
+.theme-calm .md-body li {
+  line-height: 1.85;
+}
+.theme-calm .md-body h1,
+.theme-calm .md-body h2,
+.theme-calm .md-body h3 {
+  color: #e2e8f0;
+}
+/* No neon "#" markers or monospace quotes in calm posts */
+.theme-calm .md-body h2 > span:first-child {
+  display: none;
+}
+.theme-calm .md-body blockquote {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  border-left-color: #475569;
+  background: rgba(148, 163, 184, 0.06);
+}
+.theme-calm .md-body a {
+  color: #a5c9bf;
+}
+.theme-calm h1 {
+  letter-spacing: -0.01em;
+}
+.theme-vivid .md-body h2 > span:first-child,
+.theme-vivid .md-body h3 {
+  color: var(--section-accent);
+}
+.theme-vivid .md-body blockquote {
+  border-left-color: var(--section-accent);
+}
+.section-footer .md-body {
+  font-size: 0.8125rem;
+  color: #94a3b8;
+}
+.section-footer .md-body a {
+  color: #67e8f9;
+  text-decoration: underline;
+}

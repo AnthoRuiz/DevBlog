@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, ListOrdered, Clock, Calendar, ArrowBigUp, Share2, Bookmark, MessageSquare, Send, Edit3, Trash2 } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, ListOrdered, Info, X, Clock, Calendar, ArrowBigUp, Share2, Bookmark, MessageSquare, Send, Edit3, Trash2 } from 'lucide-react';
 import { PostDetail, Comment, Post } from '../types';
 import { Language, Translations } from '../i18n';
 import { fetchComments, createComment } from '../services/api';
@@ -35,6 +35,10 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
   t,
   currentLang = 'es',
 }) => {
+  // Section personality: calm (softer, for Mental Health) or vivid (section color accents)
+  const theme = post.section?.theme ?? 'default';
+  const isCalm = theme === 'calm';
+  const [isNoticeDismissed, setIsNoticeDismissed] = useState(false);
   const [upvotes, setUpvotes] = useState(post?.upvotes_count ?? 0);
   const [hasUpvoted, setHasUpvoted] = useState(false);
 
@@ -48,6 +52,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
   useEffect(() => {
     setUpvotes(post.upvotes_count ?? 0);
     setHasUpvoted(false);
+    setIsNoticeDismissed(false);
     // Unpublished previews have no public comments
     if (post.status === 'published') loadComments(post.id);
     else setComments([]);
@@ -107,7 +112,10 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      <article className="relative w-full bg-[#0b0f19] border border-[#1e293b] rounded-2xl overflow-hidden">
+      <article
+        className={`theme-${theme} relative w-full bg-[#0b0f19] border border-[#1e293b] rounded-2xl overflow-hidden`}
+        style={{ '--section-accent': post.section?.color_hex ?? '#22D3EE' } as React.CSSProperties}
+      >
 
         {/* Post toolbar */}
         <div className="border-b border-[#1e293b] p-4 flex items-center justify-between">
@@ -205,7 +213,9 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
           </h1>
 
           {/* Metadata */}
-          <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-slate-400 border-b border-[#1e293b] pb-6 mt-4 mb-8">
+          <div
+            className={`flex flex-wrap items-center gap-4 text-xs ${isCalm ? 'font-sans' : 'font-mono'} text-slate-400 border-b border-[#1e293b] pb-6 mt-4 mb-8`}
+          >
             <span>{t.byAuthor}</span>
             <span>&bull;</span>
             <span className="flex items-center gap-1">
@@ -231,22 +241,57 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
           )}
 
           {/* Highlighted summary */}
-          <div className="p-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 text-slate-300 text-sm leading-relaxed mb-8">
+          <div
+            className={`p-4 rounded-xl border text-slate-300 text-sm leading-relaxed mb-8 ${
+              isCalm ? 'border-[#1e293b] bg-[#121622]' : 'border-cyan-500/30 bg-cyan-500/5'
+            }`}
+          >
             <strong>{t.summaryLabel}</strong> {post.summary}
           </div>
+
+          {/* Content notice, dismissible */}
+          {post.content_notice && !isNoticeDismissed && (
+            <div role="note" className="mb-8 flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-400/5 p-4 text-sm text-amber-100">
+              <Info className="w-4 h-4 mt-0.5 shrink-0 text-amber-300" />
+              <div className="flex-1">
+                <p className="text-[11px] uppercase tracking-[0.08em] text-amber-300 mb-1">{t.contentNoticeTitle}</p>
+                <p>{post.content_notice}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNoticeDismissed(true)}
+                className="p-1 rounded-lg text-amber-300/80 hover:text-amber-200"
+                aria-label={t.contentNoticeDismiss}
+                title={t.contentNoticeDismiss}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {/* Rendered markdown body */}
           <div className="prose prose-invert max-w-none text-slate-300">
             <MarkdownRenderer content={post.content_markdown} />
           </div>
 
+          {/* Section footer (admin-editable, e.g. the Mental Health disclaimer) */}
+          {post.section?.footer_markdown && (
+            <aside className="section-footer mt-10 rounded-xl border border-[#1e293b] bg-[#07090e] p-5 text-slate-400">
+              <MarkdownRenderer content={post.section.footer_markdown} />
+            </aside>
+          )}
+
           {/* Bottom reaction bar */}
           <div className="flex items-center justify-between border-t border-[#1e293b] pt-6 mt-12">
             <button
               type="button"
               onClick={handleUpvote}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-mono font-bold text-sm transition-all ${
-                hasUpvoted
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all ${isCalm ? 'font-sans' : 'font-mono'} ${
+                isCalm
+                  ? hasUpvoted
+                    ? 'bg-[#cbd5e1] text-slate-900'
+                    : 'bg-[#121622] text-slate-300 border border-[#1e293b] hover:border-[#475569]'
+                  : hasUpvoted
                   ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/30'
                   : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/20'
               }`}

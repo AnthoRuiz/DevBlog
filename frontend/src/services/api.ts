@@ -73,7 +73,7 @@ export async function fetchSections(): Promise<SectionWithCount[]> {
 // ADMIN only
 export async function updateSection(
   sectionId: string,
-  data: { name?: string; description?: string; color_hex?: string },
+  data: { name?: string; description?: string; color_hex?: string; theme?: string; footer_markdown?: string },
   token: string
 ): Promise<Section> {
   const res = await fetch(`${API_BASE}/admin/sections/${sectionId}`, {
@@ -208,6 +208,7 @@ export async function createPost(
     language: string;
     content_markdown: string;
     cover_image_url?: string;
+    content_notice?: string;
     reading_time_minutes?: number;
     tag_ids: string[];
     section_id: string;
@@ -242,6 +243,8 @@ export async function updatePost(
     language?: string;
     content_markdown?: string;
     cover_image_url?: string;
+    // Empty string removes the notice
+    content_notice?: string;
     reading_time_minutes?: number;
     tag_ids?: string[];
     section_id?: string;
