@@ -8,8 +8,8 @@ interface PostGridProps {
   posts: Post[];
   isLoading: boolean;
   isBookmarks: boolean;
-  /** Featured posts are shown above: an empty grid then needs no empty state */
-  hasFeatured: boolean;
+  /** Posts shown in the featured band above (excluded from this grid, but counted) */
+  featuredCount: number;
   total: number;
   hasMore: boolean;
   isLoadingMore: boolean;
@@ -24,7 +24,7 @@ export const PostGrid: FC<PostGridProps> = ({
   posts,
   isLoading,
   isBookmarks,
-  hasFeatured,
+  featuredCount,
   total,
   hasMore,
   isLoadingMore,
@@ -44,8 +44,17 @@ export const PostGrid: FC<PostGridProps> = ({
     );
   }
 
+  // "Showing X of Y" counts the featured band too: the grid only holds the rest of the section
+  const counter = (
+    <span className="text-xs font-mono text-slate-400">
+      {t.showingPostsCount
+        .replace('{shown}', String(posts.length + featuredCount))
+        .replace('{total}', String(total + featuredCount))}
+    </span>
+  );
+
   if (posts.length === 0) {
-    if (hasFeatured) return null;
+    if (featuredCount > 0) return <div className="flex justify-center mt-8">{counter}</div>;
     return (
       <div className="text-center py-16 bg-[#0b0f19] border border-[#1e293b] rounded-2xl">
         <Sparkles className="w-8 h-8 text-cyan-400 mx-auto mb-3" />
@@ -83,9 +92,7 @@ export const PostGrid: FC<PostGridProps> = ({
               {isLoadingMore ? t.loadingMorePosts : t.loadMorePosts}
             </button>
           )}
-          <span className="text-xs font-mono text-slate-400">
-            {t.showingPostsCount.replace('{shown}', String(posts.length)).replace('{total}', String(total))}
-          </span>
+          {counter}
         </div>
       )}
     </>

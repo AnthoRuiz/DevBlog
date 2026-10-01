@@ -126,7 +126,7 @@ export const FeedPage: FC = () => {
         posts={feed.posts}
         isLoading={feed.isLoading}
         isBookmarks={isBookmarks}
-        hasFeatured={feed.featured.length > 0}
+        featuredCount={feed.featured.length}
         total={feed.total}
         hasMore={feed.hasMore}
         isLoadingMore={feed.isLoadingMore}

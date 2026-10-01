@@ -37,6 +37,9 @@ test.describe('admin', () => {
 
     const band = page.locator('section[aria-label="Destacados"]');
     await expect(band.getByText(post.title)).toBeVisible();
+    // The counter includes the featured band (the grid itself leaves featured posts out)
+    const total = (await api.section('gaming')).post_count;
+    await expect(page.getByText(`Mostrando ${total} de ${total} artículos`)).toBeVisible();
     await band.locator('article', { hasText: post.title }).getByTitle('Quitar de destacados').click();
     await expect(band).toHaveCount(0);
   });
