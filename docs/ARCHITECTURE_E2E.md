@@ -162,6 +162,9 @@ erDiagram
     POSTS }o--o{ TAGS : "post_tags"
     SECTIONS ||--o{ POSTS : "groups"
     SECTIONS ||--o{ TAGS : "owns"
+    SECTIONS ||--o{ SERIES : "groups"
+    SERIES |o--o{ POSTS : "orders"
+    USERS |o--o{ SERIES : "creates"
 
     USERS {
         uuid id PK
@@ -213,7 +216,21 @@ erDiagram
         text review_note "rejection reason"
         tsvector search_vector "generated: title A, summary B, content C (GIN index)"
         datetime featured_at "set while featured (max two per section)"
+        uuid series_id FK "optional"
+        int series_position "unique per series (deferrable)"
         datetime published_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    SERIES {
+        uuid id PK
+        string title
+        string slug UK
+        text description
+        uuid section_id FK
+        string cover_image_url
+        uuid created_by FK
         datetime created_at
         datetime updated_at
     }
@@ -385,7 +402,8 @@ frontend/src/
 ├── main.tsx                    # React root inside BrowserRouter
 ├── pages/
 │   ├── PostPage.tsx            # /posts/:slug — loads the post, 404 state, tab title
-│   └── SearchPage.tsx          # /search — results, section filter, highlights, load more
+│   ├── SearchPage.tsx          # /search — results, section filter, highlights, load more
+│   └── SeriesPage.tsx          # /series/:slug — ordered posts, progress, owner tools
 ├── index.css                   # Tailwind layers and custom styles
 ├── vite-env.d.ts               # Vite env typings (VITE_ENABLE_ROLE_TESTING)
 ├── i18n/index.ts               # Typed translation dictionaries (es, en, pt, fr)
@@ -419,9 +437,10 @@ The URL is the source of truth for the page and the feed filters (`App.tsx`):
 | Path | Page |
 |---|---|
 | `/` | Home feed |
-| `/:section` | Section feed (`tech`, `ai`, `career`, `mental-health`, `gaming`) with a *Featured* band (up to two posts) above the rest; `?tag=` filters by a tag of that section |
+| `/:section` | Section feed (`tech`, `ai`, `career`, `mental-health`, `gaming`) with a *Featured* band (up to two posts) and its series above the rest; `?tag=` filters by a tag of that section |
 | `/tags/:tag` | Tag feed across sections |
 | `/posts/:slug` | Post page (canonical post URL, used by feeds and previews) |
+| `/series/:slug` | Series page: ordered posts, reading progress (stored in the browser), reorder/edit/delete for its owner |
 | `/bookmarks` | Saved posts |
 | `/admin/status`, `/admin/backups` | Admin modals over the feed (old `#/status` and `#/backups` links redirect here) |
 | `/search?q=&section=` | Full-text search results with highlighted matches; typing in the navbar opens it, scoped to the section being browsed |
@@ -500,6 +519,19 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 |---|---|---|---|
 | `GET` | `/sections` | Public | Sections in display order with published post counts |
 | `PUT` | `/admin/sections/{section_id}` | Admin | Edit name, description or color |
+
+### 6.2d Series
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/series` | Public | Series with at least one published post (`section` filter), with `post_count` |
+| `GET` | `/series/mine` | Creator | Series the user can add posts to (all for admins), with total post count |
+| `GET` | `/series/{slug}` | Optional | Series with its posts in order; readers see published posts, the owner and admins all (`can_edit`) |
+| `POST` | `/series` | Creator | Create a series in a section |
+| `PUT` | `/series/{series_id}` | Creator | Edit title, description or cover (owner or admin); the section only while empty |
+| `PUT` | `/series/{series_id}/order` | Creator | Reorder: `post_ids` lists every post, first to last |
+| `DELETE` | `/series/{series_id}` | Creator | Delete the series; its posts stay |
+
+Posts take an optional `series_id` on create and update (`null` removes it); a post joins at the end, must share the series' section and the series must belong to the user (any series for admins). Changing a post's section takes it out of its series. `GET /posts/{slug}` returns `series: {slug, title, position, total, prev, next}`, counting published posts only for readers.
 
 ### 6.2c Review
 | Method | Endpoint | Auth | Description |
