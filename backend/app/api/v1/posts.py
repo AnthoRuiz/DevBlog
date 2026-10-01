@@ -54,6 +54,20 @@ from app.core.limiter import limiter
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
 
+def _search_tsquery(q: str | None):
+    """Prefix tsquery from the words in q ('docker comp' -> docker:* & comp:*), or None when q has no words.
+
+    Only word characters reach to_tsquery, so user input cannot inject tsquery operators.
+    """
+    words = re.findall(r"\w+", (q or "").lower())[:8]
+    # One-letter words in the middle of a query add noise; the last word is kept because the
+    # reader may still be typing it
+    words = [w for i, w in enumerate(words) if len(w) > 1 or i == len(words) - 1]
+    if not words:
+        return None
+    return func.to_tsquery("simple", " & ".join(f"{w}:*" for w in words))
+
+
 def _can_publish_directly(user: User) -> bool:
     """Admins and trusted creators publish directly; other creators go through review."""
     return user.role == UserRole.ADMIN or user.is_trusted
@@ -81,8 +95,8 @@ async def _get_section_or_400(db: AsyncSession, section_id: uuid.UUID) -> Sectio
 async def list_posts(
     section: Optional[str] = Query(None, description="Filter by section slug"),
     tag: Optional[str] = Query(None, description="Filter by tag slug"),
-    q: Optional[str] = Query(None, description="Search by title or summary"),
-    sort: str = Query("recent", regex="^(recent|top_voted|trending)$"),
+    q: Optional[str] = Query(None, max_length=200, description="Full-text search over title, summary and content"),
+    sort: str = Query("recent", regex="^(recent|top_voted|trending|relevance)$"),
     limit: int = Query(12, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db)
@@ -95,8 +109,18 @@ async def list_posts(
     if tag:
         query = query.join(Post.tags).where(Tag.slug == tag)
 
-    if q:
-        search_filter = f"%{q}%"
+    rank = None
+    ts_query = _search_tsquery(q)
+    if ts_query is not None:
+        # Full-text match (prefix-aware, so results appear while typing); ILIKE on the title
+        # also catches spellings the simple configuration does not normalize (accents, hyphens)
+        match = Post.search_vector.op("@@")(ts_query)
+        if len(q.strip()) >= 3:
+            match = match | Post.title.ilike(f"%{q.strip()}%")
+        query = query.where(match)
+        rank = func.ts_rank_cd(Post.search_vector, ts_query)
+    elif q and q.strip():
+        search_filter = f"%{q.strip()}%"
         query = query.where((Post.title.ilike(search_filter)) | (Post.summary.ilike(search_filter)))
 
     # Total for the same filters, so the client knows whether there is another page
@@ -104,7 +128,9 @@ async def list_posts(
 
     query = query.options(selectinload(Post.tags))
 
-    if sort == "top_voted":
+    if sort == "relevance" and rank is not None:
+        query = query.order_by(desc(rank), desc(Post.published_at))
+    elif sort == "top_voted":
         query = query.order_by(desc(Post.upvotes_count), desc(Post.created_at))
     elif sort == "trending":
         query = query.order_by(desc(Post.upvotes_count * 2 + Post.views_count), desc(Post.created_at))
