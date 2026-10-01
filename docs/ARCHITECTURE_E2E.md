@@ -211,6 +211,7 @@ erDiagram
         int views_count
         enum status "draft, pending_review, published, rejected"
         text review_note "rejection reason"
+        tsvector search_vector "generated: title A, summary B, content C (GIN index)"
         datetime published_at
         datetime created_at
         datetime updated_at
@@ -291,7 +292,9 @@ Every sign-up (email or Google) is a `CREATOR`; the admin account comes from `AD
 
 **Post lifecycle (`posts.status`):** `draft` → `pending_review` → `published`, or `rejected` with a `review_note` the author sees; a rejected post can be edited and submitted again. `submit=true` publishes directly for admins and trusted creators and sends the post to review otherwise; `submit=false` keeps it as a draft. When an untrusted creator edits a published post it goes back to review. Unpublished posts are visible only to their author and admins, and readers can only interact with published posts.
 
-**Daily quotas (`app/core/quotas.py`):** per-user, in-memory counters that reset at UTC midnight (and on restart): AI calls 30/day, image uploads 20/day, real-time tag checks 200/day. Admins are exempt. Exceeding a quota returns `429`. `PUT /auth/me/role` (self role switch) returns `403` unless `ALLOW_ROLE_SELF_SWITCH=True`, which is meant for local testing only.
+**Daily quotas (`app/core/quotas.py`):** per-user, in-memory counters that reset at UTC midnight (and on restart): AI calls 30/day, image uploads 20/day, real-time tag checks 200/day. Admins are exempt. Exceeding a quota returns `429`.
+
+**Review alerts:** there is no email; admins see the pending count (`GET /admin/review/count`) as a badge on the navbar's admin panel button and as a `(N)` prefix in the tab title. It is polled every 60 s (also in background tabs) and refreshed when the tab regains focus. `PUT /auth/me/role` (self role switch) returns `403` unless `ALLOW_ROLE_SELF_SWITCH=True`, which is meant for local testing only.
 
 **Route dependencies (`backend/app/api/deps.py`):**
 - `get_current_user_optional` — decodes the Bearer JWT if present, otherwise `None`.
@@ -380,7 +383,8 @@ frontend/src/
 ├── App.tsx                     # App shell: routes, feed filters from the URL, tag filter bar, modals
 ├── main.tsx                    # React root inside BrowserRouter
 ├── pages/
-│   └── PostPage.tsx            # /posts/:slug — loads the post, 404 state, tab title
+│   ├── PostPage.tsx            # /posts/:slug — loads the post, 404 state, tab title
+│   └── SearchPage.tsx          # /search — results, section filter, highlights, load more
 ├── index.css                   # Tailwind layers and custom styles
 ├── vite-env.d.ts               # Vite env typings (VITE_ENABLE_ROLE_TESTING)
 ├── i18n/index.ts               # Typed translation dictionaries (es, en, pt, fr)
@@ -419,7 +423,7 @@ The URL is the source of truth for the page and the feed filters (`App.tsx`):
 | `/posts/:slug` | Post page (canonical post URL, used by feeds and previews) |
 | `/bookmarks` | Saved posts |
 | `/admin/status`, `/admin/backups` | Admin modals over the feed (old `#/status` and `#/backups` links redirect here) |
-| `?q=` | Search within the current feed (debounced, replaces the history entry) |
+| `/search?q=&section=` | Full-text search results with highlighted matches; typing in the navbar opens it, scoped to the section being browsed |
 
 Unknown paths and unknown section slugs render the client-side 404 page. Section slugs are fixed and must never be `posts`, `tags`, `bookmarks`, `admin`, `search` or `series`.
 
@@ -475,7 +479,7 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 ### 6.2 Posts & Tags
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `GET` | `/posts` | Public | Paginated published posts (`section`, `tag`, `q`, `sort=recent\|top_voted\|trending`, `limit` 1–100 default 12, `offset`); returns `{items, total, limit, offset, has_more}` |
+| `GET` | `/posts` | Public | Paginated published posts (`section`, `tag`, `q` (full-text, prefix-aware), `sort=recent\|top_voted\|trending\|relevance`, `limit` 1–100 default 12, `offset`); returns `{items, total, limit, offset, has_more}` |
 | `GET` | `/posts/mine` | Creator | The current user's posts in every status |
 | `GET` | `/posts/{slug}` | Optional | Post detail (increments views); unpublished posts only for their author and admins |
 | `POST` | `/posts` | Creator | Create a post (`section_id` required; `submit` publishes or sends to review, `false` saves a draft) |
