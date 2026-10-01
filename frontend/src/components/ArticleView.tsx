@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Clock, Calendar, ArrowBigUp, Share2, Bookmark, MessageSquare, Send, Edit3, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, ChevronLeft, ChevronRight, ListOrdered, Clock, Calendar, ArrowBigUp, Share2, Bookmark, MessageSquare, Send, Edit3, Trash2 } from 'lucide-react';
 import { PostDetail, Comment, Post } from '../types';
 import { Language, Translations } from '../i18n';
 import { fetchComments, createComment } from '../services/api';
@@ -180,6 +181,19 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
             ))}
           </div>
 
+          {/* Series position */}
+          {post.series && (
+            <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[#1e293b] bg-[#07090e] px-4 py-2.5 text-xs">
+              <ListOrdered className="w-4 h-4 text-[#22D3EE]" />
+              <span className="font-mono text-[#7C8AA0]">
+                {t.seriesPart.replace('{n}', String(post.series.position)).replace('{total}', String(post.series.total))}
+              </span>
+              <Link to={`/series/${post.series.slug}`} className="font-semibold text-[#F8FAFC] hover:text-[#22D3EE]">
+                {post.series.title}
+              </Link>
+            </div>
+          )}
+
           {/* Main title */}
           {post.status !== 'published' && (
             <div className="rounded-xl border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs font-mono text-sky-200">
@@ -253,6 +267,36 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
               <span>{t.shareBtn}</span>
             </button>
           </div>
+
+          {/* Previous / next in the series */}
+          {post.series && (post.series.prev || post.series.next) && (
+            <nav aria-label={t.seriesLabel} className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-10">
+              {post.series.prev ? (
+                <Link
+                  to={`/posts/${post.series.prev.slug}`}
+                  className="rounded-xl border border-[#1e293b] hover:border-[rgba(34,211,238,0.35)] p-4 transition-colors"
+                >
+                  <span className="flex items-center gap-1 text-[11px] font-mono text-[#7C8AA0]">
+                    <ChevronLeft className="w-3.5 h-3.5" /> {t.seriesPrev}
+                  </span>
+                  <span className="block mt-1 text-sm font-semibold text-[#F8FAFC]">{post.series.prev.title}</span>
+                </Link>
+              ) : (
+                <span />
+              )}
+              {post.series.next && (
+                <Link
+                  to={`/posts/${post.series.next.slug}`}
+                  className="rounded-xl border border-[#1e293b] hover:border-[rgba(34,211,238,0.35)] p-4 text-right transition-colors"
+                >
+                  <span className="flex items-center justify-end gap-1 text-[11px] font-mono text-[#7C8AA0]">
+                    {t.seriesNext} <ChevronRight className="w-3.5 h-3.5" />
+                  </span>
+                  <span className="block mt-1 text-sm font-semibold text-[#F8FAFC]">{post.series.next.title}</span>
+                </Link>
+              )}
+            </nav>
+          )}
 
           {/* COMMENTS SECTION (published posts only) */}
           {post.status === 'published' && (

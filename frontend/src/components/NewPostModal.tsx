@@ -12,7 +12,7 @@ import {
   Plus,
   Tag as TagIcon,
 } from 'lucide-react';
-import { Tag, Post, PostDetail, Section, TagValidation, AIStatus } from '../types';
+import { Tag, Post, PostDetail, Section, Series, TagValidation, AIStatus } from '../types';
 import { Language, Translations, languageFlags, languageNames } from '../i18n';
 import {
   uploadImage,
@@ -24,6 +24,8 @@ import {
   fetchAIStatus,
   AIUnavailableError,
   suggestTagsWithAi,
+  fetchMySeries,
+  createSeries,
 } from '../services/api';
 import { MarkdownToolbar } from './MarkdownToolbar';
 import { SectionIcon } from './SectionIcon';
@@ -65,6 +67,11 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   const [coverImageUrl, setCoverImageUrl] = useState('');
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [sectionId, setSectionId] = useState<string>('');
+  // Optional series ('' = none); only series of the selected section are offered
+  const [seriesId, setSeriesId] = useState<string>('');
+  const [mySeries, setMySeries] = useState<Series[]>([]);
+  const [newSeriesTitle, setNewSeriesTitle] = useState<string>('');
+  const [isCreatingSeries, setIsCreatingSeries] = useState(false);
   // Real-time check that a new tag name fits the selected section
   const [tagCheck, setTagCheck] = useState<TagValidation | null>(null);
   const [isCheckingTag, setIsCheckingTag] = useState(false);
@@ -103,6 +110,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setCoverImageUrl(editingPost.cover_image_url || '');
       setSelectedTagIds(editingPost.tags ? editingPost.tags.map((tg) => tg.id) : []);
       setSectionId(editingPost.section?.id || '');
+      setSeriesId(editingPost.series_id || '');
       setContentMarkdown('content_markdown' in editingPost ? (editingPost as PostDetail).content_markdown : '');
     } else {
       setTitle('');
@@ -111,13 +119,42 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setCoverImageUrl('');
       setSelectedTagIds([]);
       setSectionId('');
+      setSeriesId('');
       setContentMarkdown('');
     }
     setEditorTab('write');
     setErrorMsg(null);
     setAiTagSuggestions([]);
     setTagSearchQuery('');
+    setNewSeriesTitle('');
   }, [editingPost, isOpen, defaultLang]);
+
+  useEffect(() => {
+    if (!isOpen || !token) return;
+    fetchMySeries(token).then(setMySeries).catch(() => setMySeries([]));
+  }, [isOpen, token]);
+
+  const sectionSeries = mySeries.filter((sr) => sr.section.id === sectionId);
+  // A series belongs to one section: changing the section drops a series from another one
+  useEffect(() => {
+    if (seriesId && mySeries.length > 0 && !sectionSeries.some((sr) => sr.id === seriesId)) setSeriesId('');
+  }, [sectionId, mySeries]);
+
+  const handleCreateSeries = async () => {
+    const title = newSeriesTitle.trim();
+    if (!token || !sectionId || title.length < 3 || isCreatingSeries) return;
+    setIsCreatingSeries(true);
+    try {
+      const created = await createSeries({ title, section_id: sectionId }, token);
+      setMySeries((prev) => [...prev, created]);
+      setSeriesId(created.id);
+      setNewSeriesTitle('');
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Failed to create the series');
+    } finally {
+      setIsCreatingSeries(false);
+    }
+  };
 
   useEffect(() => {
     setAvailableTags((prev) => {
@@ -400,6 +437,8 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             tag_ids: selectedTagIds,
             section_id: sectionId,
             submit,
+            // Only send a change, so editing never moves the post within its series
+            ...(seriesId !== (editingPost.series_id || '') ? { series_id: seriesId || null } : {}),
           },
           token
         );
@@ -414,6 +453,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             tag_ids: selectedTagIds,
             section_id: sectionId,
             submit,
+            series_id: seriesId || undefined,
           },
           token
         );
@@ -616,6 +656,55 @@ export const NewPostModal: FC<NewPostModalProps> = ({
             </div>
             {!sectionId && <p className="mt-1.5 text-[11px] font-mono text-slate-500">{t.sectionPlaceholder}</p>}
           </div>
+
+          {sectionId && (
+            <div>
+              <label htmlFor="post-series" className="block text-xs font-mono text-slate-400 mb-1.5">
+                {t.seriesLabel}
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <select
+                  id="post-series"
+                  value={seriesId}
+                  onChange={(e) => setSeriesId(e.target.value)}
+                  className="flex-1 bg-[#07090e] border border-[#1e293b] rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="">{t.seriesNone}</option>
+                  {sectionSeries.map((sr) => (
+                    <option key={sr.id} value={sr.id}>
+                      {sr.title} ({sr.post_count})
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2 flex-1">
+                  <input
+                    type="text"
+                    value={newSeriesTitle}
+                    onChange={(e) => setNewSeriesTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCreateSeries();
+                      }
+                    }}
+                    maxLength={200}
+                    placeholder={t.seriesNewPlaceholder}
+                    className="flex-1 min-w-0 bg-[#07090e] border border-[#1e293b] rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateSeries}
+                    disabled={newSeriesTitle.trim().length < 3 || isCreatingSeries}
+                    className="flex items-center gap-1 px-3 py-2 rounded-xl border border-[#1e293b] hover:border-cyan-500/50 text-xs text-slate-300 disabled:opacity-40"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    {t.seriesCreateBtn}
+                  </button>
+                </div>
+              </div>
+              <p className="mt-1.5 text-[11px] font-mono text-slate-500">{t.seriesHint}</p>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-mono text-slate-400 mb-1.5">

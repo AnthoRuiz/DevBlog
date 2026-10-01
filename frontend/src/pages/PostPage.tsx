@@ -7,6 +7,7 @@ import { fetchPostBySlug } from '../services/api';
 import { ArticleView } from '../components/ArticleView';
 import { NotFound } from '../components/NotFound';
 import { setPageTitle } from '../utils/pageTitle';
+import { markPostRead } from '../utils/readPosts';
 
 interface PostPageProps {
   // From the /posts/:slug match in App (the page is not rendered inside a <Route>)
@@ -50,6 +51,7 @@ export const PostPage: FC<PostPageProps> = ({
         if (cancelled) return;
         setPost(detail);
         setState('ready');
+        markPostRead(detail.id);
       })
       .catch(() => {
         if (!cancelled) setState('missing');

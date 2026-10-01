@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { matchPath, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, matchPath, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { SectionIcon } from './components/SectionIcon';
 import { DigestCard } from './components/DigestCard';
@@ -7,18 +7,20 @@ import { NotFound } from './components/NotFound';
 import { setPageTitle, setTitleBadge } from './utils/pageTitle';
 import { PostPage } from './pages/PostPage';
 import { SearchPage } from './pages/SearchPage';
+import { SeriesPage } from './pages/SeriesPage';
 import { LoginModal } from './components/LoginModal';
 import { NewPostModal } from './components/NewPostModal';
 import { SystemStatusModal } from './components/SystemStatusModal';
 import { BackupsModal } from './components/BackupsModal';
 import { MyPostsModal } from './components/MyPostsModal';
-import { Post, PostDetail, SectionWithCount, Tag, User, UserRole } from './types';
+import { Post, PostDetail, SectionWithCount, Series, Tag, User, UserRole } from './types';
 
 const DEFAULT_TITLE = 'Anthony Ruiz — Software engineer, homelab & security';
 const SITE_NAME = 'Anthony Ruiz';
 const BOOKMARKS = '__bookmarks__';
 import {
   fetchReviewCount,
+  fetchSeriesList,
   featurePost,
   unfeaturePost,
   fetchPosts,
@@ -44,6 +46,7 @@ export function App() {
   //   /:section?tag=x   tag within section   /bookmarks      saved posts
   //   /admin/status, /admin/backups          admin modals over the feed
   //   /search?q=&section=                    full-text search results
+  //   /series/:slug                          series (learning path) page
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -52,13 +55,14 @@ export function App() {
   const adminMatch = matchPath('/admin/:panel', location.pathname);
   const isBookmarksRoute = location.pathname === '/bookmarks';
   const isSearchRoute = location.pathname === '/search';
+  const seriesMatch = matchPath('/series/:seriesSlug', location.pathname);
   const sectionMatch =
-    !postMatch && !tagMatch && !adminMatch && !isBookmarksRoute && !isSearchRoute
+    !postMatch && !tagMatch && !adminMatch && !isBookmarksRoute && !isSearchRoute && !seriesMatch
       ? matchPath('/:sectionSlug', location.pathname)
       : null;
   const isKnownRoute =
     location.pathname === '/' ||
-    Boolean(postMatch || tagMatch || adminMatch || isBookmarksRoute || isSearchRoute || sectionMatch);
+    Boolean(postMatch || tagMatch || adminMatch || isBookmarksRoute || isSearchRoute || seriesMatch || sectionMatch);
   const selectedSection = sectionMatch?.params.sectionSlug;
   // The featured band appears on a section page with no tag filter
   const showsFeaturedBand = Boolean(sectionMatch) && !(sectionMatch && searchParams.get('tag'));
@@ -71,6 +75,8 @@ export function App() {
   const [posts, setPosts] = useState<Post[]>([]);
   // Section page without a tag filter: up to two featured posts shown above the grid
   const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);
+  // Section page: its series (learning paths)
+  const [sectionSeries, setSectionSeries] = useState<Series[]>([]);
   // Pagination of the main feed (not used by the bookmarks view)
   const [totalPosts, setTotalPosts] = useState<number>(0);
   const [hasMorePosts, setHasMorePosts] = useState<boolean>(false);
@@ -264,17 +270,19 @@ export function App() {
 
         if (tagsData.length > 0) setTags(tagsData);
       } else {
-        const [page, featuredPage, tagsData, sectionsData] = await Promise.all([
+        const [page, featuredPage, seriesData, tagsData, sectionsData] = await Promise.all([
           fetchPosts({ section: selectedSection, tag: selectedTag, sort: sortBy, featured: showsFeaturedBand ? false : undefined }),
           showsFeaturedBand
             ? fetchPosts({ section: selectedSection, featured: true, limit: 2 }).catch(() => null)
             : Promise.resolve(null),
+          showsFeaturedBand && selectedSection ? fetchSeriesList(selectedSection).catch(() => []) : Promise.resolve([]),
           fetchAllTags().catch(() => []),
           fetchSections().catch(() => []),
         ]);
         if (requestId !== feedRequestId.current) return;
         if (sectionsData.length > 0) setSections(sectionsData);
         setFeaturedPosts(featuredPage?.items ?? []);
+        setSectionSeries(seriesData);
         setPosts(page.items);
         setTotalPosts(page.total);
         setHasMorePosts(page.has_more);
@@ -593,6 +601,14 @@ export function App() {
             onEditPost={handleEditPost}
             onDeletePost={handleDeletePost}
           />
+        ) : seriesMatch ? (
+          <SeriesPage
+            slug={seriesMatch.params.seriesSlug ?? ''}
+            t={t}
+            currentLang={currentLang}
+            token={userToken}
+            siteName={SITE_NAME}
+          />
         ) : isSearchRoute ? (
           <SearchPage t={t} currentLang={currentLang} sections={sections} />
         ) : !isKnownRoute || isUnknownSection ? (
@@ -829,6 +845,28 @@ export function App() {
                   t={t}
                   currentLang={currentLang}
                 />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Series band (section pages) */}
+        {!isLoading && showsFeaturedBand && sectionSeries.length > 0 && (
+          <section aria-label={t.seriesBandTitle} className="mb-8">
+            <p className="text-xs font-mono uppercase tracking-[0.08em] text-[#22D3EE] mb-3">{t.seriesBandTitle}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {sectionSeries.map((sr) => (
+                <Link
+                  key={sr.id}
+                  to={`/series/${sr.slug}`}
+                  className="block bg-[#0b0f19] border border-[#1e293b] hover:border-[rgba(34,211,238,0.35)] rounded-2xl p-4 transition-colors"
+                >
+                  <span className="block font-bold text-[#F8FAFC] leading-snug">{sr.title}</span>
+                  {sr.description && <span className="block text-xs text-[#94A3B8] mt-1 line-clamp-2">{sr.description}</span>}
+                  <span className="block text-[11px] font-mono text-[#7C8AA0] mt-2">
+                    {t.seriesPostCount.replace('{count}', String(sr.post_count))}
+                  </span>
+                </Link>
               ))}
             </div>
           </section>

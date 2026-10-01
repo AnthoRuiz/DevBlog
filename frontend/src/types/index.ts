@@ -90,6 +90,8 @@ export interface Post {
   review_note?: string | null;
   // Set while the admin features the post in its section (max two per section)
   featured_at?: string | null;
+  series_id?: string | null;
+  series_position?: number | null;
   published_at?: string;
   created_at: string;
   section?: Section | null;
@@ -104,6 +106,36 @@ export interface ReviewItem extends Post {
 export interface PostDetail extends Post {
   content_markdown: string;
   comments: Comment[];
+  // "Part N of M" (readers only count published posts)
+  series?: PostSeriesInfo | null;
+}
+
+export interface PostSeriesInfo {
+  id: string;
+  slug: string;
+  title: string;
+  position: number;
+  total: number;
+  prev?: { slug: string; title: string } | null;
+  next?: { slug: string; title: string } | null;
+}
+
+// An ordered learning path of posts within one section
+export interface Series {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  cover_image_url?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  section: Section;
+  post_count: number;
+}
+
+export interface SeriesDetail extends Series {
+  posts: Post[];
+  can_edit: boolean;
 }
 
 export interface PostUpdate {
@@ -115,6 +147,8 @@ export interface PostUpdate {
   reading_time_minutes?: number;
   // true: publish or submit for review; false: back to draft
   submit?: boolean;
+  // null takes the post out of its series
+  series_id?: string | null;
   section_id?: string;
   tag_ids?: string[];
 }

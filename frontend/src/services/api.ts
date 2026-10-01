@@ -1,4 +1,4 @@
-import { Post, PostDetail, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions, ReviewItem } from '../types';
+import { Post, PostDetail, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions, ReviewItem, Series, SeriesDetail } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -213,6 +213,7 @@ export async function createPost(
     section_id: string;
     // true: publish (admins, trusted creators) or submit for review; false: save as draft
     submit: boolean;
+    series_id?: string;
   },
   token: string
 ): Promise<PostDetail> {
@@ -245,6 +246,8 @@ export async function updatePost(
     tag_ids?: string[];
     section_id?: string;
     submit?: boolean;
+    // null takes the post out of its series
+    series_id?: string | null;
   },
   token: string
 ): Promise<PostDetail> {
@@ -612,4 +615,49 @@ export function featurePost(postId: string, token: string): Promise<Post> {
 
 export function unfeaturePost(postId: string, token: string): Promise<Post> {
   return authJson(`/admin/posts/${postId}/feature`, token, 'Failed to unfeature the post', { method: 'DELETE' });
+}
+
+export async function fetchSeriesList(section?: string): Promise<Series[]> {
+  const res = await fetch(`${API_BASE}/series${section ? `?section=${encodeURIComponent(section)}` : ''}`);
+  if (!res.ok) throw new Error('Failed to load series');
+  return res.json();
+}
+
+export async function fetchSeriesBySlug(slug: string): Promise<SeriesDetail> {
+  const token = localStorage.getItem('auth_token');
+  const res = await fetch(`${API_BASE}/series/${encodeURIComponent(slug)}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error('Series not found');
+  return res.json();
+}
+
+export function fetchMySeries(token: string): Promise<Series[]> {
+  return authJson('/series/mine', token, 'Failed to load your series');
+}
+
+export function createSeries(
+  body: { title: string; description?: string; section_id: string },
+  token: string
+): Promise<Series> {
+  return authJson('/series', token, 'Failed to create the series', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function updateSeries(
+  seriesId: string,
+  body: { title?: string; description?: string },
+  token: string
+): Promise<Series> {
+  return authJson(`/series/${seriesId}`, token, 'Failed to update the series', { method: 'PUT', body: JSON.stringify(body) });
+}
+
+export function reorderSeries(seriesId: string, postIds: string[], token: string): Promise<SeriesDetail> {
+  return authJson(`/series/${seriesId}/order`, token, 'Failed to reorder the series', {
+    method: 'PUT',
+    body: JSON.stringify({ post_ids: postIds }),
+  });
+}
+
+export function deleteSeries(seriesId: string, token: string): Promise<{ deleted: boolean }> {
+  return authJson(`/series/${seriesId}`, token, 'Failed to delete the series', { method: 'DELETE' });
 }

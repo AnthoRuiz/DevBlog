@@ -177,6 +177,27 @@ export interface Translations {
   featuredLabel: string;
   featurePost: string;
   unfeaturePost: string;
+  seriesLabel: string;
+  seriesNone: string;
+  seriesNewPlaceholder: string;
+  seriesCreateBtn: string;
+  seriesHint: string;
+  seriesPart: string;
+  seriesPrev: string;
+  seriesNext: string;
+  seriesProgress: string;
+  seriesStart: string;
+  seriesContinue: string;
+  seriesRead: string;
+  seriesEdit: string;
+  seriesDelete: string;
+  seriesDeleteConfirm: string;
+  seriesDescriptionPlaceholder: string;
+  seriesMoveUp: string;
+  seriesMoveDown: string;
+  seriesEmpty: string;
+  seriesBandTitle: string;
+  seriesPostCount: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -353,6 +374,27 @@ export const translations: Record<Language, Translations> = {
     featuredLabel: 'Destacados',
     featurePost: 'Destacar en la sección',
     unfeaturePost: 'Quitar de destacados',
+    seriesLabel: 'Serie',
+    seriesNone: 'Sin serie',
+    seriesNewPlaceholder: 'Nueva serie…',
+    seriesCreateBtn: 'Crear',
+    seriesHint: 'El post se agrega al final; puedes reordenar en la página de la serie.',
+    seriesPart: 'Parte {n} de {total}',
+    seriesPrev: 'Anterior',
+    seriesNext: 'Siguiente',
+    seriesProgress: '{read} de {total} leídos',
+    seriesStart: 'Empezar',
+    seriesContinue: 'Continuar',
+    seriesRead: 'Leído',
+    seriesEdit: 'Editar serie',
+    seriesDelete: 'Eliminar serie',
+    seriesDeleteConfirm: '¿Eliminar esta serie? Los posts se conservan.',
+    seriesDescriptionPlaceholder: 'De qué trata esta serie',
+    seriesMoveUp: 'Subir',
+    seriesMoveDown: 'Bajar',
+    seriesEmpty: 'Esta serie aún no tiene posts.',
+    seriesBandTitle: 'Series',
+    seriesPostCount: '{count} posts',
   },
   en: {
     siteTitle: 'Anthony Ruiz',
@@ -527,6 +569,27 @@ export const translations: Record<Language, Translations> = {
     featuredLabel: 'Featured',
     featurePost: 'Feature in section',
     unfeaturePost: 'Remove from featured',
+    seriesLabel: 'Series',
+    seriesNone: 'No series',
+    seriesNewPlaceholder: 'New series…',
+    seriesCreateBtn: 'Create',
+    seriesHint: 'The post is added at the end; you can reorder it on the series page.',
+    seriesPart: 'Part {n} of {total}',
+    seriesPrev: 'Previous',
+    seriesNext: 'Next',
+    seriesProgress: '{read} of {total} read',
+    seriesStart: 'Start',
+    seriesContinue: 'Continue',
+    seriesRead: 'Read',
+    seriesEdit: 'Edit series',
+    seriesDelete: 'Delete series',
+    seriesDeleteConfirm: 'Delete this series? Its posts are kept.',
+    seriesDescriptionPlaceholder: 'What this series is about',
+    seriesMoveUp: 'Move up',
+    seriesMoveDown: 'Move down',
+    seriesEmpty: 'This series has no posts yet.',
+    seriesBandTitle: 'Series',
+    seriesPostCount: '{count} posts',
   },
   pt: {
     siteTitle: 'Anthony Ruiz',
@@ -701,6 +764,27 @@ export const translations: Record<Language, Translations> = {
     featuredLabel: 'Destaques',
     featurePost: 'Destacar na seção',
     unfeaturePost: 'Remover dos destaques',
+    seriesLabel: 'Série',
+    seriesNone: 'Sem série',
+    seriesNewPlaceholder: 'Nova série…',
+    seriesCreateBtn: 'Criar',
+    seriesHint: 'O post é adicionado ao final; você pode reordenar na página da série.',
+    seriesPart: 'Parte {n} de {total}',
+    seriesPrev: 'Anterior',
+    seriesNext: 'Próximo',
+    seriesProgress: '{read} de {total} lidos',
+    seriesStart: 'Começar',
+    seriesContinue: 'Continuar',
+    seriesRead: 'Lido',
+    seriesEdit: 'Editar série',
+    seriesDelete: 'Excluir série',
+    seriesDeleteConfirm: 'Excluir esta série? Os posts são mantidos.',
+    seriesDescriptionPlaceholder: 'Sobre o que é esta série',
+    seriesMoveUp: 'Mover para cima',
+    seriesMoveDown: 'Mover para baixo',
+    seriesEmpty: 'Esta série ainda não tem posts.',
+    seriesBandTitle: 'Séries',
+    seriesPostCount: '{count} posts',
   },
   fr: {
     siteTitle: 'Anthony Ruiz',
@@ -875,6 +959,27 @@ export const translations: Record<Language, Translations> = {
     featuredLabel: 'À la une',
     featurePost: 'Mettre à la une',
     unfeaturePost: 'Retirer de la une',
+    seriesLabel: 'Série',
+    seriesNone: 'Aucune série',
+    seriesNewPlaceholder: 'Nouvelle série…',
+    seriesCreateBtn: 'Créer',
+    seriesHint: 'L\'article est ajouté à la fin ; vous pouvez réordonner sur la page de la série.',
+    seriesPart: 'Partie {n} sur {total}',
+    seriesPrev: 'Précédent',
+    seriesNext: 'Suivant',
+    seriesProgress: '{read} sur {total} lus',
+    seriesStart: 'Commencer',
+    seriesContinue: 'Continuer',
+    seriesRead: 'Lu',
+    seriesEdit: 'Modifier la série',
+    seriesDelete: 'Supprimer la série',
+    seriesDeleteConfirm: 'Supprimer cette série ? Ses articles sont conservés.',
+    seriesDescriptionPlaceholder: 'De quoi parle cette série',
+    seriesMoveUp: 'Monter',
+    seriesMoveDown: 'Descendre',
+    seriesEmpty: 'Cette série n\'a pas encore d\'articles.',
+    seriesBandTitle: 'Séries',
+    seriesPostCount: '{count} articles',
   },
 };
 
