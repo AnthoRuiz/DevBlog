@@ -7,7 +7,7 @@ The personal blog of Anthony Ruiz: a self-hosted blog engine and Homelab observa
 - 🌐 **Production:** [https://blog.anthoruiz.dev](https://blog.anthoruiz.dev)
 - 📖 **Technical sheet / handoff:** [`docs/ARCHITECTURE_E2E.md`](./docs/ARCHITECTURE_E2E.md) — start with §0 to resume development (current state, conventions, workflow, decisions, known issues and next steps)
 
-**Stack:** React 18 + TypeScript + Vite · FastAPI + SQLAlchemy (async) · PostgreSQL 16 · Nginx · Docker Compose · Cloudflare Tunnel · Claude & Gemini (AI, with failover)
+**Stack:** React 18 + TypeScript + Vite (React Router, TanStack Query, feature-based structure) · FastAPI + SQLAlchemy (async) · PostgreSQL 16 · Nginx · Docker Compose · Cloudflare Tunnel · Claude & Gemini (AI, with failover)
 
 ---
 
@@ -152,7 +152,13 @@ cd frontend
 npm install     # first time or when package.json changes
 npm run dev     # http://localhost:5173
 ```
-Vite proxies `/api` and `/uploads` to the **development** backend on port 8001 (override with `VITE_API_PROXY_TARGET`).
+Vite proxies `/api`, `/uploads` and the RSS feeds to the **development** backend on port 8001 (override with `VITE_API_PROXY_TARGET`).
+
+### 4. Run the end-to-end tests
+```bash
+cd frontend
+npm run test:e2e   # Playwright with the installed Chrome, against the dev stack (creates and deletes its own posts)
+```
 
 Sign in as `admin@devblog.local` with the `ADMIN_PASSWORD` from `.env.dev`.
 

@@ -1,6 +1,6 @@
 # Anthony Ruiz — Blog • End-to-End Technical Specification & Architecture Manual
 
-> **Document Version:** 4.0.0 (2026-10-01)  
+> **Document Version:** 4.1.0 (2026-10-01)  
 > **Target Audience:** AI agents and developers picking up the project, systems architects, DevOps engineers  
 > **Production URL:** `https://blog.anthoruiz.dev`  
 > **Local endpoints:** Production stack: frontend `127.0.0.1:3000`, API `127.0.0.1:8000` · Development stack: frontend `localhost:5173`, API `localhost:8001/docs`  
@@ -28,7 +28,8 @@ Content is organized in five fixed **sections** (Tech & Coding, AI, Interviews &
 |---|---|
 | Backend (FastAPI) | `backend/app/` — `api/v1/` routers, `models/`, `schemas/`, `services/`, `core/` (config, security, quotas, limiter, logging) |
 | Migrations | `backend/migrations/versions/0001…0008` (run automatically on startup) |
-| Frontend (React + Vite) | `frontend/src/` — `App.tsx` (shell and routes), `pages/`, `components/`, `services/api.ts`, `i18n/index.ts`, `types/index.ts`, `utils/` |
+| Frontend (React + Vite) | `frontend/src/` — `app/` (router, layout, navbar, shell context), `features/<feature>/` (admin, auth, bookmarks, feed, home, posts, search, series), `shared/` (API client, TanStack Query keys, i18n, UI, utils, types) — see §5.2 |
+| End-to-end tests | `frontend/e2e/` (Playwright, run against the dev stack: `npm run test:e2e`) |
 | Nginx (production) | `frontend/nginx.conf` (SPA fallback, API proxy, feeds, social-bot previews, security headers) |
 | Compose | `docker-compose.yml` (production, project `blog`), `docker-compose.dev.yml` (development, project `devblog-dev`) |
 | Deploy script | `deploy.sh` (checks, deploy, post-deploy security verification) |
@@ -36,10 +37,10 @@ Content is organized in five fixed **sections** (Tech & Coding, AI, Interviews &
 | Backups | `backend/backups/` (host bind mount, git-ignored) |
 | Docs | `README.md` (overview), this file (full spec), `docs/plans/IMPLEMENTATION_PLAN_V2.md` (plan and decisions, done), `docs/plans/FEAT_RSS_LINKEDIN_SPEC.md` (RSS/OG spec; LinkedIn automation still pending) |
 | Personal brand book (outside the repo) | `C:\Users\14076\OneDrive\Desktop\Personal_Brand\Brand Book\brand-book.md` (WSL: `/mnt/c/Users/14076/OneDrive/Desktop/Personal_Brand/Brand Book/`) plus SVG assets. Source of truth for name, tagline, colors, fonts and copy |
-| Approved home design | claude.ai design artifact "Blog Home Redesign" (`https://claude.ai/artifact/GrRrM54VekGMX4Dg7aCKuQ`), implemented in `frontend/src/pages/HomeMagazine.tsx` |
+| Approved home design | claude.ai design artifact "Blog Home Redesign" (`https://claude.ai/artifact/GrRrM54VekGMX4Dg7aCKuQ`), implemented in `frontend/src/features/home/HomeMagazine.tsx` |
 
 ### 0.4 Non-negotiable conventions
-1. **English only** for code, comments, identifiers, log/error messages, commit messages, scripts and docs. The owner chats in Spanish; that never leaks into the project. User-facing strings go through `frontend/src/i18n/index.ts` in **es, en, pt and fr** (Spanish is the default UI language).
+1. **English only** for code, comments, identifiers, log/error messages, commit messages, scripts and docs. The owner chats in Spanish; that never leaks into the project. User-facing strings go through `frontend/src/shared/i18n/translations.ts` in **es, en, pt and fr** (Spanish is the default UI language).
 2. **Brand book first** for any visual or copy decision (tokens in §5.1).
 3. **Every schema change = an Alembic migration**, tested on a copy of production before deploying (§11.2).
 4. **Backup before every production deploy**, then `./deploy.sh` and verify (§11.5).
@@ -64,6 +65,7 @@ cd frontend && npm install && npm run dev       # see §11.6: Node is the Window
 # Checks before committing
 docker exec devblog_dev_backend alembic check   # models and schema in sync
 cd frontend && npx tsc --noEmit -p .            # type check
+cd frontend && npm run test:e2e                 # end-to-end suite (dev stack running, see §11.3)
 ```
 
 ---
@@ -463,55 +465,54 @@ Every sign-up (email or Google) is a `CREATOR`; the admin account comes from `AD
 - **Code highlighting:** highlight.js.
 - **Diagrams:** Mermaid 12 (dark theme, `securityLevel: 'strict'`).
 - **Icons:** lucide-react.
-- **Routing:** React Router 6 (`BrowserRouter`); Nginx serves `index.html` for unknown paths.
-- **HTTP:** native `fetch` wrapped in `src/services/api.ts`.
+- **Routing:** React Router 6 data router (`createBrowserRouter` in `src/app/router.tsx`) with a shared layout; Nginx serves `index.html` for unknown paths.
+- **Server state:** TanStack Query 5 (cache, pagination with infinite queries, invalidation after changes, polling for the review badge).
+- **Client state:** React Context for the session (`AuthProvider`), language (`LanguageProvider`), bookmarks (`BookmarksProvider`) and the layout's modals (`ShellProvider`).
+- **HTTP:** native `fetch` wrapped in `src/shared/api/client.ts`.
+- **Tests:** Playwright end-to-end suite in `frontend/e2e/` (§11.3).
 
-### 5.2 Component Tree
+### 5.2 Source Structure (feature-based)
+
+Code is grouped by feature; each feature owns its components, hooks and data access, and shares only through `shared/` and the app shell. Business logic lives in hooks; components render.
 
 ```
 frontend/src/
-├── App.tsx                     # App shell: routes, feed filters from the URL, tag filter bar, modals
-├── main.tsx                    # React root inside BrowserRouter
-├── public/favicon.svg          # Minimal >ar_ mark from the brand book (in frontend/public/)
-├── pages/
-│   ├── PostPage.tsx            # /posts/:slug — loads the post, 404 state, tab title
-│   ├── SearchPage.tsx          # /search — results, section filter, highlights, load more
-│   ├── SeriesPage.tsx          # /series/:slug — ordered posts, progress, owner tools
-│   └── HomeMagazine.tsx        # / — lead story, latest, section blocks, browse by tag
-├── index.css                   # Tailwind layers and custom styles
-├── vite-env.d.ts               # Vite env typings (VITE_ENABLE_ROLE_TESTING)
-├── i18n/index.ts               # Typed translation dictionaries (es, en, pt, fr)
-├── types/index.ts              # Domain models and API contracts
-├── services/
-│   ├── api.ts                  # REST client (fetch) and ROLE_TESTING_ENABLED flag
-│   └── logger.ts               # Client error reporting to /api/v1/logs/client
-├── utils/
-│   ├── pageTitle.ts            # Single owner of document.title (page title + "(N)" review badge)
-│   ├── readPosts.ts            # Posts opened in this browser (series progress), localStorage
-│   └── readingTime.ts          # Client-side reading time estimate
-└── components/
-    ├── Navbar.tsx              # Top bar: brand, search, status, language, New post, My posts, admin panel (+ review badge)
-    ├── SectionIcon.tsx         # Section icon keys → lucide icons
-    ├── SectionsAdmin.tsx       # Admin Sections tab: name, description, color, theme, footer
-    ├── BrandMark.tsx           # >ar_ monogram (inline SVG from the brand book)
-    ├── DigestCard.tsx          # Post card (cover, language badge, metadata, actions)
-    ├── ArticleView.tsx         # Post page body: article, reactions and comments
-    ├── NotFound.tsx            # Client-side 404 page
-    ├── NewPostModal.tsx        # Editor: cover upload, tags, AI translate/suggest/estimate
-    ├── MarkdownToolbar.tsx     # Formatting toolbar, inline image upload and quick guide
-    ├── MarkdownRenderer.tsx    # In-house markdown renderer with sanitized links and images
-    ├── MermaidRenderer.tsx     # Mermaid diagram rendering with copy-source button
-    ├── LoginModal.tsx          # Sign-in and sign-up
-    ├── SystemStatusModal.tsx   # /status dashboard (admin data, notice for others)
-    ├── BackupsModal.tsx        # Admin panel: review queue, users & roles, sections, backups, media cleanup
-    ├── ReviewQueue.tsx         # Admin review tab: approve or reject pending posts
-    ├── MyPostsModal.tsx        # The signed-in user's posts with their review status
-    └── ErrorBoundary.tsx       # Crash screen with automatic error reporting
+├── main.tsx                     # Providers (QueryClient, Language, Auth, Bookmarks) + RouterProvider; global error listeners
+├── index.css                    # Tailwind layers, section-theme CSS
+├── vite-env.d.ts                # Vite env typings (VITE_ENABLE_ROLE_TESTING)
+├── app/
+│   ├── router.tsx               # Every route (createBrowserRouter), see §5.3
+│   ├── Layout.tsx               # Navbar + <Outlet/> (inside ErrorBoundary) + footer + app-wide modals; navbar search; hash redirects
+│   ├── ShellContext.tsx         # Editor and sign-in modal state; notifyPostsChanged (query invalidation)
+│   └── Navbar.tsx               # Brand, search, status, language, New post, My posts, admin panel + review badge
+├── features/
+│   ├── admin/                   # BackupsModal (admin panel), ReviewQueue, SectionsAdmin, SystemStatusModal, RoleTestingBar, useReviewBadge
+│   ├── auth/                    # AuthContext (useAuth: token, user, login/logout, permissions), LoginModal
+│   ├── bookmarks/               # BookmarksContext (local cache synced with the API)
+│   ├── feed/                    # FeedPage, useFeed (queries), SectionBar, TagFilterBar, SortSelect, FeedBanners,
+│   │                            #   SectionBands (header, featured, series), PostGrid, FeedPostCard
+│   ├── home/                    # HomeMagazine (/ lead story, latest, section blocks, browse by tag)
+│   ├── posts/                   # PostPage, ArticleView, DigestCard, NewPostModal (editor), MarkdownToolbar, MyPostsModal, usePostActions
+│   ├── search/                  # SearchPage (infinite query, highlights)
+│   └── series/                  # SeriesPage (progress, reorder/edit/delete)
+└── shared/
+    ├── api/                     # client.ts (REST calls, ROLE_TESTING_ENABLED), queries.ts (queryClient, useSections, useTags,
+    │                            #   useInvalidatePosts), queryKeys.ts, logger.ts (client error reporting)
+    ├── i18n/                    # translations.ts (es/en/pt/fr dictionaries), LanguageContext (useLanguage)
+    ├── ui/                      # BrandMark, NotFound, MarkdownRenderer, MermaidRenderer, SectionIcon, SiteFooter, ErrorBoundary
+    ├── utils/                   # pageTitle (title + "(N)" badge), readPosts (series progress), readingTime
+    ├── types.ts                 # Domain models and API contracts
+    └── site.ts                  # SITE_NAME, DEFAULT_TITLE
 ```
+`frontend/public/favicon.svg` is the minimal `>ar_` mark from the brand book.
+
+**Data flow.** Pages read server data through TanStack Query hooks (keys in `shared/api/queryKeys.ts`). Everything that depends on posts is keyed under `['posts', …]` or `['series', …]`; after any change (publish, edit, delete, feature, review, series edit) code calls `notifyPostsChanged()` / `useInvalidatePosts()`, which invalidates posts, series, sections, tags and the review count, so every visible page refreshes. Do not add manual refresh counters.
+
+**Adding a feature.** Create `features/<name>/` with its page/components and hooks; add the route in `app/router.tsx` (and the table in §5.3); put query keys in `queryKeys.ts`; put strings in `translations.ts` (4 languages); add or extend an e2e spec.
 
 ### 5.3 Routes
 
-The URL is the source of truth for the page and the feed filters (`App.tsx`):
+The URL is the source of truth for the page and the feed filters (`app/router.tsx`, `features/feed/FeedPage.tsx`):
 
 | Path | Page |
 |---|---|
@@ -526,7 +527,7 @@ The URL is the source of truth for the page and the feed filters (`App.tsx`):
 
 Unknown paths and unknown section slugs render the client-side 404 page. Section slugs are fixed and must never be `posts`, `tags`, `bookmarks`, `admin`, `search` or `series`.
 
-**How routing is implemented (read before touching `App.tsx`):** `App.tsx` does not use `<Routes>`. It computes `matchPath(...)` results from `useLocation()` and renders the matching page inside `<main>`; feed filters (`selectedSection`, `selectedTag`) are derived from the URL, and setters navigate. Consequence: **`useParams()` returns nothing in pages**, so `PostPage` and `SeriesPage` receive their slug as a prop from `App.tsx`. A new route needs: a `matchPath` in `App.tsx`, its exclusion from `sectionMatch`, an `isKnownRoute` entry, a render branch, and an entry in the table above. Admin modals are routes (`/admin/status`, `/admin/backups`) that remember where they were opened from (`location.state.from`).
+**How routing is implemented:** `createBrowserRouter` in `app/router.tsx` declares every route under the `Layout` element; pages read their params with `useParams()`. Static segments outrank `:sectionSlug`, which is why section slugs cannot be reserved words. The feed routes (`/`, `/:sectionSlug`, `/tags/:tagSlug`, `/bookmarks`, `/admin/:panel`) all render `FeedPage`, which derives its filters from the URL; changing a filter navigates. Admin modals are routes (`/admin/status`, `/admin/backups`) rendered by the layout over the feed; they remember where they were opened from (`location.state.from`). Each page sets its own tab title through `shared/utils/pageTitle.ts`.
 
 ### 5.4 Key UI Behaviour
 
@@ -544,13 +545,13 @@ Unknown paths and unknown section slugs render the client-side 404 page. Section
 #### Inline image upload (`MarkdownToolbar.tsx`)
 - The image button uploads through `POST /posts/upload-image` and inserts `![alt](url)` as its own paragraph at the cursor, reading the live textarea value so text typed during the upload is kept.
 
-#### Feed pagination (`App.tsx`)
-- The feed loads 12 posts at a time (`POSTS_PAGE_SIZE`). **Load more** requests the next page with `offset = posts loaded` and appends it (deduplicated by id); a counter shows `Showing X of Y posts`.
-- Changing section, tag or sort starts a fresh first page; a request counter discards late responses from a previous filter. Search is its own page (`/search`), not a feed filter.
+#### Feed pagination (`features/feed/useFeed.ts`)
+- The feed is a TanStack infinite query loading 12 posts per page (`POSTS_PAGE_SIZE`). **Load more** fetches the next page (`offset` = posts loaded so far) and pages are flattened and deduplicated by id; a counter shows `Showing X of Y posts`.
+- Section, tag and sort are part of the query key, so a filter change starts a fresh first page and late responses never mix with the new filter. Search is its own page (`/search`), not a feed filter.
 - On section pages without a tag filter the grid requests `featured=false`, because featured posts are already shown in the *Featured* band above it.
 - Ordering always ends with `Post.id` as a tie-breaker, so page boundaries are stable when dates or votes are equal.
 
-#### Compact tag filter bar (`App.tsx`)
+#### Compact tag filter bar (`features/feed/TagFilterBar.tsx`)
 - Shown on section, tag and bookmarks pages (not on the magazine home, which has *Browse by tag* and its own *All posts* header with sort and a bookmarks link). Shows `All`, `Bookmarks (N)` and the first 6 tags of the current section (`PRIMARY_TAG_LIMIT`); the rest live in a searchable `+N more` dropdown. A tag picked from the dropdown is pinned to the bar with a remove button.
 
 #### Editor (`NewPostModal.tsx`)
@@ -566,7 +567,7 @@ Unknown paths and unknown section slugs render the client-side 404 page. Section
 #### Role testing switcher
 - Hidden unless the frontend is built with `VITE_ENABLE_ROLE_TESTING=true` **and** the backend allows `ALLOW_ROLE_SELF_SWITCH=True`. Switches the signed-in user between `ADMIN` and `CREATOR` (development only).
 
-#### Internationalization (`src/i18n/index.ts`)
+#### Internationalization (`src/shared/i18n/`)
 - Typed dictionaries for 🇪🇸 `es` (default), 🇺🇸 `en`, 🇧🇷 `pt` and 🇫🇷 `fr`, switched instantly from the navbar. The active language is kept in React state (not persisted).
 
 #### Local storage
@@ -766,7 +767,7 @@ docker exec -it devblog_dev_postgres psql -U devblog_dev -d devblog_dev
 ## 9. AI Agent Guidance & Ingestion Index
 
 When reading, analyzing or extending this repository:
-1. **Language:** all code, comments, messages, commits and docs are in English. User-facing strings belong in `frontend/src/i18n/index.ts` (es/en/pt/fr). Spanish keywords in `backend/app/services/ai_features.py` are intentional matching data for Spanish-language posts.
+1. **Language:** all code, comments, messages, commits and docs are in English. User-facing strings belong in `frontend/src/shared/i18n/translations.ts` (es/en/pt/fr). Spanish keywords in `backend/app/services/ai_features.py` are intentional matching data for Spanish-language posts.
 2. **Environments:** never point development tooling at production. Use `docker-compose.dev.yml` + `.env.dev`; Vite already proxies to port 8001.
 3. **Secrets:** never add defaults for secrets in `docker-compose*.yml` or `config.py`; required values use `${VAR:?...}`. Never commit `.env*` files (other than the templates) or anything in `backend/backups/`.
 4. **Routing:** Nginx proxies `/api/` to `backend:8000/api/`, `/feed.xml` and `/<section>/feed.xml` to the feed endpoints, and `/posts/<slug>` for social bots to the preview page; any other path falls back to `index.html` and React Router renders it (see §5.3).
@@ -776,7 +777,7 @@ When reading, analyzing or extending this repository:
 8. **Deploying:** use `./deploy.sh` from WSL; it refuses unsafe configurations and verifies security regressions after deploying.
 9. **OneDrive:** the working copy lives in a OneDrive-synced folder, which has restored stale file versions before and briefly locks `.git/index.lock`. Commit promptly, retry git commands that fail on the lock, and prefer moving the repository outside OneDrive.
 10. **Line endings:** files in the working tree are mostly CRLF (Windows editors) while the repository stores LF. Keep a file's existing line endings when editing, and stage CR-stripped content so diffs only show real changes (§11.4). Only `*.sh` is forced to LF by `.gitattributes`.
-11. **Routing:** see "How routing is implemented" in §5.3 before adding pages.
+11. **Frontend structure:** feature folders, hooks for logic, TanStack Query for server data, invalidation instead of manual refreshes (§5.2–5.3). Run the e2e suite after frontend changes.
 12. **Before saying something works:** run the checks in §11 (alembic check, type check, build, a browser test for UI changes). Report failures honestly.
 13. **Never** push to GitHub, change `.env` secrets, or delete production data without the owner's explicit request; always back up before a deploy.
 
@@ -791,6 +792,7 @@ When reading, analyzing or extending this repository:
 | 2026-09-27/28 | Security hardening (secrets required, production guard, rate limits, upload validation, client-log sanitizing), `deploy.sh`, separate dev/prod stacks, Alembic, everything translated to English, clean production database |
 | 2026-09-29/30 | Local media storage hardening (GIF support, orphan cleanup, media in backups), pagination, sections + tags tied to sections with AI validation (Phase 1–2), Claude/Gemini failover with honest fallbacks and quota handling |
 | 2026-09-30 → 10-01 | Implementation Plan v2, phases A–I (below), each deployed with a backup |
+| 2026-10-01 | Frontend refactor: Playwright e2e suite, hooks/contexts, declarative router with a layout, feature folders, TanStack Query (App.tsx removed) |
 
 ### 10.2 Implementation Plan v2 (done)
 | Phase | Delivered | Migration |
@@ -820,6 +822,7 @@ When reading, analyzing or extending this repository:
 - **Search:** `simple` text-search configuration so Spanish and English posts both match (no stemming, accents not normalized; an ILIKE on the title covers some of that).
 - **Quotas:** creators get 30 AI calls and 20 uploads per day; admin unlimited.
 - **Storage:** local disk volume (not S3) with daily backups including media.
+- **Frontend architecture:** feature-based folders, custom hooks, TanStack Query for server state, Context for the little client state, React Router data router. Rejected: Redux (too heavy for this size), Next.js/SSR (would mean a rewrite; SEO needs are covered by Nginx previews and RSS), strict Feature-Sliced Design (too much ceremony for one maintainer).
 - **AI:** free Gemini tier first; Claude used when a key exists. Translation never fakes a result.
 
 ---
@@ -844,8 +847,19 @@ docker exec devblog_dev_postgres sh -c 'dropdb -U "$POSTGRES_USER" prodcopy'; rm
 ```
 The backend builds its database URL from `POSTGRES_*` variables, so overriding `POSTGRES_DB` points Alembic at the copy.
 
-### 11.3 Browser tests (Playwright with the installed Chrome)
-There is no automated test suite in the repository; features were verified with throwaway scripts. For UI checks, Playwright works with the Chrome already installed on Windows (`chromium.launch({ channel: 'chrome' })`); downloading Playwright's own Chromium stalled on this machine. Because `node`/`npx` resolve to the **Windows** Node install (`/mnt/c/Program Files/nodejs`), run scripts with `node.exe <windows path>` (`wslpath -w script.mjs`), and keep them outside the repository. Typical checks: routes and back/forward, deep links, 404s, the editor flow, admin actions, screenshots at 1440 px and 390 px, and `document.documentElement.scrollWidth` to catch horizontal overflow.
+### 11.3 End-to-end tests (Playwright)
+The suite in `frontend/e2e/` covers navigation (home, sections, post pages, back/forward, deep links, tags, 404s, hash redirects), bookmarks, search, the review queue and badge, featured posts, the editor draft flow, series and section themes.
+
+```bash
+# Dev backend running (docker-compose.dev.yml); Vite is started automatically if it is not up
+cd frontend && npm run test:e2e                  # or: npx playwright test admin.spec.ts
+```
+- Runs against the **development** stack only (it creates and deletes posts); never point `E2E_BASE_URL` at production.
+- Admin credentials come from `../.env.dev` (`ADMIN_EMAIL`, `ADMIN_PASSWORD`) or `E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD`. A fixed creator account (`e2e-creator@example.com`) is registered on first use.
+- Tests create their data through the API with unique titles and delete it afterwards (`e2e/support/fixtures.ts`). Login tokens are cached for the run because `/auth/login` is limited to 10/min.
+- Uses the installed Chrome (`channel: 'chrome'`); downloading Playwright's own Chromium stalled on this machine. `node`/`npx` are the **Windows** install, which works because the repository lives on `C:`; ad-hoc scripts outside the repo need `node.exe <windows path>` (`wslpath -w`).
+- The UI defaults to Spanish, so selectors use Spanish labels.
+- For visual checks, take screenshots at 1440 px and 390 px and compare `document.documentElement.scrollWidth` with the viewport to catch horizontal overflow.
 
 ### 11.4 Committing
 - Conventional messages in English (`feat(scope): …`, `fix(...)`, `docs: …`, `chore(...)`), with a body explaining why for non-trivial changes.
@@ -887,7 +901,7 @@ Then check the changed pages in a browser against production.
 
 ### 12.1 Limitations (by design or accepted for now)
 - **In-memory state:** creator quotas and SlowAPI rate limits live in process memory (reset on restart, single node only).
-- **No automated tests or CI**; verification is manual plus scripts (§11.3).
+- **No backend unit tests or CI**; the frontend has the Playwright e2e suite (§11.3), the backend is verified through it and manual API checks.
 - **Search:** `simple` configuration, no accent folding (`programacion` does not match `programación` except via the title ILIKE), no snippet highlighting from Postgres (the UI highlights client-side).
 - **Comments:** anonymous, auto-approved (`is_approved=True` on create); there is no moderation UI yet.
 - **Language choice** is not persisted (React state, Spanish default).
@@ -900,7 +914,6 @@ Then check the changed pages in a browser against production.
 ### 12.2 Technical debt
 - Empty legacy files tracked at the repo root: `index.html`, `mockups.html`, `serve.py` (0 bytes, from an early prototype commit) — safe to delete.
 - An untracked `package-lock.json` at the repo root (not part of the project; the frontend's lockfile is `frontend/package-lock.json`).
-- `App.tsx` is large (routing, feed state, modals); extracting the feed into `pages/FeedPage.tsx` and moving to `<Routes>` would simplify it.
 - Older components use Tailwind `slate`/`cyan` utilities instead of brand tokens; consolidating into Tailwind theme tokens is pending.
 - The repository lives inside OneDrive (§9.9).
 
@@ -910,4 +923,4 @@ Then check the changed pages in a browser against production.
 - Persist the language choice and use the author's name in the byline.
 - Accent-insensitive search (`unaccent` with an immutable wrapper) and Postgres `ts_headline` snippets.
 - Redis (or Postgres) backed quotas/rate limits if the app ever runs on more than one process.
-- An automated test suite (pytest for the API, Playwright for key flows) and CI.
+- Backend tests (pytest for the API) and CI running them together with the e2e suite.
