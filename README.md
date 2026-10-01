@@ -5,7 +5,7 @@
 The personal blog of Anthony Ruiz: a self-hosted blog engine and Homelab observability hub, running on bare-metal hardware and published through a Cloudflare Tunnel — with zero open router ports.
 
 - 🌐 **Production:** [https://blog.anthoruiz.dev](https://blog.anthoruiz.dev)
-- 📖 **End-to-end architecture manual:** [`docs/ARCHITECTURE_E2E.md`](./docs/ARCHITECTURE_E2E.md)
+- 📖 **Technical sheet / handoff:** [`docs/ARCHITECTURE_E2E.md`](./docs/ARCHITECTURE_E2E.md) — start with §0 to resume development (current state, conventions, workflow, decisions, known issues and next steps)
 
 **Stack:** React 18 + TypeScript + Vite · FastAPI + SQLAlchemy (async) · PostgreSQL 16 · Nginx · Docker Compose · Cloudflare Tunnel · Claude & Gemini (AI, with failover)
 

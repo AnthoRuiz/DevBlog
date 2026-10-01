@@ -1,9 +1,70 @@
 # Anthony Ruiz — Blog • End-to-End Technical Specification & Architecture Manual
 
-> **Document Version:** 3.4.0 (2026-10-01)  
-> **Target Audience:** Systems architects, AI agents, DevOps engineers and full-stack developers  
+> **Document Version:** 4.0.0 (2026-10-01)  
+> **Target Audience:** AI agents and developers picking up the project, systems architects, DevOps engineers  
 > **Production URL:** `https://blog.anthoruiz.dev`  
-> **Local endpoints:** Production stack: frontend `127.0.0.1:3000`, API `127.0.0.1:8000` · Development stack: frontend `localhost:5173`, API `localhost:8001/docs`
+> **Local endpoints:** Production stack: frontend `127.0.0.1:3000`, API `127.0.0.1:8000` · Development stack: frontend `localhost:5173`, API `localhost:8001/docs`  
+> **Purpose:** single source of truth for the system. A new session (human or AI) should be able to resume development from this file alone; read §0 first.
+
+---
+
+## 0. Start Here (Handoff Summary)
+
+### 0.1 What this is
+The personal blog of **Anthony Ruiz** (software engineer in security, homelab builder), live at `https://blog.anthoruiz.dev`. It runs on his own homelab (Windows 11 + WSL2 + Docker) behind a Cloudflare Tunnel. The owner is the only `ADMIN`; anyone who signs up becomes a `CREATOR` whose posts go through the admin's review queue. Anonymous visitors are the readers.
+
+Content is organized in five fixed **sections** (Tech & Coding, AI, Interviews & Career, Mental Health, Gaming). Posts can be featured, grouped into **series**, searched with PostgreSQL full-text search, followed by RSS and shared with rich link previews. Mental Health posts are the owner's personal experience, not professional advice; that section has a calm theme and a disclaimer footer.
+
+### 0.2 Current state (2026-10-01)
+- **Implementation Plan v2 is complete** (phases A–I, see §10 and `docs/plans/IMPLEMENTATION_PLAN_V2.md`). Everything is deployed to production.
+- **Database:** Alembic head `0008_section_personality` in production and development.
+- **Production data:** only the admin account and the 19 starter tags; **no posts yet**, so the home shows empty-section states until the owner publishes.
+- **Development data:** demo and pagination-test posts (all in Tech & Coding) for local testing.
+- **AI:** only a Gemini key is configured in production (no Anthropic key); Claude is wired and takes over automatically if a key is added.
+- **Git:** work happens on `main`. The owner pushes to GitHub himself; never push. Commits are authored as the owner (see §11.4).
+
+### 0.3 Where things live
+| What | Where |
+|---|---|
+| Backend (FastAPI) | `backend/app/` — `api/v1/` routers, `models/`, `schemas/`, `services/`, `core/` (config, security, quotas, limiter, logging) |
+| Migrations | `backend/migrations/versions/0001…0008` (run automatically on startup) |
+| Frontend (React + Vite) | `frontend/src/` — `App.tsx` (shell and routes), `pages/`, `components/`, `services/api.ts`, `i18n/index.ts`, `types/index.ts`, `utils/` |
+| Nginx (production) | `frontend/nginx.conf` (SPA fallback, API proxy, feeds, social-bot previews, security headers) |
+| Compose | `docker-compose.yml` (production, project `blog`), `docker-compose.dev.yml` (development, project `devblog-dev`) |
+| Deploy script | `deploy.sh` (checks, deploy, post-deploy security verification) |
+| Config | `.env` (production), `.env.dev` (development); templates `.env.example`, `.env.dev.example`. Never commit the real files |
+| Backups | `backend/backups/` (host bind mount, git-ignored) |
+| Docs | `README.md` (overview), this file (full spec), `docs/plans/IMPLEMENTATION_PLAN_V2.md` (plan and decisions, done), `docs/plans/FEAT_RSS_LINKEDIN_SPEC.md` (RSS/OG spec; LinkedIn automation still pending) |
+| Personal brand book (outside the repo) | `C:\Users\14076\OneDrive\Desktop\Personal_Brand\Brand Book\brand-book.md` (WSL: `/mnt/c/Users/14076/OneDrive/Desktop/Personal_Brand/Brand Book/`) plus SVG assets. Source of truth for name, tagline, colors, fonts and copy |
+| Approved home design | claude.ai design artifact "Blog Home Redesign" (`https://claude.ai/artifact/GrRrM54VekGMX4Dg7aCKuQ`), implemented in `frontend/src/pages/HomeMagazine.tsx` |
+
+### 0.4 Non-negotiable conventions
+1. **English only** for code, comments, identifiers, log/error messages, commit messages, scripts and docs. The owner chats in Spanish; that never leaks into the project. User-facing strings go through `frontend/src/i18n/index.ts` in **es, en, pt and fr** (Spanish is the default UI language).
+2. **Brand book first** for any visual or copy decision (tokens in §5.1).
+3. **Every schema change = an Alembic migration**, tested on a copy of production before deploying (§11.2).
+4. **Backup before every production deploy**, then `./deploy.sh` and verify (§11.5).
+5. **Commit in small steps**: backend, frontend and docs as separate commits within a feature.
+6. **Docs move with the code**: update `README.md` and this file in the same change (routes, endpoints, env vars, migrations).
+7. **Secrets** only in `.env` files; no defaults for secrets anywhere.
+8. **Employer rule** (brand book): "Views are my own" next to any employer mention; never internal details.
+
+### 0.5 Resume in five minutes
+```bash
+wsl -d Ubuntu                                   # Docker Engine lives inside WSL
+cd /mnt/c/Users/14076/OneDrive/Desktop/Blog
+git log --oneline -15                           # recent work
+docker ps                                       # prod: devblog_*  · dev: devblog_dev_*
+docker exec devblog_backend alembic current     # prod migration head
+docker exec devblog_dev_backend alembic current # dev migration head
+
+# Development
+docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
+cd frontend && npm install && npm run dev       # see §11.6: Node is the Windows install
+
+# Checks before committing
+docker exec devblog_dev_backend alembic check   # models and schema in sync
+cd frontend && npx tsc --noEmit -p .            # type check
+```
 
 ---
 
@@ -84,11 +145,11 @@ flowchart TD
 | Backend | Code baked into the image, no reload · `127.0.0.1:8000` | Source mounted, `--reload` · `127.0.0.1:8001` |
 | Database | `devblog` · `127.0.0.1:5432` | `devblog_dev` · `127.0.0.1:5433` |
 | OpenAPI docs | Disabled | `http://localhost:8001/docs` |
-| Seed | 19 starter tags + admin | 19 starter tags + admin + 3 demo posts |
+| Seed | 19 starter tags + admin | 19 starter tags + admin + 3 demo posts (plus test posts created while developing) |
 | Cloudflare Tunnel | Yes | No |
 | Deploy | `./deploy.sh` | Automatic on save |
 
-The Vite dev server proxies `/api` and `/uploads` to the development backend (`VITE_API_PROXY_TARGET`, default `http://localhost:8001`) — never to production.
+The Vite dev server proxies `/api`, `/uploads`, `/feed.xml` and `/<section>/feed.xml` to the development backend (`VITE_API_PROXY_TARGET`, default `http://localhost:8001`) — never to production.
 
 ### 3.3 Production Container Orchestration (`docker-compose.yml`)
 
@@ -121,6 +182,8 @@ The Vite dev server proxies `/api` and `/uploads` to the development backend (`V
    - **Rate limiting:** leaky bucket at `30 r/s` per visitor with `burst=50` (`zone=api_gateway_limit:10m`), HTTP 429 on exhaustion.
    - **Security headers:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (camera/microphone/geolocation off); `server_tokens off`.
    - **SPA fallback:** `try_files $uri $uri/ /index.html`.
+   - **Social previews:** a `map` on `$http_user_agent` flags social bots (LinkedIn, X, Facebook, Slack, Discord, WhatsApp, Telegram, Mastodon, Bluesky, Reddit, Embedly); `location /posts/` sends them (via `error_page 418` to a named location) to `/api/v1/share/posts/<slug>`, everyone else gets `index.html`.
+   - **Feeds:** `location = /feed.xml` → `/api/v1/feed.xml`; `location ~ ^/[a-z0-9-]+/feed\.xml$` rewrites to `/api/v1/sections/<slug>/feed.xml` (rewrite + `proxy_pass` without URI, so no resolver is needed).
    - **API proxy:** `/api/` → `backend:8000/api/`, `client_max_body_size 16m` for uploads.
    - **Uploads:** `/uploads/` → backend, cached 30 days, served with `nosniff` and `Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox`.
    - **gzip** for text, CSS, JSON, JavaScript and XML.
@@ -284,7 +347,7 @@ Every post and every tag belongs to exactly one section (`section_id`, required,
 | Mental Health | `mental-health` | `#f472b6` | `heart` |
 | Gaming | `gaming` | `#4ade80` | `gamepad` |
 
-Admins can edit name, description and color (`PUT /admin/sections/{id}`); slugs are fixed because they are used in URLs.
+Admins can edit name, description, color, `theme` and `footer_markdown` (`PUT /admin/sections/{id}`, admin panel → Sections). Slugs are fixed because they are URLs (`/tech`), and there is no endpoint to create or delete sections: a new section needs a migration (and must not use a reserved slug, §5.3). Mental Health is seeded with `theme=calm` and a disclaimer footer by migration `0008`.
 
 **Tag-section validation (`backend/app/services/tag_classifier.py`).** A new tag must fit its section ("WoW" belongs to Gaming, never Tech & Coding):
 - With an AI provider configured, the LLM layer (4.11) classifies the name against the section names and descriptions and returns `{section_slug, confidence, reason}` (the slug is an enum of the sections plus `none`). Without a provider, or when all fail, a keyword classifier is used (games, consoles, engines, mental-health, interview and AI terms; short keywords match whole words only).
@@ -357,8 +420,14 @@ Every sign-up (email or Google) is a `CREATOR`; the admin account comes from `AD
 - `0001_baseline` — the schema as of the Alembic introduction (autogenerated from the models).
 - `0002_reconcile_legacy` — idempotent fixes for databases created by older versions with `create_all` (nullable `bookmarks.user_id`, anonymous-bookmark index and unique constraint, no server default on `posts.language`). No-op on a database built from the baseline.
 - `0003_add_sections` — sections table plus `section_id` on tags and posts, with data backfill.
+- `0004_roles_and_review` — roles become `ADMIN`/`CREATOR` (`AUTHOR`→`CREATOR`, `READER` accounts→`CREATOR`; the enum is rebuilt because Postgres cannot drop enum values), `users.is_trusted`, `posts.status` (backfilled from `is_published`, which is dropped) and `posts.review_note`.
+- `0005_post_search` — `posts.search_vector`, a **stored generated** `tsvector` (title A, summary B, content C, `simple` config) with a GIN index. The model declares it with `Computed(...)`; `alembic check` prints a harmless "Computed default cannot be modified" warning.
+- `0006_featured_posts` — `posts.featured_at` (indexed).
+- `0007_series` — `series` table, `posts.series_id`/`series_position` and the **deferrable** unique constraint `uq_posts_series_position` (lets a reorder swap positions inside one transaction).
+- `0008_section_personality` — `sections.theme`, `sections.footer_markdown` (Mental Health seeded calm + disclaimer) and `posts.content_notice`.
 - **Startup:** `run_migrations()` runs in a worker thread before seeding. A database that has the app tables but no `alembic_version` (created before Alembic) is stamped at `0001_baseline` first, so its data is kept and only later migrations run.
-- **New migration:** change the models, then `docker exec -w /app devblog_dev_backend alembic revision --autogenerate -m "<message>"`, review the file (add data backfills by hand), and restart the dev backend to apply it. `alembic check` reports whether models and schema still differ.
+- **New migration:** change the models, then `docker exec -w /app devblog_dev_backend alembic revision --autogenerate -m "<message>"` (or write it by hand following the `000N_<name>.py` naming and `revision`/`down_revision` chain), review the file (add data backfills by hand, write a real `downgrade()`), and let the dev backend apply it (it reloads on save and migrates on startup; `alembic upgrade head` also works). `alembic check` must report "No new upgrade operations detected". Then test it on a copy of production (§11.2).
+- **Model gotchas learned the hard way:** a `Mapped[datetime]` (non-optional) column is `NOT NULL`, so the migration must say `nullable=False` or `alembic check` fails; and a SQLAlchemy relationship must not share its name with a field of the Pydantic response schema built from that model (`Post.parent_series` exists because `PostDetailRead.series` is computed data; with both named `series`, Pydantic triggers a lazy load and async SQLAlchemy raises `MissingGreenlet`).
 
 ### 4.10 Observability & Hardware Telemetry
 - **Logging:** rotating file handler at `/app/logs/server.log` (5 MB × 3) plus stdout; client errors are logged through the `devblog.client` logger.
@@ -390,7 +459,7 @@ Every sign-up (email or Google) is a `CREATOR`; the admin account comes from `AD
 - **Framework:** React 18 (function components and hooks).
 - **Language:** TypeScript 5 (strict).
 - **Bundler / dev server:** Vite 5.
-- **Styling:** Tailwind CSS 3 with a custom dark "cyber-homelab" theme.
+- **Styling:** Tailwind CSS 3, dark only, using the brand book tokens: background `#07090E`, surface `#0B0F19`, surface-2 `#121622`, border `#1E293B`, strong border `#475569`, text `#F8FAFC` / `#94A3B8` / `#7C8AA0` (never `#64748B`, it fails WCAG AA), accent `#22D3EE` (hover `#67E8F9`). Fonts: Inter (people's text) and JetBrains Mono (machine text: tags, dates, metrics, eyebrows), loaded from Google Fonts in `index.html`. Older components still use Tailwind's `slate`/`cyan` utilities; new code uses the hex tokens. Section-theme CSS lives in `src/index.css`.
 - **Code highlighting:** highlight.js.
 - **Diagrams:** Mermaid 12 (dark theme, `securityLevel: 'strict'`).
 - **Icons:** lucide-react.
@@ -403,6 +472,7 @@ Every sign-up (email or Google) is a `CREATOR`; the admin account comes from `AD
 frontend/src/
 ├── App.tsx                     # App shell: routes, feed filters from the URL, tag filter bar, modals
 ├── main.tsx                    # React root inside BrowserRouter
+├── public/favicon.svg          # Minimal >ar_ mark from the brand book (in frontend/public/)
 ├── pages/
 │   ├── PostPage.tsx            # /posts/:slug — loads the post, 404 state, tab title
 │   ├── SearchPage.tsx          # /search — results, section filter, highlights, load more
@@ -415,9 +485,14 @@ frontend/src/
 ├── services/
 │   ├── api.ts                  # REST client (fetch) and ROLE_TESTING_ENABLED flag
 │   └── logger.ts               # Client error reporting to /api/v1/logs/client
-├── utils/                      # Formatting helpers
+├── utils/
+│   ├── pageTitle.ts            # Single owner of document.title (page title + "(N)" review badge)
+│   ├── readPosts.ts            # Posts opened in this browser (series progress), localStorage
+│   └── readingTime.ts          # Client-side reading time estimate
 └── components/
-    ├── Navbar.tsx              # Top bar: search, language switcher, status, admin panel
+    ├── Navbar.tsx              # Top bar: brand, search, status, language, New post, My posts, admin panel (+ review badge)
+    ├── SectionIcon.tsx         # Section icon keys → lucide icons
+    ├── SectionsAdmin.tsx       # Admin Sections tab: name, description, color, theme, footer
     ├── BrandMark.tsx           # >ar_ monogram (inline SVG from the brand book)
     ├── DigestCard.tsx          # Post card (cover, language badge, metadata, actions)
     ├── ArticleView.tsx         # Post page body: article, reactions and comments
@@ -451,6 +526,8 @@ The URL is the source of truth for the page and the feed filters (`App.tsx`):
 
 Unknown paths and unknown section slugs render the client-side 404 page. Section slugs are fixed and must never be `posts`, `tags`, `bookmarks`, `admin`, `search` or `series`.
 
+**How routing is implemented (read before touching `App.tsx`):** `App.tsx` does not use `<Routes>`. It computes `matchPath(...)` results from `useLocation()` and renders the matching page inside `<main>`; feed filters (`selectedSection`, `selectedTag`) are derived from the URL, and setters navigate. Consequence: **`useParams()` returns nothing in pages**, so `PostPage` and `SeriesPage` receive their slug as a prop from `App.tsx`. A new route needs: a `matchPath` in `App.tsx`, its exclusion from `sectionMatch`, an `isKnownRoute` entry, a render branch, and an entry in the table above. Admin modals are routes (`/admin/status`, `/admin/backups`) that remember where they were opened from (`location.state.from`).
+
 ### 5.4 Key UI Behaviour
 
 #### Section personality (`ArticleView.tsx`, `index.css`)
@@ -469,20 +546,32 @@ Unknown paths and unknown section slugs render the client-side 404 page. Section
 
 #### Feed pagination (`App.tsx`)
 - The feed loads 12 posts at a time (`POSTS_PAGE_SIZE`). **Load more** requests the next page with `offset = posts loaded` and appends it (deduplicated by id); a counter shows `Showing X of Y posts`.
-- Changing tag, sort or search starts a fresh first page; a request counter discards late responses from a previous filter.
+- Changing section, tag or sort starts a fresh first page; a request counter discards late responses from a previous filter. Search is its own page (`/search`), not a feed filter.
+- On section pages without a tag filter the grid requests `featured=false`, because featured posts are already shown in the *Featured* band above it.
 - Ordering always ends with `Post.id` as a tie-breaker, so page boundaries are stable when dates or votes are equal.
 
 #### Compact tag filter bar (`App.tsx`)
-- Shows `All`, `Bookmarks (N)` and the first 6 tags (`PRIMARY_TAG_LIMIT`); the rest live in a searchable `+N more` dropdown. A tag picked from the dropdown is pinned to the bar with a remove button.
+- Shown on section, tag and bookmarks pages (not on the magazine home, which has *Browse by tag* and its own *All posts* header with sort and a bookmarks link). Shows `All`, `Bookmarks (N)` and the first 6 tags of the current section (`PRIMARY_TAG_LIMIT`); the rest live in a searchable `+N more` dropdown. A tag picked from the dropdown is pinned to the bar with a remove button.
+
+#### Editor (`NewPostModal.tsx`)
+- Title, summary, optional content notice, section (required), optional series of that section (pick one of yours or create one inline), cover upload, tags with real-time section validation, markdown with toolbar and preview, AI translate / tag suggestions / reading time.
+- Buttons: **Save draft** (`submit=false`) and **Publish** (admins, trusted creators) or **Submit for review** (other creators). Rejected posts show the admin's reason; pending posts show a notice.
+
+#### Admin panel (`BackupsModal.tsx`, route `/admin/backups`)
+- Tabs: **Review (N)** (default; approve, reject with a reason, preview opens the post page), **Users & roles** (role select, *Trusted* checkbox for creators, self role switch only in testing mode), **Backups** (create, download, delete, media usage and orphan cleanup) and **Sections** (name, description, color, theme, footer). The panel's own labels are English only (admin-facing).
+
+#### Admin features on public pages
+- A star on each post card features/unfeatures it (max two per section; the API's 409 message is shown). Pending-review count: navbar badge + `(N)` tab title, polled every 60 s.
 
 #### Role testing switcher
-- Hidden unless the frontend is built with `VITE_ENABLE_ROLE_TESTING=true` **and** the backend allows `ALLOW_ROLE_SELF_SWITCH=True`.
+- Hidden unless the frontend is built with `VITE_ENABLE_ROLE_TESTING=true` **and** the backend allows `ALLOW_ROLE_SELF_SWITCH=True`. Switches the signed-in user between `ADMIN` and `CREATOR` (development only).
 
 #### Internationalization (`src/i18n/index.ts`)
 - Typed dictionaries for 🇪🇸 `es` (default), 🇺🇸 `en`, 🇧🇷 `pt` and 🇫🇷 `fr`, switched instantly from the navbar. The active language is kept in React state (not persisted).
 
 #### Local storage
-- `auth_token`, `current_user`, `user_email` (session) and `devblog_bookmarks` (offline bookmark cache).
+- `auth_token`, `current_user`, `user_email` (session), `devblog_bookmarks` (offline bookmark cache) and `read_posts` (ids of opened posts, for series progress; max 500).
+- `fetchPostBySlug` and `fetchSeriesBySlug` send the token when present, so authors and admins can open their unpublished posts and drafts in a series.
 
 ---
 
@@ -529,6 +618,16 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 | `GET` | `/sections` | Public | Sections in display order with published post counts |
 | `PUT` | `/admin/sections/{section_id}` | Admin | Edit name, description, color, `theme` (`default`/`calm`/`vivid`) or `footer_markdown` |
 
+### 6.2c Review & Featured
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/admin/review` | Admin | Posts waiting for review, oldest first, with the author's name |
+| `GET` | `/admin/review/count` | Admin | `{pending}` for the admin panel badge |
+| `POST` | `/admin/posts/{post_id}/approve` | Admin | Publish a pending post |
+| `POST` | `/admin/posts/{post_id}/feature` | Admin | Feature a published post in its section (`409` when the section already has two) |
+| `DELETE` | `/admin/posts/{post_id}/feature` | Admin | Unfeature a post |
+| `POST` | `/admin/posts/{post_id}/reject` | Admin | Send a pending post back with `{reason}` |
+
 ### 6.2d Series
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
@@ -541,16 +640,6 @@ Auth legend: **Public** — no token · **Optional** — token used if present �
 | `DELETE` | `/series/{series_id}` | Creator | Delete the series; its posts stay |
 
 Posts take an optional `series_id` on create and update (`null` removes it); a post joins at the end, must share the series' section and the series must belong to the user (any series for admins). Changing a post's section takes it out of its series. `GET /posts/{slug}` returns `series: {slug, title, position, total, prev, next}`, counting published posts only for readers.
-
-### 6.2c Review
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/admin/review` | Admin | Posts waiting for review, oldest first, with the author's name |
-| `GET` | `/admin/review/count` | Admin | `{pending}` for the admin panel badge |
-| `POST` | `/admin/posts/{post_id}/approve` | Admin | Publish a pending post |
-| `POST` | `/admin/posts/{post_id}/feature` | Admin | Feature a published post in its section (`409` when the section already has two) |
-| `DELETE` | `/admin/posts/{post_id}/feature` | Admin | Unfeature a post |
-| `POST` | `/admin/posts/{post_id}/reject` | Admin | Send a pending post back with `{reason}` |
 
 ### 6.3 Interactions
 | Method | Endpoint | Auth | Description |
@@ -685,4 +774,140 @@ When reading, analyzing or extending this repository:
 6. **Seed data:** starter tags and demo posts are defined in `backend/app/main.py`; anything that must exist in a fresh database belongs there, not only in a live database.
 7. **CORS:** add new public hostnames to `BACKEND_CORS_ORIGINS` in `backend/app/core/config.py`.
 8. **Deploying:** use `./deploy.sh` from WSL; it refuses unsafe configurations and verifies security regressions after deploying.
-9. **OneDrive:** the working copy lives in a OneDrive-synced folder, which has restored stale file versions before. Commit promptly, and prefer moving the repository outside OneDrive.
+9. **OneDrive:** the working copy lives in a OneDrive-synced folder, which has restored stale file versions before and briefly locks `.git/index.lock`. Commit promptly, retry git commands that fail on the lock, and prefer moving the repository outside OneDrive.
+10. **Line endings:** files in the working tree are mostly CRLF (Windows editors) while the repository stores LF. Keep a file's existing line endings when editing, and stage CR-stripped content so diffs only show real changes (§11.4). Only `*.sh` is forced to LF by `.gitattributes`.
+11. **Routing:** see "How routing is implemented" in §5.3 before adding pages.
+12. **Before saying something works:** run the checks in §11 (alembic check, type check, build, a browser test for UI changes). Report failures honestly.
+13. **Never** push to GitHub, change `.env` secrets, or delete production data without the owner's explicit request; always back up before a deploy.
+
+---
+
+## 10. Project Status, History & Decisions
+
+### 10.1 Timeline
+| Date | Milestone |
+|---|---|
+| 2026-09-26 | Initial FastAPI + React app, Docker Compose, PostgreSQL, JWT auth |
+| 2026-09-27/28 | Security hardening (secrets required, production guard, rate limits, upload validation, client-log sanitizing), `deploy.sh`, separate dev/prod stacks, Alembic, everything translated to English, clean production database |
+| 2026-09-29/30 | Local media storage hardening (GIF support, orphan cleanup, media in backups), pagination, sections + tags tied to sections with AI validation (Phase 1–2), Claude/Gemini failover with honest fallbacks and quota handling |
+| 2026-09-30 → 10-01 | Implementation Plan v2, phases A–I (below), each deployed with a backup |
+
+### 10.2 Implementation Plan v2 (done)
+| Phase | Delivered | Migration |
+|---|---|---|
+| A. Two roles + review queue | `ADMIN`/`CREATOR`, trusted creators, post statuses, review endpoints and admin tab, My posts, creator daily quotas | `0004` |
+| B. Brand | Name, tagline, monogram, favicon, title, footer from the brand book; `GET /site`; fake streak and public telemetry removed | — |
+| C. Real URLs | React Router, post pages, 404, hash-link redirects; review badge polling + `(N)` tab title | — |
+| D. Search | PostgreSQL FTS, `sort=relevance`, `/search` page with section filter and highlights | `0005` |
+| E. Featured posts | Max two per section, admin star, *Featured* band | `0006` |
+| F. Series | Series CRUD/reorder, editor picker, part N of M, series page with progress, section series band | `0007` |
+| G. Section personality | Themes (calm/vivid), section footers, content notices | `0008` |
+| H. RSS | Site and per-section RSS 2.0 (W3C-valid), auto-discovery, OpenGraph previews for social bots | — |
+| I. Magazine home | Approved design: lead story + latest, section blocks, browse by tag, all posts | — |
+
+### 10.3 Decisions and their reasons
+- **Two roles only.** Visitors read anonymously; signing up makes you a `CREATOR`; one admin for now, and the admin can promote others. The last admin can never be demoted.
+- **Review queue for untrusted creators (D1).** Nothing a creator writes is public before review; the admin can mark trusted creators. Admin posts publish directly. Existing posts became `published` in the migration.
+- **Rejected posts** carry a reason, stay editable and can be resubmitted. Untrusted creators editing a live post send it back to review.
+- **No email notifications.** Pending reviews are a badge + tab title, polled every minute (the owner chose this over SMTP).
+- **Anonymous comments stay (D2)**, protected by honeypot, sanitizing and rate limits.
+- **Personal blog brand (D3)** from the brand book; the fake writing streak (`max(14, posts × 2)`) was removed.
+- **Mental Health (D4)** is personal experience, not professional advice: calm theme, disclaimer footer with findahelpline.com, optional content notices.
+- **URLs:** `/<section>` and `/posts/<slug>` (not `/blog/...`); the canonical post URL is used by feeds and previews.
+- **Featured:** max two per section; the home lead and section leads fall back to the latest post.
+- **Series:** owned by creators (admin manages all), one section per series; readers only count published posts.
+- **RSS:** summary + link (not full content), latest 20 posts.
+- **Search:** `simple` text-search configuration so Spanish and English posts both match (no stemming, accents not normalized; an ILIKE on the title covers some of that).
+- **Quotas:** creators get 30 AI calls and 20 uploads per day; admin unlimited.
+- **Storage:** local disk volume (not S3) with daily backups including media.
+- **AI:** free Gemini tier first; Claude used when a key exists. Translation never fakes a result.
+
+---
+
+## 11. Development Workflow & Verification
+
+### 11.1 Everyday loop
+1. Make sure the dev stack is up (§8.2). The dev backend mounts the source and reloads on save; it also applies new migrations on startup.
+2. Backend change → hit the dev API (`http://localhost:8001/api/v1/...`, docs at `/docs`) with `curl` or a small Python script using `.env.dev`'s `ADMIN_EMAIL`/`ADMIN_PASSWORD` to log in. Clean up any test users/posts you create.
+3. Frontend change → `npx tsc --noEmit -p .` in `frontend/`, and `npx vite build --outDir .vitecheck --emptyOutDir` to check the production build (delete `.vitecheck` afterwards; never build into `C:\tmp` or the repo's `dist`).
+4. UI change → verify in a real browser (§11.3).
+
+### 11.2 Testing a migration on a copy of production
+```bash
+# Dump production into a scratch database on the DEV Postgres, migrate it there, then drop it
+docker exec devblog_postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > /tmp/prodcopy.sql
+docker exec devblog_dev_postgres sh -c 'dropdb -U "$POSTGRES_USER" --if-exists prodcopy; createdb -U "$POSTGRES_USER" prodcopy'
+docker exec -i devblog_dev_postgres sh -c 'psql -q -U "$POSTGRES_USER" prodcopy' < /tmp/prodcopy.sql   # role-owner errors are harmless
+docker exec -e POSTGRES_DB=prodcopy devblog_dev_backend sh -c \
+  'alembic upgrade head && alembic downgrade <previous_revision> && alembic upgrade head && alembic check'
+docker exec devblog_dev_postgres sh -c 'dropdb -U "$POSTGRES_USER" prodcopy'; rm /tmp/prodcopy.sql
+```
+The backend builds its database URL from `POSTGRES_*` variables, so overriding `POSTGRES_DB` points Alembic at the copy.
+
+### 11.3 Browser tests (Playwright with the installed Chrome)
+There is no automated test suite in the repository; features were verified with throwaway scripts. For UI checks, Playwright works with the Chrome already installed on Windows (`chromium.launch({ channel: 'chrome' })`); downloading Playwright's own Chromium stalled on this machine. Because `node`/`npx` resolve to the **Windows** Node install (`/mnt/c/Program Files/nodejs`), run scripts with `node.exe <windows path>` (`wslpath -w script.mjs`), and keep them outside the repository. Typical checks: routes and back/forward, deep links, 404s, the editor flow, admin actions, screenshots at 1440 px and 390 px, and `document.documentElement.scrollWidth` to catch horizontal overflow.
+
+### 11.4 Committing
+- Conventional messages in English (`feat(scope): …`, `fix(...)`, `docs: …`, `chore(...)`), with a body explaining why for non-trivial changes.
+- Separate commits for backend, frontend and docs within a feature.
+- Git has no global identity on this machine: commit with `git -c "user.name=Anthony Ruiz" -c user.email=<owner email> commit ...` (the owner's email is in the existing history: `git log -1 --format=%ae`).
+- Stage CR-stripped content so CRLF-only noise never enters a commit:
+  ```bash
+  for f in <files>; do
+    mode=$(git ls-files -s -- "$f" | awk '{print $1}'); mode=${mode:-100644}
+    sha=$(tr -d '\r' < "$f" | git hash-object -w --stdin)
+    git update-index --add --cacheinfo "$mode,$sha,$f"     # retry if OneDrive holds index.lock
+  done
+  ```
+  After committing, check `git show --stat HEAD` lists every intended file; a lock failure silently skips one. Deleted files need `git rm --cached`.
+- `git status` shows many files as modified because of line endings only; that is expected.
+
+### 11.5 Releasing to production
+```bash
+# 1. Backup (database dump + media archive into backend/backups/)
+docker exec devblog_backend python -c "import asyncio; from app.services.backup_service import create_backup; print(asyncio.run(create_backup(keep=7)))"
+# 2. Deploy and verify (builds images, runs migrations on startup, checks 401s on admin endpoints)
+./deploy.sh --yes
+# 3. Confirm
+docker exec devblog_backend alembic current
+curl -s https://blog.anthoruiz.dev/api/v1/site
+```
+Then check the changed pages in a browser against production.
+
+### 11.6 Environment gotchas
+- **Docker lives inside WSL Ubuntu**; Windows Docker CLIs do not see it.
+- **Node is the Windows install.** `npx vite` from WSL starts a Windows process: in WSL, reach it at the host's LAN IP (e.g. `http://10.0.0.185:5173`), not `localhost`. From Windows browsers `localhost:5173` works.
+- **`pkill -f <pattern>`** can match and kill your own shell when the pattern appears in the command line.
+- **OneDrive** locks `.git/index.lock` now and then; wait and retry.
+- The dev backend restarts on every saved file; a broken import (e.g. a renamed dependency) takes the dev API down until fixed.
+
+---
+
+## 12. Known Limitations, Technical Debt & Next Steps
+
+### 12.1 Limitations (by design or accepted for now)
+- **In-memory state:** creator quotas and SlowAPI rate limits live in process memory (reset on restart, single node only).
+- **No automated tests or CI**; verification is manual plus scripts (§11.3).
+- **Search:** `simple` configuration, no accent folding (`programacion` does not match `programación` except via the title ILIKE), no snippet highlighting from Postgres (the UI highlights client-side).
+- **Comments:** anonymous, auto-approved (`is_approved=True` on create); there is no moderation UI yet.
+- **Language choice** is not persisted (React state, Spanish default).
+- **Post byline** is the hardcoded `byAuthor` string ("Por Ingeniero de Software"), not the author's name.
+- **Social previews** are served only to known bots; regular link unfurlers that are not in the list get the SPA without OpenGraph tags.
+- **Admin panel** strings are English only (not in i18n).
+- **Section creation/deletion** requires a migration (no API).
+- **React Router v7 future-flag warnings** in the dev console; the production bundle has a large-chunk warning (Mermaid/highlight.js).
+
+### 12.2 Technical debt
+- Empty legacy files tracked at the repo root: `index.html`, `mockups.html`, `serve.py` (0 bytes, from an early prototype commit) — safe to delete.
+- An untracked `package-lock.json` at the repo root (not part of the project; the frontend's lockfile is `frontend/package-lock.json`).
+- `App.tsx` is large (routing, feed state, modals); extracting the feed into `pages/FeedPage.tsx` and moving to `<Routes>` would simplify it.
+- Older components use Tailwind `slate`/`cyan` utilities instead of brand tokens; consolidating into Tailwind theme tokens is pending.
+- The repository lives inside OneDrive (§9.9).
+
+### 12.3 Candidate next steps (not started; confirm with the owner first)
+- LinkedIn automation from the RSS feed (n8n/Zapier), per `docs/plans/FEAT_RSS_LINKEDIN_SPEC.md`.
+- Comment moderation (pending state + admin tab), and notifications to authors when a post is approved or rejected.
+- Persist the language choice and use the author's name in the byline.
+- Accent-insensitive search (`unaccent` with an immutable wrapper) and Postgres `ts_headline` snippets.
+- Redis (or Postgres) backed quotas/rate limits if the app ever runs on more than one process.
+- An automated test suite (pytest for the API, Playwright for key flows) and CI.
