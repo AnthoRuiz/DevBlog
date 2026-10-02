@@ -18,5 +18,6 @@ export const queryKeys = {
   reviewCount: ['review', 'count'] as const,
   // Under ['posts'] so post changes refresh them
   reviewQueue: ['posts', 'review-queue'] as const,
-  aiStatus: ['review', 'ai-status'] as const,
+  ideasStatus: ['review', 'ideas-status'] as const,
+  ideas: ['review', 'ideas'] as const,
 };

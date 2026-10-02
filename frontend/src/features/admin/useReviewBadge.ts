@@ -22,8 +22,8 @@ export function useReviewBadge() {
     refetchIntervalInBackground: true,
   });
   const pending = enabled ? query.data?.pending ?? 0 : 0;
-  // AI drafts among the pending posts
-  const aiPending = enabled ? query.data?.ai_pending ?? 0 : 0;
+  // New writing ideas from the daily job
+  const ideasPending = enabled ? query.data?.ideas_pending ?? 0 : 0;
   const { refetch } = query;
 
   // TanStack Query only watches visibilitychange; window focus counts too
@@ -41,8 +41,8 @@ export function useReviewBadge() {
   }, [enabled, refetch]);
 
   useEffect(() => {
-    setTitleBadge(pending);
-  }, [pending]);
+    setTitleBadge(pending + ideasPending);
+  }, [pending, ideasPending]);
 
-  return { pending, aiPending };
+  return { pending, ideasPending };
 }

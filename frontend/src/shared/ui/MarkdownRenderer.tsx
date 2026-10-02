@@ -250,6 +250,20 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 
         // Blockquotes / callouts (> )
         if (trimmed.startsWith('>')) {
+          const rawLines = trimmed.split('\n').map((l) => l.replace(/^>\s?/, ''));
+          // Writing-template prompts ("> ✍️ ..."): one per line, styled as guidance to delete
+          if (rawLines.some((l) => l.startsWith('✍️'))) {
+            return (
+              <div
+                key={idx}
+                className="my-3 p-3 rounded-xl border border-dashed border-violet-400/50 bg-violet-500/5 text-violet-100/90 text-xs sm:text-sm space-y-1"
+              >
+                {rawLines.map((line, i) => (
+                  <p key={i}>{renderInline(line)}</p>
+                ))}
+              </div>
+            );
+          }
           const quoteLines = trimmed
             .split('\n')
             .map((l) => l.replace(/^>\s?/, ''))

@@ -17,12 +17,12 @@ import {
   Eraser,
   LayoutGrid,
   ClipboardCheck,
-  Sparkles,
+  Lightbulb,
 } from 'lucide-react';
 import { SectionsAdmin } from './SectionsAdmin';
 import { ReviewQueue } from './ReviewQueue';
-import { AIDraftsTab } from './AIDraftsTab';
-import { BackupItem, BackupsResponse, MediaStats, Post, ReviewItem, User, UserRole } from '../../shared/types';
+import { IdeasTab } from './IdeasTab';
+import { BackupItem, BackupsResponse, MediaStats, ReviewItem, User, UserRole } from '../../shared/types';
 import {
   fetchAdminBackups,
   createAdminBackup,
@@ -47,14 +47,15 @@ interface BackupsModalProps {
   reviewPending?: number;
   onReviewed?: () => void;
   onPreviewPost?: (item: ReviewItem) => void;
-  /** AI drafts waiting (also part of reviewPending) */
-  aiPending?: number;
-  /** Tab to show when the panel opens (?tab=ai from the account menu or the banner) */
+  /** New writing ideas from the daily job */
+  ideasPending?: number;
+  /** Tab to show when the panel opens (?tab=ideas from the account menu or the banner) */
   initialTab?: string | null;
-  onEditPost?: (post: Post) => void;
+  /** Opens the editor on the draft created from an idea */
+  onStartWriting?: (slug: string) => void;
 }
 
-type AdminTab = 'review' | 'ai' | 'roles' | 'backups' | 'sections';
+type AdminTab = 'review' | 'ideas' | 'roles' | 'backups' | 'sections';
 
 export const BackupsModal: React.FC<BackupsModalProps> = ({
   isOpen,
@@ -66,15 +67,15 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
   reviewPending = 0,
   onReviewed,
   onPreviewPost,
-  aiPending = 0,
+  ideasPending = 0,
   initialTab,
-  onEditPost,
+  onStartWriting,
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('review');
 
   // Open on the requested tab each time the panel opens
   useEffect(() => {
-    if (isOpen) setActiveTab(initialTab === 'ai' ? 'ai' : 'review');
+    if (isOpen) setActiveTab(initialTab === 'ideas' ? 'ideas' : 'review');
   }, [isOpen, initialTab]);
   
   // Backups state
@@ -339,20 +340,20 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
             }`}
           >
             <ClipboardCheck className="w-4 h-4" />
-            <span>Review ({reviewPending - aiPending})</span>
+            <span>Review ({reviewPending})</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveTab('ai')}
+            onClick={() => setActiveTab('ideas')}
             className={`flex items-center gap-2 py-3 px-4 text-xs font-mono font-bold border-b-2 transition-all ${
-              activeTab === 'ai'
+              activeTab === 'ideas'
                 ? 'border-violet-400 text-violet-200 bg-violet-500/5'
                 : 'border-transparent text-slate-400 hover:text-white'
             }`}
           >
-            <Sparkles className="w-4 h-4" />
-            <span>AI drafts ({aiPending})</span>
+            <Lightbulb className="w-4 h-4" />
+            <span>Writing ideas ({ideasPending})</span>
           </button>
 
           <button
@@ -563,13 +564,8 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
           <ReviewQueue token={token} onMessage={setMessage} onReviewed={onReviewed} onPreview={onPreviewPost} />
         )}
 
-        {activeTab === 'ai' && (
-          <AIDraftsTab
-            token={token}
-            onMessage={setMessage}
-            onPreview={(slug) => onPreviewPost?.({ slug } as ReviewItem)}
-            onEdit={(post) => onEditPost?.(post)}
-          />
+        {activeTab === 'ideas' && (
+          <IdeasTab token={token} onMessage={setMessage} onStartWriting={(slug) => onStartWriting?.(slug)} />
         )}
 
         {activeTab === 'sections' && (

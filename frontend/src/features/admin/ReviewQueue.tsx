@@ -23,8 +23,7 @@ export const ReviewQueue: FC<ReviewQueueProps> = ({ token, onMessage, onReviewed
     if (!token) return;
     setIsLoading(true);
     try {
-      // AI drafts have their own tab
-      setItems((await fetchReviewQueue(token)).filter((p) => p.origin !== 'ai'));
+      setItems(await fetchReviewQueue(token));
     } catch (err: any) {
       onMessage({ text: err?.message || 'Failed to load the review queue', type: 'error' });
     } finally {

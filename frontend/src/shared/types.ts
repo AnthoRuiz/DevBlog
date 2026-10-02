@@ -126,7 +126,7 @@ export interface ReviewItem extends Post {
   } | null;
 }
 
-export interface AIDraftRun {
+export interface IdeaRun {
   id: string;
   run_date: string;
   trigger: 'schedule' | 'retry' | 'manual';
@@ -137,8 +137,8 @@ export interface AIDraftRun {
   finished_at: string | null;
 }
 
-// GET /admin/ai-drafts/status
-export interface AIDraftsStatus {
+// GET /admin/ideas/status
+export interface IdeasStatus {
   enabled: boolean;
   max_pending: number;
   sections: string[];
@@ -149,7 +149,32 @@ export interface AIDraftsStatus {
   running: boolean;
   providers: string[];
   unsplash_configured: boolean;
-  recent_runs: AIDraftRun[];
+  recent_runs: IdeaRun[];
+}
+
+// A researched topic suggestion; "Start writing" turns it into the admin's own draft with a template
+export interface Idea {
+  id: string;
+  section_slug: string;
+  section_name: string;
+  section_color: string;
+  language: 'en' | 'es';
+  title: string;
+  hook: string;
+  brief: {
+    angles?: string[];
+    outline?: { heading: string; guidance: string; prompts: string[] }[];
+    questions?: string[];
+    experiment?: string;
+    tags?: string[];
+    providers?: { research?: string; brief?: string };
+  };
+  sources: { title: string; url: string }[];
+  cover_image_url?: string | null;
+  cover_credit?: { id: string; name: string; profile_url: string; photo_url: string } | null;
+  status: 'new' | 'started' | 'dismissed';
+  post_id?: string | null;
+  created_at: string;
 }
 
 export interface PostDetail extends Post {

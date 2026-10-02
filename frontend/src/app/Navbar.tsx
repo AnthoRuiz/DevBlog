@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FC, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, ChevronDown, FileText, LogOut, PenLine, Search, Shield, Sparkles, User as UserIcon, X } from 'lucide-react';
+import { Activity, ChevronDown, FileText, Lightbulb, LogOut, PenLine, Search, Shield, User as UserIcon, X } from 'lucide-react';
 import { Language } from '../shared/i18n/translations';
 import { useLanguage } from '../shared/i18n/LanguageContext';
 import { useAuth } from '../features/auth/AuthContext';
@@ -15,9 +15,9 @@ interface NavbarProps {
   onOpenMyPosts: () => void;
   onOpenAdmin: () => void;
   onOpenStatus: () => void;
-  onOpenAIDrafts: () => void;
-  /** AI drafts waiting (included in reviewPending) */
-  aiPending: number;
+  onOpenIdeas: () => void;
+  /** New writing ideas from the daily job */
+  ideasPending: number;
   /** Only shown when the role testing mode is on */
   showRoleSwitch: boolean;
   /** Posts waiting for review (admins) */
@@ -36,8 +36,8 @@ export const Navbar: FC<NavbarProps> = ({
   onOpenMyPosts,
   onOpenAdmin,
   onOpenStatus,
-  onOpenAIDrafts,
-  aiPending,
+  onOpenIdeas,
+  ideasPending,
   showRoleSwitch,
   reviewPending,
 }) => {
@@ -100,7 +100,7 @@ export const Navbar: FC<NavbarProps> = ({
                 name={user.full_name || user.email.split('@')[0]}
                 email={user.email}
                 role={user.role}
-                reviewPending={isAdmin ? reviewPending : 0}
+                reviewPending={isAdmin ? reviewPending + ideasPending : 0}
                 t={t}
               >
                 {(close) => (
@@ -110,11 +110,11 @@ export const Navbar: FC<NavbarProps> = ({
                     </MenuItem>
                     {isAdmin && (
                       <>
-                        <MenuItem icon={<Shield className="w-4 h-4" />} onClick={() => (close(), onOpenAdmin())} badge={reviewPending - aiPending}>
+                        <MenuItem icon={<Shield className="w-4 h-4" />} onClick={() => (close(), onOpenAdmin())} badge={reviewPending}>
                           {t.menuAdminPanel}
                         </MenuItem>
-                        <MenuItem icon={<Sparkles className="w-4 h-4" />} onClick={() => (close(), onOpenAIDrafts())} badge={aiPending} badgeTone="ai">
-                          {t.menuAIDrafts}
+                        <MenuItem icon={<Lightbulb className="w-4 h-4" />} onClick={() => (close(), onOpenIdeas())} badge={ideasPending} badgeTone="ai">
+                          {t.menuIdeas}
                         </MenuItem>
                         <MenuItem icon={<Activity className="w-4 h-4" />} onClick={() => (close(), onOpenStatus())}>
                           {t.menuSystemStatus}

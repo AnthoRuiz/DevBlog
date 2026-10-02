@@ -1,4 +1,4 @@
-import { Post, PostDetail, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions, ReviewItem, Series, SeriesDetail, HomeData, AIDraftsStatus } from '../types';
+import { Post, PostDetail, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions, ReviewItem, Series, SeriesDetail, HomeData, IdeasStatus, Idea } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -589,34 +589,40 @@ export function fetchReviewQueue(token: string): Promise<ReviewItem[]> {
   return authJson('/admin/review', token, 'Failed to load the review queue');
 }
 
-/** pending: everything waiting for review; ai_pending: the AI drafts among them */
-export function fetchReviewCount(token: string): Promise<{ pending: number; ai_pending: number }> {
+/** pending: posts waiting for review; ideas_pending: new writing ideas from the daily job */
+export function fetchReviewCount(token: string): Promise<{ pending: number; ideas_pending: number }> {
   return authJson('/admin/review/count', token, 'Failed to load the review count');
 }
 
-export function fetchAIDraftsStatus(token: string): Promise<AIDraftsStatus> {
-  return authJson('/admin/ai-drafts/status', token, 'Failed to load the AI drafts status');
+export function fetchIdeasStatus(token: string): Promise<IdeasStatus> {
+  return authJson('/admin/ideas/status', token, 'Failed to load the ideas status');
 }
 
-export function updateAIDraftsSettings(
+export function updateIdeasSettings(
   body: { enabled?: boolean; max_pending?: number; sections?: string[] },
   token: string
 ): Promise<{ enabled: boolean; max_pending: number; sections: string[] }> {
-  return authJson('/admin/ai-drafts/settings', token, 'Failed to update the AI drafts settings', {
+  return authJson('/admin/ideas/settings', token, 'Failed to update the ideas settings', {
     method: 'PUT',
     body: JSON.stringify(body),
   });
 }
 
-export function runAIDraftsNow(token: string): Promise<{ started: boolean }> {
-  return authJson('/admin/ai-drafts/run', token, 'Failed to start the generation', { method: 'POST' });
+export function runIdeasNow(token: string): Promise<{ started: boolean }> {
+  return authJson('/admin/ideas/run', token, 'Failed to start looking for ideas', { method: 'POST' });
 }
 
-export function regenerateAIDraft(postId: string, note: string, token: string): Promise<{ started: boolean }> {
-  return authJson(`/admin/ai-drafts/${postId}/regenerate`, token, 'Failed to start the new version', {
-    method: 'POST',
-    body: JSON.stringify({ note }),
-  });
+export function fetchIdeas(token: string): Promise<Idea[]> {
+  return authJson('/admin/ideas?status=new', token, 'Failed to load the ideas');
+}
+
+/** Creates the admin's own draft from the idea, with a guided template */
+export function startIdea(ideaId: string, token: string): Promise<{ post_id: string; slug: string }> {
+  return authJson(`/admin/ideas/${ideaId}/start`, token, 'Failed to start writing', { method: 'POST' });
+}
+
+export function dismissIdea(ideaId: string, token: string): Promise<{ dismissed: boolean }> {
+  return authJson(`/admin/ideas/${ideaId}/dismiss`, token, 'Failed to dismiss the idea', { method: 'POST' });
 }
 
 export function approvePost(postId: string, token: string): Promise<Post> {

@@ -28,6 +28,7 @@ import {
   createSeries,
 } from '../../shared/api/client';
 import { MarkdownToolbar } from './MarkdownToolbar';
+import { blankPostTemplate, countGuides } from '../../shared/utils/postTemplate';
 import { SectionIcon } from '../../shared/ui/SectionIcon';
 import { MarkdownRenderer } from '../../shared/ui/MarkdownRenderer';
 
@@ -70,6 +71,8 @@ export const NewPostModal: FC<NewPostModalProps> = ({
   // Optional series ('' = none); only series of the selected section are offered
   const [seriesId, setSeriesId] = useState<string>('');
   const [contentNotice, setContentNotice] = useState<string>('');
+  // Publishing with template prompts left asks for a second click
+  const [guidesWarned, setGuidesWarned] = useState(false);
   const [mySeries, setMySeries] = useState<Series[]>([]);
   const [newSeriesTitle, setNewSeriesTitle] = useState<string>('');
   const [isCreatingSeries, setIsCreatingSeries] = useState(false);
@@ -126,6 +129,7 @@ export const NewPostModal: FC<NewPostModalProps> = ({
       setContentMarkdown('');
     }
     setEditorTab('write');
+    setGuidesWarned(false);
     setErrorMsg(null);
     setAiTagSuggestions([]);
     setTagSearchQuery('');
@@ -421,6 +425,12 @@ export const NewPostModal: FC<NewPostModalProps> = ({
     }
     if (!sectionId) {
       setErrorMsg(t.sectionRequired);
+      return;
+    }
+    const guidesLeft = countGuides(contentMarkdown);
+    if (submit && guidesLeft > 0 && !guidesWarned) {
+      setErrorMsg(t.templateGuidesLeft.replace('{count}', String(guidesLeft)));
+      setGuidesWarned(true);
       return;
     }
 
@@ -1028,8 +1038,23 @@ export const NewPostModal: FC<NewPostModalProps> = ({
               <label className="block text-xs font-mono text-slate-400">
                 {t.contentMarkdownLabel} *
               </label>
-              <span className="text-[10px] font-mono text-cyan-400/80">
-                {editorTab === 'write' ? 'Markdown + Word Toolbar' : 'Live Preview'}
+              <span className="flex items-center gap-2">
+                {!contentMarkdown.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContentMarkdown(blankPostTemplate(language));
+                      setEditorTab('write');
+                    }}
+                    className="px-2 py-0.5 rounded-md border border-violet-500/40 bg-violet-500/10 hover:bg-violet-500/20 text-[11px] font-semibold text-violet-200"
+                    title={t.useTemplateHint}
+                  >
+                    ✍️ {t.useTemplateBtn}
+                  </button>
+                )}
+                <span className="text-[10px] font-mono text-cyan-400/80">
+                  {editorTab === 'write' ? 'Markdown + Word Toolbar' : 'Live Preview'}
+                </span>
               </span>
             </div>
 

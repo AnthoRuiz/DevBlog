@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
 import { Outlet, useLocation, useMatch, useNavigate, useSearchParams } from 'react-router-dom';
-import { Sparkles, X } from 'lucide-react';
+import { Lightbulb, X } from 'lucide-react';
 import { Navbar } from './Navbar';
 import { LoginModal } from '../features/auth/LoginModal';
 import { NewPostModal } from '../features/posts/NewPostModal';
@@ -16,6 +16,7 @@ import { SiteFooter } from '../shared/ui/SiteFooter';
 import { ErrorBoundary } from '../shared/ui/ErrorBoundary';
 import { ROLE_TESTING_ENABLED } from '../shared/api/client';
 import { ShellProvider, useShell } from './ShellContext';
+import { Post } from '../shared/types';
 import { useSections, useTags } from '../shared/api/queries';
 
 // Every page renders inside this layout: navbar, footer and the app-wide modals
@@ -28,9 +29,9 @@ export const Layout: FC = () => (
 const LayoutFrame: FC = () => {
   const { lang, t } = useLanguage();
   const { token, user, isAdmin, canPublishDirectly, login, setUser } = useAuth();
-  const { pending: reviewPending, aiPending } = useReviewBadge();
-  // The AI drafts banner can be hidden until the next page load
-  const [isAIBannerHidden, setIsAIBannerHidden] = useState(false);
+  const { pending: reviewPending, ideasPending } = useReviewBadge();
+  // The ideas banner can be hidden until the next page load
+  const [isIdeasBannerHidden, setIsIdeasBannerHidden] = useState(false);
   const { notifyPostsChanged, editor, openEditor, closeEditor, isLoginOpen, setLoginOpen } = useShell();
   const sections = useSections();
   const tags = useTags();
@@ -58,7 +59,7 @@ const LayoutFrame: FC = () => {
 
   // Admin modals are routes over the feed; closing one returns to the page it was opened from
   const adminMatch = useMatch('/admin/:panel');
-  const openAdminPanel = (panel: 'status' | 'backups', tab?: 'ai') =>
+  const openAdminPanel = (panel: 'status' | 'backups', tab?: 'ideas') =>
     navigate(`/admin/${panel}${tab ? `?tab=${tab}` : ''}`, {
       state: { from: adminMatch ? '/' : location.pathname + location.search },
     });
@@ -109,33 +110,33 @@ const LayoutFrame: FC = () => {
         onOpenMyPosts={() => setIsMyPostsOpen(true)}
         onOpenAdmin={() => openAdminPanel('backups')}
         onOpenStatus={() => openAdminPanel('status')}
-        onOpenAIDrafts={() => openAdminPanel('backups', 'ai')}
-        aiPending={aiPending}
+        onOpenIdeas={() => openAdminPanel('backups', 'ideas')}
+        ideasPending={ideasPending}
         showRoleSwitch={ROLE_TESTING_ENABLED}
         reviewPending={reviewPending}
       />
 
-      {/* Admins: AI drafts waiting for review */}
-      {isAdmin && aiPending > 0 && !adminMatch && !isAIBannerHidden && (
+      {/* Admins: new writing ideas */}
+      {isAdmin && ideasPending > 0 && !adminMatch && !isIdeasBannerHidden && (
         <div className="border-b border-violet-500/20 bg-violet-500/[0.06]">
           <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-sm">
             <p className="flex items-center gap-2 text-violet-100">
-              <Sparkles className="w-4 h-4 text-violet-300" aria-hidden="true" />
-              {t.aiDraftsBanner.replace('{count}', String(aiPending))}
+              <Lightbulb className="w-4 h-4 text-violet-300" aria-hidden="true" />
+              {t.ideasBanner.replace('{count}', String(ideasPending))}
             </p>
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => openAdminPanel('backups', 'ai')}
+                onClick={() => openAdminPanel('backups', 'ideas')}
                 className="px-3 py-1 rounded-md bg-violet-500/20 hover:bg-violet-500/30 border border-violet-400/40 text-violet-100 text-xs font-semibold"
               >
-                {t.aiDraftsReview}
+                {t.ideasView}
               </button>
               <button
                 type="button"
-                onClick={() => setIsAIBannerHidden(true)}
+                onClick={() => setIsIdeasBannerHidden(true)}
                 className="p-1 rounded text-violet-200/70 hover:text-violet-100"
-                aria-label={t.aiDraftsHide}
+                aria-label={t.ideasHide}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -186,11 +187,12 @@ const LayoutFrame: FC = () => {
         reviewPending={reviewPending}
         onReviewed={notifyPostsChanged}
         onPreviewPost={(item) => navigate(`/posts/${item.slug}`)}
-        aiPending={aiPending}
+        ideasPending={ideasPending}
         initialTab={searchParams.get('tab')}
-        onEditPost={(post) => {
+        onStartWriting={(slug) => {
           closeAdminPanel();
-          openEditor(post);
+          // The editor loads the full draft (template included) by slug
+          openEditor({ slug } as Post);
         }}
       />
 

@@ -35,7 +35,7 @@ const CREATOR = { email: 'e2e-creator@example.com', password: 'E2e!creator-pass-
 /** Dev API helper: authenticated calls plus automatic cleanup of everything a test creates. */
 export class Api {
   adminToken = '';
-  private created: { posts: string[]; series: string[] } = { posts: [], series: [] };
+  private created: { posts: string[]; series: string[]; ideas: string[] } = { posts: [], series: [], ideas: [] };
 
   private request: APIRequestContext;
 
@@ -94,32 +94,41 @@ export class Api {
     return series;
   }
 
-  /** Post an AI draft through the ingest endpoint (needs AI_DRAFTS_API_KEY in ../.env.dev); no AI quota used. */
-  async ingestDraft(fields: Json & { section_slug: string }): Promise<Json> {
+  /** Post a writing idea through the ingest endpoint (needs AI_DRAFTS_API_KEY in ../.env.dev); no AI quota used. */
+  async ingestIdea(fields: Json & { section_slug: string }): Promise<Json> {
     const key = process.env.E2E_AI_DRAFTS_API_KEY ?? devEnv().AI_DRAFTS_API_KEY;
     if (!key) throw new Error('Set AI_DRAFTS_API_KEY in ../.env.dev');
-    const res = await this.request.fetch('/api/v1/ai-drafts/ingest', {
+    const res = await this.request.fetch('/api/v1/ideas/ingest', {
       method: 'POST',
       headers: { 'X-API-Key': key },
       data: {
-        summary: 'E2E AI summary for review.',
-        content_markdown: 'Intro paragraph for the AI draft.\n\n## Section\n\nBody text long enough to pass the minimum length check for drafts.',
+        hook: 'Why this matters right now, in two sentences for the e2e test.',
         language: 'en',
+        angles: ['Angle one', 'Angle two'],
+        outline: [{ heading: 'Setting it up', guidance: 'Explain the setup.', prompts: ['What broke first?'] }],
+        questions: ['When did this bite you?'],
+        experiment: 'Measure it before and after.',
         tags: [],
         sources: [{ title: 'Example source', url: 'https://example.com/article' }],
-        editor_notes: ['Check the main claim.'],
         ...fields,
       },
     });
     if (!res.ok()) throw new Error(`ingest -> ${res.status()} ${await res.text()}`);
-    const draft = await res.json();
-    this.created.posts.push(draft.id);
-    return draft;
+    const idea = await res.json();
+    this.created.ideas.push(idea.id);
+    return idea;
+  }
+
+  /** Track a post created by the app (e.g. "Start writing") so it is deleted after the test */
+  trackPost(id: string) {
+    this.created.posts.push(id);
   }
 
   async cleanup() {
     for (const id of this.created.posts) await this.call('DELETE', `/posts/${id}`, undefined, this.adminToken).catch(() => {});
     for (const id of this.created.series) await this.call('DELETE', `/series/${id}`, undefined, this.adminToken).catch(() => {});
+    // Dismissed ideas no longer count against the daily job's limit
+    for (const id of this.created.ideas) await this.call('POST', `/admin/ideas/${id}/dismiss`, undefined, this.adminToken).catch(() => {});
   }
 }
 

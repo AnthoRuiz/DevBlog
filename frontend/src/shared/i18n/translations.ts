@@ -220,12 +220,15 @@ export interface Translations {
   pagePrev: string;
   pageNext: string;
   paginationLabel: string;
-  menuAIDrafts: string;
-  aiDraftsBanner: string;
-  aiDraftsReview: string;
-  aiDraftsHide: string;
+  menuIdeas: string;
+  ideasBanner: string;
+  ideasView: string;
+  ideasHide: string;
   photoCreditPrefix: string;
   photoCreditOn: string;
+  useTemplateBtn: string;
+  useTemplateHint: string;
+  templateGuidesLeft: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -445,12 +448,15 @@ export const translations: Record<Language, Translations> = {
     pagePrev: 'Anterior',
     pageNext: 'Siguiente',
     paginationLabel: 'Paginación',
-    menuAIDrafts: 'Borradores de IA',
-    aiDraftsBanner: 'Tienes {count} borrador(es) de IA esperando tu revisión.',
-    aiDraftsReview: 'Revisar',
-    aiDraftsHide: 'Ocultar aviso',
+    menuIdeas: 'Ideas para escribir',
+    ideasBanner: 'Tienes {count} idea(s) nueva(s) para escribir.',
+    ideasView: 'Ver ideas',
+    ideasHide: 'Ocultar aviso',
     photoCreditPrefix: 'Foto de',
     photoCreditOn: 'en',
+    useTemplateBtn: 'Usar plantilla',
+    useTemplateHint: 'Empieza con una estructura guiada (en el idioma del post)',
+    templateGuidesLeft: 'Aún quedan {count} indicaciones ✍️ de la plantilla. Bórralas, o pulsa publicar de nuevo para publicar igual.',
   },
   en: {
     siteTitle: 'Anthony Ruiz',
@@ -668,12 +674,15 @@ export const translations: Record<Language, Translations> = {
     pagePrev: 'Previous',
     pageNext: 'Next',
     paginationLabel: 'Pagination',
-    menuAIDrafts: 'AI drafts',
-    aiDraftsBanner: 'You have {count} AI draft(s) waiting for your review.',
-    aiDraftsReview: 'Review',
-    aiDraftsHide: 'Hide notice',
+    menuIdeas: 'Writing ideas',
+    ideasBanner: 'You have {count} new writing idea(s).',
+    ideasView: 'See ideas',
+    ideasHide: 'Hide notice',
     photoCreditPrefix: 'Photo by',
     photoCreditOn: 'on',
+    useTemplateBtn: 'Use template',
+    useTemplateHint: 'Start from a guided structure (in the post\'s language)',
+    templateGuidesLeft: 'There are still {count} ✍️ template prompts. Delete them, or press publish again to publish anyway.',
   },
   pt: {
     siteTitle: 'Anthony Ruiz',
@@ -891,12 +900,15 @@ export const translations: Record<Language, Translations> = {
     pagePrev: 'Anterior',
     pageNext: 'Próximo',
     paginationLabel: 'Paginação',
-    menuAIDrafts: 'Rascunhos de IA',
-    aiDraftsBanner: 'Você tem {count} rascunho(s) de IA aguardando sua revisão.',
-    aiDraftsReview: 'Revisar',
-    aiDraftsHide: 'Ocultar aviso',
+    menuIdeas: 'Ideias para escrever',
+    ideasBanner: 'Você tem {count} nova(s) ideia(s) para escrever.',
+    ideasView: 'Ver ideias',
+    ideasHide: 'Ocultar aviso',
     photoCreditPrefix: 'Foto de',
     photoCreditOn: 'no',
+    useTemplateBtn: 'Usar modelo',
+    useTemplateHint: 'Comece com uma estrutura guiada (no idioma do post)',
+    templateGuidesLeft: 'Ainda restam {count} indicações ✍️ do modelo. Apague-as ou clique em publicar de novo para publicar assim mesmo.',
   },
   fr: {
     siteTitle: 'Anthony Ruiz',
@@ -1114,12 +1126,15 @@ export const translations: Record<Language, Translations> = {
     pagePrev: 'Précédent',
     pageNext: 'Suivant',
     paginationLabel: 'Pagination',
-    menuAIDrafts: 'Brouillons IA',
-    aiDraftsBanner: 'Vous avez {count} brouillon(s) IA en attente de votre relecture.',
-    aiDraftsReview: 'Relire',
-    aiDraftsHide: 'Masquer l\'avis',
+    menuIdeas: 'Idées d\'écriture',
+    ideasBanner: 'Vous avez {count} nouvelle(s) idée(s) d\'écriture.',
+    ideasView: 'Voir les idées',
+    ideasHide: 'Masquer l\'avis',
     photoCreditPrefix: 'Photo de',
     photoCreditOn: 'sur',
+    useTemplateBtn: 'Utiliser un modèle',
+    useTemplateHint: 'Commencer avec une structure guidée (dans la langue de l\'article)',
+    templateGuidesLeft: 'Il reste {count} indications ✍️ du modèle. Supprimez-les, ou cliquez à nouveau sur publier pour publier quand même.',
   },
 };
 
