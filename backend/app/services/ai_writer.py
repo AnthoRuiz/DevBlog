@@ -37,9 +37,20 @@ RETRY_DELAY = timedelta(minutes=30)
 _lock = asyncio.Lock()
 
 LANGUAGE_RULES = {
-    "en": "Write in English.",
-    "es": "Write in Spanish: neutral Latin American Spanish, address the reader as \"tú\", keep English tool and product names.",
+    "en": (
+        "Write in English, casual and conversational, like explaining it to a friend who codes: always use contractions "
+        "(it's, you're, don't), short sentences, everyday words."
+    ),
+    "es": (
+        "Write in Spanish: neutral Latin American Spanish, casual and conversational, address the reader as \"tú\" "
+        "(like talking to a friend who programs), keep English tool and product names. Natural everyday expressions in "
+        "moderation (\"ojo con…\", \"la verdad es que…\", \"te cuento…\"); no heavy slang."
+    ),
 }
+
+# Target reading time (minutes, as the blog computes it: ~180 words/min plus code and density)
+MIN_READ, MAX_READ = 5, 10
+TARGET_WORDS = "1000 to 1500 words"
 
 
 # ── Schedule ──────────────────────────────────────────────────────────────────
@@ -199,9 +210,11 @@ def _write_prompt(section: Section, language: str, research: str, tag_names: lis
 {LANGUAGE_RULES[language]}
 Section: {section.name}.
 {feedback}
-Voice (from his brand book): pragmatic, precise, curious, hands-on, generous. First person singular, active voice.
-Never hype, clickbait, corporate or vague language. No emoji in headings. Tool names, commands and config keys in
-`code`. Numbers always with units and only when the research states them.
+Tone: this is a personal blog, not documentation. Casual and conversational, never formal: talk to the reader
+directly, short paragraphs, plain words, a bit of personality and the occasional light aside. Still genuinely useful:
+concrete steps, real examples, the "why" behind things. Brand book rules still apply: pragmatic and precise, first
+person singular, active voice; no hype, clickbait, corporate or vague language; no emoji in headings. Tool names,
+commands and config keys in `code`. Numbers always with units and only when the research states them.
 
 Rules:
 - The research describes OTHER people's work. Present it as such ("the author of X ported...", "the Postgres docs
@@ -209,8 +222,10 @@ Rules:
   the title, the summary or the body. First person is only for opinions and recommendations ("I would start with...").
 - Never invent personal experiences, measurements or claims that Anthony did something. Where his own experience or
   a homelab test would make the post stronger, add a blockquote that starts with "> TODO:" saying what to add.
-- 700 to 1100 words of Markdown: start with a short intro paragraph (no H1), then "## " sections; code blocks or a
-  short list when they help. Do not add a sources section (it is appended automatically).
+- Length: a 5 to 10 minute read, which means {TARGET_WORDS} of Markdown (count code blocks as slower to read, so
+  use fewer words when there is code). Never longer than that. Start with a short intro paragraph (no H1), then
+  "## " sections; code blocks or a short list when they help. Do not add a sources section (it is appended
+  automatically).
 - title: specific and plain, at most 90 characters. summary: one or two sentences, at most 280 characters.
 - tags: 1 to 3, chosen only from: {", ".join(tag_names) or "(none)"}.
 - unsplash_query: 2 to 4 English words describing a concrete, photographable scene for the cover (no text, no logos).
@@ -221,16 +236,37 @@ Research notes:
 
 
 async def _write(section: Section, language: str, research: str, tag_names: list[str], note: Optional[str] = None):
-    result = await generate_json(
-        _write_prompt(section, language, research, tag_names, note),
-        WRITE_SCHEMA,
-        task="ai_draft_write",
-        max_tokens=6000,
-        timeout=180,
-        effort="medium",
-        stream=True,
+    """Write the draft; if it does not read in MIN_READ-MAX_READ minutes, ask once for a version that does."""
+    async def attempt(extra_note: Optional[str]):
+        return await generate_json(
+            _write_prompt(section, language, research, tag_names, extra_note),
+            WRITE_SCHEMA,
+            task="ai_draft_write",
+            max_tokens=8000,
+            timeout=180,
+            effort="medium",
+            stream=True,
+        )
+
+    result = await attempt(note)
+    minutes = estimate_reading_time_heuristic(result.data["content_markdown"])
+    if MIN_READ <= minutes <= MAX_READ:
+        return result
+    direction = "longer: add depth, examples and practical detail" if minutes < MIN_READ else "shorter: cut repetition and side topics"
+    length_note = (
+        f"The previous version read in {minutes} minutes; it must read in {MIN_READ} to {MAX_READ} minutes "
+        f"({TARGET_WORDS}). Make it {direction}."
     )
-    return result
+    logger.info(f"[AI drafts] draft read in {minutes} min; asking for a {MIN_READ}-{MAX_READ} minute version")
+    try:
+        retry = await attempt(f"{note}. {length_note}" if note else length_note)
+    except LLMUnavailable:
+        return result
+    retry_minutes = estimate_reading_time_heuristic(retry.data["content_markdown"])
+    # Keep whichever version is closer to the range
+    def distance(m: int) -> int:
+        return 0 if MIN_READ <= m <= MAX_READ else min(abs(m - MIN_READ), abs(m - MAX_READ))
+    return retry if distance(retry_minutes) <= distance(minutes) else result
 
 
 def _with_sources(markdown: str, language: str, sources: list[dict]) -> str:
