@@ -23,18 +23,11 @@ SECTION_KEYWORDS: dict[str, list[str]] = {
         "game", "games", "gaming", "gamer", "videogame", "video game", "esports", "e-sports", "speedrun",
         "wow", "world of warcraft", "warcraft", "starcraft", "diablo", "overwatch", "hearthstone",
         "minecraft", "fortnite", "roblox", "zelda", "mario", "pokemon", "halo", "elden ring", "dark souls",
-        "league of legends", "valorant", "dota", "counter-strike", "cs2", "apex legends", "call of duty",
+        "league of legends", "valorant", "escape from tarkov", "tarkov", "valheim", "dota", "counter-strike", "cs2", "apex legends", "call of duty",
         "gta", "cyberpunk 2077", "the witcher", "baldur's gate", "final fantasy", "animal crossing",
         "steam", "xbox", "playstation", "ps5", "ps4", "nintendo", "switch 2", "steam deck",
         "rpg", "mmo", "mmorpg", "fps", "roguelike", "metroidvania", "indie game",
         "unity", "unreal engine", "godot", "game engine", "gamedev", "game dev", "game design", "pixel art",
-    ],
-    "mental-health": [
-        "mental health", "anxiety", "depression", "burnout", "stress", "therapy", "therapist",
-        "mindfulness", "meditation", "self-care", "self care", "wellbeing", "well-being", "wellness",
-        "sleep", "emotional", "emotions", "imposter syndrome", "impostor syndrome", "journaling",
-        "work-life balance", "work life balance", "adhd", "resilience", "gratitude", "loneliness",
-        "productivity", "habits", "motivation", "procrastination", "focus",
     ],
     "career": [
         "interview", "interviews", "interviewing", "leetcode", "hackerrank", "resume", "cv", "cover letter",
@@ -107,7 +100,7 @@ Sections:
 Tag: "{name}"
 
 Decide which section this tag belongs to. Consider abbreviations and proper nouns
-(e.g. "WoW" is World of Warcraft -> gaming; "LeetCode" -> career; "Burnout" -> mental-health).
+(e.g. "WoW" is World of Warcraft -> gaming; "LeetCode" -> career).
 If the tag could reasonably belong to several sections or you do not recognize it, answer "none".
 Confidence is a number from 0 to 1. Keep the reason under 12 words.
 """

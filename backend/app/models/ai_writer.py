@@ -7,7 +7,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
 
-# Mental Health is personal experience only: never drafted by AI
 DEFAULT_AI_SECTIONS = ["tech", "ai", "career", "gaming"]
 
 
@@ -21,6 +20,8 @@ class AIWriterSettings(Base):
     max_pending: Mapped[int] = mapped_column(Integer, default=6, server_default="6", nullable=False)
     # Section slugs the writer may pick from
     sections: Mapped[list] = mapped_column(JSONB, default=lambda: list(DEFAULT_AI_SECTIONS), nullable=False)
+    # What the owner knows, likes, wants to learn and avoids: {knows: [], learning: [], avoid: [], notes}
+    profile: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 
 class AIDraftRun(Base):

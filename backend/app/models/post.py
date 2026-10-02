@@ -20,7 +20,7 @@ class PostStatus(str, enum.Enum):
     REJECTED = "rejected"
 
 class Section(Base):
-    """Top-level blog section (e.g. Tech & Coding, Mental Health). Every post and tag belongs to one."""
+    """Top-level blog section (e.g. Tech & Coding, Gaming). Every post and tag belongs to one."""
     __tablename__ = "sections"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -31,7 +31,7 @@ class Section(Base):
     # Icon key understood by the frontend (code, cpu, target, heart, gamepad)
     icon: Mapped[str] = mapped_column(String(40), default="code", nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    # Visual personality: default | calm (softer, for Mental Health) | vivid
+    # Visual personality: default | calm (softer, larger type) | vivid (section color accents)
     theme: Mapped[str] = mapped_column(String(20), default="default", server_default="default", nullable=False)
     # Admin-editable markdown shown below every post of the section (e.g. a disclaimer)
     footer_markdown: Mapped[str] = mapped_column(Text, default="", server_default="", nullable=False)

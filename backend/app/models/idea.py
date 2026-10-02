@@ -26,6 +26,8 @@ class PostIdea(Base):
     cover_credit: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # new | started | dismissed
     status: Mapped[str] = mapped_column(String(20), default="new", index=True, nullable=False)
+    # The owner's reaction: like | unknown | dislike (used as examples for future ideas)
+    feedback: Mapped[str | None] = mapped_column(String(10), nullable=True)
     # The draft created by "Start writing"
     post_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("posts.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

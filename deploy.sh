@@ -107,6 +107,8 @@ if $CHECK_ONLY; then
   step "--check mode: skipping deployment"
 else
   step "Deploying ${SERVICES[*]:-all services}"
+  # Work history for the writing-ideas job (the image has no git)
+  ./scripts/export_work_log.sh || echo "  ! could not export the work log; ideas will use trends only"
   docker compose up -d --build --remove-orphans "${SERVICES[@]}"
 fi
 

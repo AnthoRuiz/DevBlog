@@ -57,7 +57,7 @@ async def translate_post_content(
     target_name = LANG_NAMES.get(target_lang, target_lang)
     source_name = LANG_NAMES.get(source_lang, source_lang)
     prompt = f"""You are an expert technical translator for a personal blog about software engineering,
-AI, careers, mental health and gaming. Translate the article below from {source_name} to {target_name}.
+AI, careers and gaming. Translate the article below from {source_name} to {target_name}.
 
 Rules:
 1. Translate the title, summary and markdown content into natural, professional {target_name}.
@@ -120,7 +120,7 @@ async def suggest_post_tags(
     (not_configured | quota_exhausted | failed) and is None when an LLM answered.
     """
     prompt = f"""You suggest tags for a personal blog post (topics: software engineering, AI,
-interviews and career, mental health, gaming). Suggest the 3 to 5 most relevant tags.
+interviews and career, gaming). Suggest the 3 to 5 most relevant tags.
 Prefer these existing tags when they fit: {', '.join(existing_tags)}
 
 Title: {title}

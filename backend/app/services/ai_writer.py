@@ -1,17 +1,20 @@
 """Daily writing ideas.
 
 Every day at AI_DRAFTS_TIME (AI_DRAFTS_TIMEZONE) the scheduler picks two different topics from the
-eligible sections (Mental Health is never included), one meant to be written in English and one in
-Spanish (randomly assigned). Each topic is researched (live web search, or free public feeds) and
-saved as an idea card: why it matters now, angles, an outline with prompts, personal questions, a
+eligible sections, one meant to be written in English and one in Spanish (randomly assigned): one
+from the owner's own work (the project's git history, exported to app/data/work_log.json) and one
+timely topic that fits his writer profile (live web search, or free public feeds scored against the
+profile). Each is saved as an idea card: why it matters now, angles, an outline with prompts, personal questions, a
 homelab experiment, sources and an Unsplash cover. The AI never writes the post: "Start writing"
 creates the admin's own draft with a guided template built from the card.
 """
 import asyncio
+import json
 import logging
 import random
 import re
 from datetime import date, datetime, time, timedelta, timezone
+from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -92,7 +95,7 @@ async def _pick_sections(db: AsyncSession, cfg: AIWriterSettings, count: int) ->
     """Up to `count` DIFFERENT sections, never the same one twice in a run: the section that went
     longest without an idea comes first (ties at random). With fewer eligible sections than `count`,
     fewer ideas are created that day rather than repeating a section."""
-    allowed = [slug for slug in cfg.sections if slug != "mental-health"]
+    allowed = list(cfg.sections)
     sections = (await db.execute(select(Section).where(Section.slug.in_(allowed)))).scalars().all()
     if not sections:
         return []
@@ -145,7 +148,7 @@ async def _verify_sources(sources: list[dict]) -> list[dict]:
 
 
 # ── Research and writing ──────────────────────────────────────────────────────
-def _research_prompt(section: Section, avoid: list[str]) -> str:
+def _research_prompt(section: Section, avoid: list[str], profile: str, feedback: str) -> str:
     avoid_list = "\n".join(f"- {t}" for t in avoid) or "- (none yet)"
     return f"""You are researching the next post for the blog of Anthony Ruiz, a software engineer in security who
 builds and tests systems in his homelab. Readers: junior to mid-level engineers and the self-hosting community.
@@ -155,6 +158,12 @@ Section: {section.name} ({section.description}).
 Use web search to find ONE specific, timely topic for this section (news, a release, a technique or a debate from
 roughly the last 30 days) that these readers would find useful. It must clearly differ from these existing posts:
 {avoid_list}
+
+The topic must fit the writer's profile (what he knows or wants to learn):
+{profile}
+
+His reactions to past ideas (more like the liked ones, nothing like the others):
+{feedback}
 
 Never pick: internal details of any employer (including Amazon), politics, medical or mental-health advice, rumors.
 
@@ -195,15 +204,28 @@ IDEA_SCHEMA = {
 }
 
 
-def _idea_prompt(section: Section, language: str, research: str, tag_names: list[str]) -> str:
+def _idea_prompt(section: Section, language: str, research: str, tag_names: list[str], kind: str, profile: str) -> str:
+    if kind == "experience":
+        focus = (
+            "The notes describe HIS OWN work on his blog and homelab. The outline's prompts must help him tell what he "
+            "built, why, the decisions and trade-offs, what failed first and what he would measure; first person is right."
+        )
+    else:
+        focus = (
+            "The notes describe other people's news or work. Point the outline toward what HE can try, measure and give "
+            "an opinion on; do not present other people's work as his."
+        )
     return f"""You help Anthony Ruiz decide what to write next on his personal blog. He writes every post himself:
 your job is NOT to write the post, only to turn the research notes below into an idea card and a writing outline
 that guides his own thinking.
 
 {LANGUAGE_RULES[language]} (Every field of the card is in that language.)
 Section: {section.name}. Readers: junior to mid-level engineers and the homelab community.
-His blog's promise: real setups with real numbers, run on his own hardware, including what failed first. Point the
-outline toward what HE can try, measure and give an opinion on; do not present other people's work as his.
+His blog's promise: real setups with real numbers, run on his own hardware, including what failed first.
+{focus}
+
+His profile (stay within what he knows; topics he is learning are framed as learning in public):
+{profile}
 
 Return:
 - title: a working title he could use or change, at most 90 characters, plain (no clickbait).
@@ -221,20 +243,47 @@ Research notes:
 {research}"""
 
 
-async def create_idea(db: AsyncSession, section: Section, language: str) -> PostIdea:
-    """Research a timely topic and save it as an idea card (status "new")."""
-    avoid = await _recent_titles(db, section.id)
-    try:
-        research = await research_with_search(_research_prompt(section, avoid), task="ai_idea_research", timeout=150)
-    except LLMUnavailable as e:
-        # Web search needs a paid tier (Gemini) or a Claude key: research from free public feeds instead
-        logger.info(f"[AI ideas] web search unavailable ({e.reason}); researching {section.slug} from public feeds")
-        research = await topic_feeds.research_from_feeds(section, avoid)
-    sources = await _verify_sources(research.sources)
+# ── Writer profile and feedback ───────────────────────────────────────────────
+def profile_text(cfg: AIWriterSettings) -> str:
+    profile = cfg.profile or {}
 
+    def bullet(key: str) -> str:
+        return "\n".join(f"- {item}" for item in profile.get(key, [])) or "- (none)"
+
+    return (
+        f"Knows well and can write about from experience:\n{bullet('knows')}\n"
+        f"Wants to learn (write as learning in public):\n{bullet('learning')}\n"
+        f"Never suggest:\n{bullet('avoid')}\n"
+        f"Notes: {profile.get('notes', '')}"
+    )
+
+
+async def feedback_text(db: AsyncSession) -> str:
+    """The owner's last reactions to ideas, as examples for the next ones."""
+    rows = (
+        await db.execute(
+            select(PostIdea.title, PostIdea.feedback).where(PostIdea.feedback.is_not(None)).order_by(desc(PostIdea.created_at)).limit(20)
+        )
+    ).all()
+    labels = {"like": "liked", "unknown": "did not know the topic", "dislike": "not interested"}
+    return "\n".join(f"- {labels.get(fb, fb)}: {title}" for title, fb in rows) or "- (no reactions yet)"
+
+
+# ── Saving an idea ────────────────────────────────────────────────────────────
+async def _save_idea(
+    db: AsyncSession,
+    section: Section,
+    language: str,
+    research_text: str,
+    research_provider: str,
+    sources: list[dict],
+    kind: str,
+    profile: str,
+    extra: Optional[dict] = None,
+) -> PostIdea:
     section_tags = (await db.execute(select(Tag).where(Tag.section_id == section.id))).scalars().all()
     result = await generate_json(
-        _idea_prompt(section, language, research.text, [t.name for t in section_tags]),
+        _idea_prompt(section, language, research_text, [t.name for t in section_tags], kind, profile),
         IDEA_SCHEMA,
         task="ai_idea_brief",
         max_tokens=4000,
@@ -243,18 +292,17 @@ async def create_idea(db: AsyncSession, section: Section, language: str) -> Post
     )
     data = result.data
     valid_tags = {t.name.lower(): t.name for t in section_tags}
-
     used_photos = set(
         (await db.execute(select(PostIdea.cover_credit["id"].astext).where(PostIdea.cover_credit.is_not(None)))).scalars().all()
     ) | set((await db.execute(select(Post.cover_credit["id"].astext).where(Post.cover_credit.is_not(None)))).scalars().all())
     cover = await unsplash.find_cover(data["unsplash_query"], used_photos)
-
     idea = PostIdea(
         section_id=section.id,
         language=language,
         title=data["title"][:255],
         hook=data["hook"],
         brief={
+            "kind": kind,
             "angles": data["angles"][:5],
             "outline": [
                 {"heading": o["heading"], "guidance": o["guidance"], "prompts": o["prompts"][:3]} for o in data["outline"][:6]
@@ -262,8 +310,9 @@ async def create_idea(db: AsyncSession, section: Section, language: str) -> Post
             "questions": data["questions"][:5],
             "experiment": data["experiment"],
             "tags": [valid_tags[t.lower()] for t in data["tags"] if t.lower() in valid_tags][:3],
-            "research_notes": research.text,
-            "providers": {"research": research.provider, "brief": result.provider},
+            "research_notes": research_text,
+            "providers": {"research": research_provider, "brief": result.provider},
+            **(extra or {}),
         },
         sources=sources,
         cover_image_url=cover["url"] if cover else None,
@@ -274,6 +323,99 @@ async def create_idea(db: AsyncSession, section: Section, language: str) -> Post
     await db.commit()
     await db.refresh(idea)
     return idea
+
+
+async def create_trend_idea(db: AsyncSession, section: Section, language: str, profile: str, feedback: str) -> PostIdea:
+    """A timely topic in this section that fits the writer profile (raises NoFittingTopic otherwise)."""
+    avoid = await _recent_titles(db, section.id)
+    try:
+        research = await research_with_search(
+            _research_prompt(section, avoid, profile, feedback), task="ai_idea_research", timeout=150
+        )
+    except LLMUnavailable as e:
+        # Web search needs a paid tier (Gemini) or a Claude key: research from free public feeds instead
+        logger.info(f"[AI ideas] web search unavailable ({e.reason}); researching {section.slug} from public feeds")
+        research = await topic_feeds.research_from_feeds(section, avoid, profile, feedback)
+    sources = await _verify_sources(research.sources)
+    return await _save_idea(db, section, language, research.text, research.provider, sources, "trend", profile)
+
+
+# ── Ideas from the owner's own work (git history of this project) ─────────────
+WORK_LOG = Path(__file__).resolve().parent.parent / "data" / "work_log.json"
+STORY_TYPES = ("feat", "fix", "refactor", "perf", "test")
+
+
+class NoStory(Exception):
+    """No usable work history (missing work log, or nothing new to tell)."""
+
+
+def work_log() -> list[dict]:
+    """Commits exported by scripts/export_work_log.sh (newest first), real changes only."""
+    try:
+        commits = json.loads(WORK_LOG.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return [c for c in commits if re.split(r"[(:!]", c.get("subject", ""), maxsplit=1)[0] in STORY_TYPES]
+
+
+STORY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "section_slug": {"type": "string"},
+        "commit_hashes": {"type": "array", "items": {"type": "string"}},
+        "story": {"type": "string"},
+        "angle": {"type": "string"},
+    },
+    "required": ["section_slug", "commit_hashes", "story", "angle"],
+}
+
+
+async def create_experience_idea(db: AsyncSession, sections: list[Section], language: str, profile: str, feedback: str) -> PostIdea:
+    """Pick a story from what the owner built (his commits) and turn it into an idea in one of `sections`."""
+    commits = work_log()
+    used_rows = (await db.execute(select(PostIdea.brief["commits"]).where(PostIdea.brief.has_key("commits")))).scalars().all()
+    used = {h for row in used_rows if isinstance(row, list) for h in row}
+    fresh = [c for c in commits if c["hash"] not in used][:80]
+    if not fresh or not sections:
+        raise NoStory("no work history left to suggest")
+    listing = "\n".join(f"- {c['hash']} {c['date']} {c['subject']}" + (f" :: {c['body'][:200]}" if c["body"] else "") for c in fresh)
+    section_list = "\n".join(f"- {s.slug}: {s.name} ({s.description})" for s in sections)
+    pick = await generate_json(
+        f"""These are recent changes Anthony Ruiz made to his own blog and homelab (git commits, newest first):
+{listing}
+
+Pick ONE story worth a blog post for junior to mid-level engineers: a feature, migration, fix or refactor he did,
+made of 1 to 6 related commits. It must fit one of these sections (answer with its slug):
+{section_list}
+
+His profile:
+{profile}
+
+His reactions to past ideas:
+{feedback}
+
+Prefer stories with a real decision, trade-off or failure behind them. Return the section slug, the commit hashes,
+the story in 3 to 5 sentences and the most interesting angle.""",
+        STORY_SCHEMA,
+        task="ai_idea_story",
+        max_tokens=1200,
+        timeout=90,
+    )
+    data = pick.data
+    by_slug = {s.slug: s for s in sections}
+    section = by_slug.get(data["section_slug"]) or sections[0]
+    chosen = [c for c in fresh if c["hash"] in set(data["commit_hashes"])][:6]
+    if not chosen:
+        raise NoStory("the model picked no valid commit")
+    notes = "\n".join(f"- {c['date']} {c['subject']}\n  {c['body']}" for c in chosen)
+    research = (
+        f"THIS IS ANTHONY'S OWN WORK on his blog and homelab.\nStory: {data['story']}\nAngle: {data['angle']}\n"
+        f"Commits:\n{notes}"
+    )
+    return await _save_idea(
+        db, section, language, research, f"work-log+{pick.provider}", [], "experience", profile,
+        extra={"commits": [c["hash"] for c in chosen]},
+    )
 
 
 # ── "Start writing": a guided template from an idea ────────────────────────────
@@ -389,31 +531,57 @@ async def run_generation(trigger: str) -> Optional[AIDraftRun]:
             if count <= 0:
                 return await _finish(db, run, "skipped", f"{cfg.max_pending} ideas are already waiting")
 
-            sections = await _pick_sections(db, cfg, count)
-            if not sections:
+            ranked = await _pick_sections(db, cfg, len(cfg.sections))
+            if not ranked:
                 return await _finish(db, run, "skipped", "No eligible sections")
-            # Two different topics, one English and one Spanish, in random order
-            languages = random.sample(["en", "es"], k=count) if count <= 2 else [random.choice(["en", "es"]) for _ in range(count)]
+            profile = profile_text(cfg)
+            feedback = await feedback_text(db)
+            # One idea from his own work and one timely topic, in different sections and languages
+            kinds = ["experience", "trend"] if work_log() else ["trend", "trend"]
+            languages = random.sample(["en", "es"], k=2)
+            section_ids = [s.id for s in ranked]
 
-            created, errors = [], []
-            plan = [(section.id, section.slug, language) for section, language in zip(sections, languages)]
-            for section_id, slug, language in plan:
+            created, errors, used_sections = [], [], set()
+            for kind, language in list(zip(kinds, languages))[:count]:
+                remaining = [sid for sid in section_ids if sid not in used_sections]
+                if not remaining:
+                    break
                 # Each idea gets its own session, so one failure cannot affect the other or the run log
                 try:
                     async with AsyncSessionLocal() as idea_db:
-                        idea = await create_idea(idea_db, await idea_db.get(Section, section_id), language)
+                        idea = await _create_one(idea_db, kind, remaining, language, profile, feedback)
+                    used_sections.add(idea.section_id)
                     created.append(str(idea.id))
-                    logger.info(f"[AI ideas] {trigger}: '{idea.title}' ({slug}, {language})")
+                    logger.info(f"[AI ideas] {trigger}: '{idea.title}' ({kind}, {language})")
                 except LLMUnavailable as e:
-                    errors.append(f"{slug}/{language}: {e.reason}: {e}")
+                    errors.append(f"{kind}/{language}: {e.reason}: {e}")
                 except Exception as e:
-                    errors.append(f"{slug}/{language}: {type(e).__name__}: {e}")
+                    errors.append(f"{kind}/{language}: {type(e).__name__}: {e}")
             run.post_ids = created
             status = "succeeded" if not errors else ("partial" if created else "failed")
             detail = "; ".join(errors) if errors else f"{len(created)} idea(s) created"
             if errors:
                 logger.warning(f"[AI ideas] {trigger} run {status}: {detail}")
             return await _finish(db, run, status, detail)
+
+
+async def _create_one(db: AsyncSession, kind: str, section_ids: list, language: str, profile: str, feedback: str) -> PostIdea:
+    """One idea of the requested kind, falling back to the other kind when it cannot be made."""
+    sections = [await db.get(Section, sid) for sid in section_ids]
+    if kind == "experience":
+        try:
+            return await create_experience_idea(db, sections, language, profile, feedback)
+        except NoStory as e:
+            logger.info(f"[AI ideas] no story from the work log ({e}); using a timely topic instead")
+    # Timely topic: try the two least recently used sections, then a story from his own work
+    for section in sections[:2]:
+        try:
+            return await create_trend_idea(db, section, language, profile, feedback)
+        except topic_feeds.NoFittingTopic as e:
+            logger.info(f"[AI ideas] nothing in {section.slug} fits the profile ({e})")
+    if kind == "trend" and work_log():
+        return await create_experience_idea(db, sections, language, profile, feedback)
+    raise topic_feeds.NoFittingTopic("no recent topic fits the writer profile")
 
 
 async def _finish(db: AsyncSession, run: AIDraftRun, status: str, detail: str) -> AIDraftRun:

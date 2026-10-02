@@ -38,8 +38,6 @@ DEFAULT_TAGS = [
     ("Algorithms & Data Structures", "algorithms-data-structures", "#eab308", "career"),
     ("Career Growth", "career-growth", "#84cc16", "career"),
     # Wellbeing
-    ("Mental Health", "mental-health", "#ec4899", "mental-health"),
-    ("Productivity & Habits", "productivity-habits", "#f472b6", "mental-health"),
     # Gaming
     ("Video Games", "video-games", "#8b5cf6", "gaming"),
     ("Game Development", "game-development", "#d946ef", "gaming"),

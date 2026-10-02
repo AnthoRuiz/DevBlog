@@ -13,7 +13,7 @@ from app.models.ai_writer import AIDraftRun
 from app.models.idea import PostIdea
 from app.models.post import Section, Tag
 from app.models.user import User
-from app.schemas.post import IdeaIngest, IdeaRead, IdeaSettingsUpdate
+from app.schemas.post import IdeaFeedback, IdeaIngest, IdeaRead, IdeaSettingsUpdate
 from app.services import ai_writer, unsplash
 from app.services.llm import configured_providers
 
@@ -65,6 +65,7 @@ async def _read(db: AsyncSession, idea: PostIdea) -> IdeaRead:
         cover_image_url=idea.cover_image_url,
         cover_credit=idea.cover_credit,
         status=idea.status,
+        feedback=idea.feedback,
         post_id=idea.post_id,
         created_at=idea.created_at,
     )
@@ -79,6 +80,8 @@ async def ideas_status(current_admin: User = Depends(get_current_admin), db: Asy
         "enabled": cfg.enabled,
         "max_pending": cfg.max_pending,
         "sections": cfg.sections,
+        "profile": cfg.profile or {},
+        "work_log_commits": len(ai_writer.work_log()),
         "schedule_time": settings.AI_DRAFTS_TIME,
         "timezone": settings.AI_DRAFTS_TIMEZONE,
         "next_run_at": ai_writer.next_run_at().isoformat(),
@@ -103,10 +106,17 @@ async def update_ideas_settings(
         cfg.max_pending = body.max_pending
     if body.sections is not None:
         known = set((await db.execute(select(Section.slug))).scalars().all())
-        # Mental Health is personal experience only: no AI topics there
-        cfg.sections = [s for s in dict.fromkeys(body.sections) if s in known and s != "mental-health"]
+        cfg.sections = [s for s in dict.fromkeys(body.sections) if s in known]
+    if body.profile is not None:
+        clean = lambda items: [i.strip()[:300] for i in items if i.strip()]
+        cfg.profile = {
+            "knows": clean(body.profile.knows),
+            "learning": clean(body.profile.learning),
+            "avoid": clean(body.profile.avoid),
+            "notes": body.profile.notes.strip(),
+        }
     await db.commit()
-    return {"enabled": cfg.enabled, "max_pending": cfg.max_pending, "sections": cfg.sections}
+    return {"enabled": cfg.enabled, "max_pending": cfg.max_pending, "sections": cfg.sections, "profile": cfg.profile or {}}
 
 
 @router.post("/admin/ideas/run", status_code=status.HTTP_202_ACCEPTED)
@@ -157,6 +167,22 @@ async def dismiss_idea(
     return {"dismissed": True}
 
 
+@router.post("/admin/ideas/{idea_id}/feedback")
+async def idea_feedback(
+    idea_id: uuid.UUID,
+    body: IdeaFeedback,
+    current_admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Record the owner's reaction; the next runs use it as an example. Unknown and dislike also hide the idea."""
+    idea = await _idea_or_404(db, idea_id)
+    idea.feedback = body.value
+    if body.value != "like" and idea.status == "new":
+        idea.status = "dismissed"
+    await db.commit()
+    return {"feedback": idea.feedback, "status": idea.status}
+
+
 def require_ingest_key(x_api_key: str | None = Header(default=None)) -> None:
     """Runs before the body is validated: a disabled endpoint answers 404, a wrong key 401."""
     expected = (settings.AI_DRAFTS_API_KEY or "").strip()
@@ -170,8 +196,8 @@ def require_ingest_key(x_api_key: str | None = Header(default=None)) -> None:
 async def ingest_idea(body: IdeaIngest, db: AsyncSession = Depends(get_db)):
     """Receive an idea from an external generator (disabled unless AI_DRAFTS_API_KEY is set)."""
     section = (await db.execute(select(Section).where(Section.slug == body.section_slug))).scalar_one_or_none()
-    if not section or section.slug == "mental-health":
-        raise HTTPException(status_code=400, detail="Unknown or excluded section")
+    if not section:
+        raise HTTPException(status_code=400, detail="Unknown section")
     cfg = await ai_writer.get_settings(db)
     if await ai_writer.pending_ideas(db) >= cfg.max_pending:
         raise HTTPException(status_code=429, detail="Too many ideas are waiting")
@@ -183,6 +209,7 @@ async def ingest_idea(body: IdeaIngest, db: AsyncSession = Depends(get_db)):
         title=body.title,
         hook=body.hook,
         brief={
+            "kind": "external",
             "angles": body.angles,
             "outline": [o.model_dump() for o in body.outline],
             "questions": body.questions,

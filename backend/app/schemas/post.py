@@ -150,14 +150,29 @@ class IdeaRead(BaseModel):
     cover_image_url: Optional[str] = None
     cover_credit: Optional[dict] = None
     status: str
+    # like | unknown | dislike: the owner's reaction, fed back to the generator
+    feedback: Optional[str] = None
     post_id: Optional[uuid.UUID] = None
     created_at: datetime
+
+
+class WriterProfile(BaseModel):
+    """What the owner knows, is learning and never wants suggested: ideas must fit it."""
+    knows: list[str] = Field(default_factory=list, max_length=20)
+    learning: list[str] = Field(default_factory=list, max_length=20)
+    avoid: list[str] = Field(default_factory=list, max_length=20)
+    notes: str = Field("", max_length=1000)
 
 
 class IdeaSettingsUpdate(BaseModel):
     enabled: Optional[bool] = None
     max_pending: Optional[int] = Field(None, ge=1, le=30)
     sections: Optional[list[str]] = None
+    profile: Optional[WriterProfile] = None
+
+
+class IdeaFeedback(BaseModel):
+    value: str = Field(..., pattern="^(like|unknown|dislike)$")
 
 
 class PostReject(BaseModel):

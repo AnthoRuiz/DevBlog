@@ -18,14 +18,21 @@ from app.services.llm import ResearchResult, generate_json
 
 logger = logging.getLogger("devblog.ai_drafts")
 
-# Section slug -> (Hacker News queries, DEV.to tags)
+# Section slug -> (Hacker News queries, DEV.to tags), tuned to what the owner knows and plays
 SECTION_SOURCES: dict[str, tuple[list[str], list[str]]] = {
-    "tech": (["docker", "kubernetes", "postgres", "python", "typescript", "security vulnerability", "self-hosted", "homelab"],
-             ["docker", "devops", "python", "typescript", "security", "selfhosted", "postgres"]),
-    "ai": (["LLM", "AI agents", "open source model", "machine learning", "RAG"], ["ai", "machinelearning", "llm", "rag"]),
-    "career": (["interview", "career", "system design", "hiring engineers"], ["career", "interview", "systemdesign", "beginners"]),
-    "gaming": (["game engine", "gamedev", "video game", "godot"], ["gamedev", "godot", "unity3d", "gaming"]),
+    "tech": (["AWS", "AWS lambda", "python", "fastapi", "postgres", "docker compose", "typescript react", "cloudflare tunnel", "self-hosted"],
+             ["aws", "python", "docker", "postgres", "typescript", "react", "selfhosted"]),
+    "ai": (["LLM API", "AI coding assistant", "Claude", "Gemini API", "RAG"], ["ai", "llm", "rag"]),
+    "career": (["coding interview", "system design interview", "behavioral interview", "leetcode", "data structures", "tech hiring"],
+               ["career", "interview", "algorithms", "datastructures", "leetcode"]),
+    "gaming": (["Escape from Tarkov", "Tarkov", "Counter-Strike 2", "CS2", "Valheim"], ["gamedev", "gaming"]),
 }
+
+
+class NoFittingTopic(Exception):
+    """None of the recent candidates fits the writer profile well enough."""
+
+
 UA = {"User-Agent": "Mozilla/5.0 (compatible; AnthonyRuizBlog/1.0; +https://blog.anthoruiz.dev)"}
 WINDOW_DAYS = 30
 
@@ -76,12 +83,17 @@ PICK_SCHEMA = {
         "topic": {"type": "string"},
         "angle": {"type": "string"},
         "related": {"type": "array", "items": {"type": "integer"}},
+        "fit_score": {"type": "integer"},
+        "fit_reason": {"type": "string"},
     },
-    "required": ["index", "topic", "angle", "related"],
+    "required": ["index", "topic", "angle", "related", "fit_score", "fit_reason"],
 }
 
 
-async def research_from_feeds(section: Section, avoid: list[str]) -> ResearchResult:
+MIN_FIT = 4
+
+
+async def research_from_feeds(section: Section, avoid: list[str], profile: str, feedback: str) -> ResearchResult:
     candidates = await _candidates(section.slug)
     if not candidates:
         raise RuntimeError(f"no recent topic candidates for {section.slug}")
@@ -97,16 +109,26 @@ Recent articles from the last {WINDOW_DAYS} days:
 It must clearly differ from these existing posts:
 {avoid_list}
 
+The writer's profile (only pick what he can write about from experience, or what he wants to learn):
+{profile}
+
+His reactions to past ideas (pick more like the liked ones, nothing like the others):
+{feedback}
+
 Never pick: internal details of any employer (including Amazon), politics, medical or mental-health advice, rumors,
 or pure product announcements without technical substance.
-Return the index of the best article, the topic in one line, a practical angle for a hands-on engineer, and the
-indexes of up to two related articles from the list that add context (may be empty).""",
+Return the index of the best article, the topic in one line, a practical angle for a hands-on engineer, the indexes
+of up to two related articles from the list that add context (may be empty), and fit_score from 1 to 5: how well
+he can contribute his own experience or opinion (5 = squarely in what he knows, 4 = what he knows or wants to learn,
+3 or less = he would have little to add), with a short fit_reason.""",
         PICK_SCHEMA,
         task="ai_draft_pick_topic",
         max_tokens=600,
         timeout=60,
     )
     chosen = pick.data
+    if chosen.get("fit_score", 0) < MIN_FIT:
+        raise NoFittingTopic(f"best candidate scored {chosen.get('fit_score')}: {chosen.get('fit_reason', '')}")
     indexes = [chosen["index"], *chosen.get("related", [])]
     picked = [candidates[i] for i in dict.fromkeys(indexes) if isinstance(i, int) and 0 <= i < len(candidates)]
     if not picked:
