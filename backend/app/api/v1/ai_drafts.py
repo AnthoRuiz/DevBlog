@@ -110,18 +110,18 @@ async def regenerate_ai_draft(
     return {"started": True}
 
 
-@router.post("/ai-drafts/ingest", status_code=status.HTTP_201_CREATED)
-async def ingest_ai_draft(
-    body: AIDraftIngest,
-    x_api_key: str | None = Header(default=None),
-    db: AsyncSession = Depends(get_db),
-):
-    """Receive a draft from an external generator (disabled unless AI_DRAFTS_API_KEY is set)."""
+def require_ingest_key(x_api_key: str | None = Header(default=None)) -> None:
+    """Runs before the body is validated: a disabled endpoint answers 404, a wrong key 401."""
     expected = (settings.AI_DRAFTS_API_KEY or "").strip()
     if not expected:
         raise HTTPException(status_code=404, detail="Not found")
     if not x_api_key or not hmac.compare_digest(x_api_key, expected):
         raise HTTPException(status_code=401, detail="Invalid API key")
+
+
+@router.post("/ai-drafts/ingest", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_ingest_key)])
+async def ingest_ai_draft(body: AIDraftIngest, db: AsyncSession = Depends(get_db)):
+    """Receive a draft from an external generator (disabled unless AI_DRAFTS_API_KEY is set)."""
     section = (await db.execute(select(Section).where(Section.slug == body.section_slug))).scalar_one_or_none()
     if not section or section.slug == "mental-health":
         raise HTTPException(status_code=400, detail="Unknown or excluded section")
