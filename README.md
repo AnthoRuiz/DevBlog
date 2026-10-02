@@ -56,29 +56,54 @@ The personal blog of Anthony Ruiz: a self-hosted blog engine and Homelab observa
 
 ## 🏗️ Architecture
 
+Everything runs on one homelab machine; Cloudflare reaches it through an outbound tunnel, so no router ports are open.
+
+```mermaid
+flowchart TB
+    reader(["Readers and admin<br/>browser or phone"])
+
+    subgraph edge["Cloudflare edge"]
+        cf["DNS, TLS, WAF, DDoS<br/>blog.anthoruiz.dev"]
+    end
+
+    subgraph host["Homelab host: Windows 11 + WSL2 Ubuntu + Docker"]
+        tunnel["devblog_tunnel<br/>cloudflared"]
+        nginx["devblog_frontend<br/>Nginx + React build<br/>127.0.0.1:3000"]
+        api["devblog_backend<br/>FastAPI + Uvicorn<br/>127.0.0.1:8000"]
+        db[("devblog_postgres<br/>PostgreSQL 16<br/>127.0.0.1:5432")]
+        jobs["Background jobs<br/>daily backup, AI drafts 16:00 PT"]
+        volumes[("Volumes<br/>uploads, logs, backups")]
+    end
+
+    subgraph external["External services"]
+        llm["Claude / Gemini<br/>AI with failover"]
+        unsplash["Unsplash<br/>draft covers"]
+        feeds["Hacker News, DEV.to<br/>topic research"]
+    end
+
+    reader -->|HTTPS| cf
+    cf <-.->|"outbound tunnel, no open ports"| tunnel
+    tunnel --> nginx
+    nginx -->|"/api, /uploads, feeds, previews"| api
+    api -->|asyncpg| db
+    api --- volumes
+    api --- jobs
+    jobs --> llm
+    jobs --> unsplash
+    jobs --> feeds
+    api -->|"translate, tags, reading time"| llm
 ```
-                         Internet
-                            │
-                            ▼
-          ┌───────────────────────────────────┐
-          │   Cloudflare Edge (TLS, WAF,      │
-          │   DDoS) · blog.anthoruiz.dev      │
-          └─────────────────┬─────────────────┘
-                            │ outbound encrypted tunnel (no open ports)
-          ┌─────────────────▼───────────────────────────────────┐
-          │ Homelab host · Windows 11 + WSL2 Ubuntu · Docker     │
-          │                                                      │
-          │   devblog_tunnel    (cloudflared)                    │
-          │         │                                            │
-          │         ▼                                            │
-          │   devblog_frontend  (Nginx + React build)  127.0.0.1:3000
-          │         │  /api/ · /uploads/                         │
-          │         ▼                                            │
-          │   devblog_backend   (FastAPI / Uvicorn)    127.0.0.1:8000
-          │         │  asyncpg                                   │
-          │         ▼                                            │
-          │   devblog_postgres  (PostgreSQL 16)        127.0.0.1:5432
-          └──────────────────────────────────────────────────────┘
+
+**How Nginx routes each request:**
+
+```mermaid
+flowchart LR
+    req["Request to<br/>blog.anthoruiz.dev"] --> nginx{"Nginx"}
+    nginx -->|"/api/*"| api["FastAPI"]
+    nginx -->|"/uploads/*"| uploads["Uploaded images<br/>served by FastAPI"]
+    nginx -->|"/feed.xml, /section/feed.xml"| rss["RSS feeds"]
+    nginx -->|"/posts/slug from a social bot"| og["Preview page<br/>OpenGraph tags"]
+    nginx -->|"any other path"| spa["React app<br/>index.html"]
 ```
 
 ### Environments
