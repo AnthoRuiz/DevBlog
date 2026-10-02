@@ -1,20 +1,26 @@
 import { test, expect, stamp } from './support/fixtures';
 
-// Section personality on the post page (Phase G)
-test('mental health posts use the calm theme, notice and disclaimer footer', async ({ page, api }) => {
-  const post = await api.createPost({
-    title: `E2E calm ${stamp()}`,
-    section: 'mental-health',
-    content_markdown: '## Sleep first\n\nA paragraph.',
-    content_notice: 'This post discusses burnout.',
-  });
-  await page.goto(`/posts/${post.slug}`);
-  await expect(page.locator('article.theme-calm')).toBeVisible();
-  await expect(page.getByRole('note')).toContainText('This post discusses burnout.');
-  await expect(page.locator('aside.section-footer a[href="https://findahelpline.com"]')).toBeVisible();
+// Section personality on the post page (Phase G): any section can be calm and carry a footer
+test('a calm section shows the calm theme, the notice and its footer', async ({ page, api }) => {
+  const career = await api.section('career');
+  await api.call('PUT', `/admin/sections/${career.id}`, { theme: 'calm', footer_markdown: '[E2E footer link](https://example.com/e2e)' }, api.adminToken);
+  try {
+    const post = await api.createPost({
+      title: `E2E calm ${stamp()}`,
+      section: 'career',
+      content_markdown: '## Sleep first\n\nA paragraph.',
+      content_notice: 'This post discusses layoffs.',
+    });
+    await page.goto(`/posts/${post.slug}`);
+    await expect(page.locator('article.theme-calm')).toBeVisible();
+    await expect(page.getByRole('note')).toContainText('This post discusses layoffs.');
+    await expect(page.locator('aside.section-footer a[href="https://example.com/e2e"]')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Ocultar aviso' }).click();
-  await expect(page.getByRole('note')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Ocultar aviso' }).click();
+    await expect(page.getByRole('note')).toHaveCount(0);
+  } finally {
+    await api.call('PUT', `/admin/sections/${career.id}`, { theme: career.theme, footer_markdown: career.footer_markdown ?? '' }, api.adminToken);
+  }
 });
 
 test('tech posts keep the default theme and have no section footer', async ({ page, api }) => {

@@ -44,12 +44,53 @@ test('the editor offers a template for a blank post', async ({ page, api }) => {
   await expect(page.locator('form textarea').last()).toHaveValue(/## Lo que hice|## What I did/);
 });
 
-test('the ingest endpoint rejects a wrong key and Mental Health', async ({ request, api }) => {
+test('the ingest endpoint rejects a wrong key and an unknown section', async ({ request, api }) => {
   const wrongKey = await request.fetch('/api/v1/ideas/ingest', {
     method: 'POST',
     headers: { 'X-API-Key': 'wrong' },
     data: {},
   });
   expect(wrongKey.status()).toBe(401);
-  await expect(api.ingestIdea({ title: `E2E idea mental ${stamp()}`, section_slug: 'mental-health' })).rejects.toThrow(/400/);
+  await expect(api.ingestIdea({ title: `E2E idea unknown ${stamp()}`, section_slug: 'mental-health' })).rejects.toThrow(/400/);
+});
+
+test('feedback buttons record the reaction and hide ideas he does not want', async ({ page, api }) => {
+  const liked = `E2E idea liked ${stamp()}`;
+  const unknown = `E2E idea unknown topic ${stamp()}`;
+  await api.ingestIdea({ title: liked, section_slug: 'gaming' });
+  const hidden = await api.ingestIdea({ title: unknown, section_slug: 'career' });
+  await signIn(page, api.adminToken);
+  await page.goto('/admin/backups?tab=ideas');
+
+  const likedCard = page.locator('li', { hasText: liked });
+  await likedCard.getByRole('button', { name: 'I like it' }).click();
+  await expect(likedCard.getByRole('button', { name: 'I like it' })).toHaveAttribute('aria-pressed', 'true');
+
+  await page.locator('li', { hasText: unknown }).getByRole('button', { name: "I don't know this" }).click();
+  await expect(page.locator('li', { hasText: unknown })).toHaveCount(0);
+
+  const dismissed = await api.call('GET', '/admin/ideas?status=dismissed', undefined, api.adminToken);
+  expect(dismissed.find((i: { id: string }) => i.id === hidden.id)?.feedback).toBe('unknown');
+});
+
+test('the writer profile is editable from the ideas tab', async ({ page, api }) => {
+  const before = (await api.call('GET', '/admin/ideas/status', undefined, api.adminToken)).profile;
+  const item = `E2E topic ${stamp()}`;
+  await signIn(page, api.adminToken);
+  await page.goto('/admin/backups?tab=ideas');
+  try {
+    const profile = page.getByTestId('writer-profile');
+    await profile.locator('summary').click();
+    const learning = profile.locator('textarea[name="learning"]');
+    await expect(learning).toHaveValue(/AWS/);
+    await learning.fill(`${await learning.inputValue()}\n${item}`);
+    await profile.getByRole('button', { name: 'Save profile' }).click();
+    await expect(page.getByText('Profile saved.')).toBeVisible();
+
+    const after = (await api.call('GET', '/admin/ideas/status', undefined, api.adminToken)).profile;
+    expect(after.learning).toContain(item);
+    expect(after.knows).toEqual(before.knows);
+  } finally {
+    await api.call('PUT', '/admin/ideas/settings', { profile: before }, api.adminToken);
+  }
 });

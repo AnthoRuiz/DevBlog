@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, FlaskConical, ImageIcon, Lightbulb, ListTree, Loader2, Pause, PenLine, Play, RefreshCw, Trash2, Wand2 } from 'lucide-react';
-import { Idea } from '../../shared/types';
-import { dismissIdea, fetchIdeas, fetchIdeasStatus, runIdeasNow, startIdea, updateIdeasSettings } from '../../shared/api/client';
+import { ExternalLink, FlaskConical, GitCommit, ImageIcon, Lightbulb, ListTree, Loader2, Pause, PenLine, Play, RefreshCw, Trash2, TrendingUp, Wand2 } from 'lucide-react';
+import { Idea, IdeaFeedback } from '../../shared/types';
+import { dismissIdea, fetchIdeas, fetchIdeasStatus, runIdeasNow, sendIdeaFeedback, startIdea, updateIdeasSettings } from '../../shared/api/client';
 import { queryKeys } from '../../shared/api/queryKeys';
 import { useInvalidatePosts } from '../../shared/api/queries';
+import { WriterProfileEditor } from './WriterProfileEditor';
 
 interface IdeasTabProps {
   token?: string;
@@ -21,6 +22,13 @@ const RUN_STYLES: Record<string, string> = {
   skipped: 'text-slate-400 border-slate-600',
   running: 'text-cyan-300 border-cyan-500/40',
 };
+
+// Reactions the next runs learn from; "unknown" and "dislike" also hide the idea
+const FEEDBACK: { value: IdeaFeedback; emoji: string; label: string; done: string }[] = [
+  { value: 'like', emoji: '👍', label: 'I like it', done: 'Noted: more ideas like this one.' },
+  { value: 'unknown', emoji: '🤷', label: "I don't know this", done: 'Noted: fewer topics you do not know.' },
+  { value: 'dislike', emoji: '👎', label: 'Not interested', done: 'Noted: no more ideas like this one.' },
+];
 
 // Admin panel tab: daily writing ideas (researched topics + outline). The admin writes every post.
 export const IdeasTab: FC<IdeasTabProps> = ({ token, onMessage, onStartWriting }) => {
@@ -83,8 +91,8 @@ export const IdeasTab: FC<IdeasTabProps> = ({ token, onMessage, onStartWriting }
             </p>
             {s && (
               <p className="text-xs text-slate-400 mt-0.5">
-                Two researched topics a day (one to write in English, one in Spanish) at {s.schedule_time} {s.timezone}. Next: {nextRun}.
-                You write the post; the idea only gives you a starting point.
+                Two topics a day at {s.schedule_time} {s.timezone} (one to write in English, one in Spanish): one from your own work
+                and one timely topic that fits your profile. Next: {nextRun}. You write the post; the idea only gives you a starting point.
               </p>
             )}
           </div>
@@ -121,7 +129,18 @@ export const IdeasTab: FC<IdeasTabProps> = ({ token, onMessage, onStartWriting }
             <span className="px-2 py-0.5 rounded border border-[#1e293b] text-slate-400">AI: {s.providers.length ? s.providers.join(', ') : 'not configured'}</span>
             <span className="px-2 py-0.5 rounded border border-[#1e293b] text-slate-400">covers: {s.unsplash_configured ? 'Unsplash' : 'none'}</span>
             <span className="px-2 py-0.5 rounded border border-[#1e293b] text-slate-400">sections: {s.sections.join(', ')}</span>
+            <span className="px-2 py-0.5 rounded border border-[#1e293b] text-slate-400">
+              work log: {s.work_log_commits ? `${s.work_log_commits} commits` : 'not exported'}
+            </span>
           </div>
+        )}
+
+        {s && (
+          <WriterProfileEditor
+            profile={s.profile}
+            saving={busyId === 'profile'}
+            onSave={(profile) => act('profile', () => updateIdeasSettings({ profile }, token as string), 'Profile saved. The next ideas will follow it.')}
+          />
         )}
 
         {s && s.recent_runs.length > 0 && (
@@ -170,6 +189,16 @@ export const IdeasTab: FC<IdeasTabProps> = ({ token, onMessage, onStartWriting }
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
                       <span className="px-1.5 py-0.5 rounded border border-[#1e293b] text-slate-300">write in {idea.language.toUpperCase()}</span>
+                      {brief.kind === 'experience' && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-emerald-500/40 text-emerald-300">
+                          <GitCommit className="w-3 h-3" /> from your work
+                        </span>
+                      )}
+                      {brief.kind === 'trend' && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-cyan-500/40 text-cyan-300">
+                          <TrendingUp className="w-3 h-3" /> trending
+                        </span>
+                      )}
                       <span style={{ color: idea.section_color }}>{idea.section_name}</span>
                     </div>
                     <p className="mt-1 text-sm font-bold text-slate-100 leading-snug">{idea.title}</p>
@@ -256,6 +285,23 @@ export const IdeasTab: FC<IdeasTabProps> = ({ token, onMessage, onStartWriting }
                   >
                     <Trash2 className="w-3.5 h-3.5" /> {confirmDismiss === idea.id ? 'Click again to dismiss' : 'Dismiss'}
                   </button>
+                  <span className="flex gap-1 sm:ml-auto" role="group" aria-label="Your reaction">
+                    {FEEDBACK.map((f) => (
+                      <button
+                        key={f.value}
+                        type="button"
+                        disabled={busy}
+                        title={f.label}
+                        aria-pressed={idea.feedback === f.value}
+                        onClick={() => act(idea.id, () => sendIdeaFeedback(idea.id, f.value, token as string), f.done)}
+                        className={`flex items-center gap-1 px-2 py-1.5 rounded-lg border text-xs disabled:opacity-50 ${
+                          idea.feedback === f.value ? 'border-violet-400/60 bg-violet-500/15 text-violet-100' : 'border-[#1e293b] text-slate-300 hover:border-slate-500'
+                        }`}
+                      >
+                        <span aria-hidden="true">{f.emoji}</span> {f.label}
+                      </button>
+                    ))}
+                  </span>
                 </div>
               </li>
             );

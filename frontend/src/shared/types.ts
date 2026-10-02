@@ -137,11 +137,24 @@ export interface IdeaRun {
   finished_at: string | null;
 }
 
+// What the owner knows, is learning and never wants suggested: the daily ideas must fit it
+export interface WriterProfile {
+  knows: string[];
+  learning: string[];
+  avoid: string[];
+  notes: string;
+}
+
+export type IdeaFeedback = 'like' | 'unknown' | 'dislike';
+
 // GET /admin/ideas/status
 export interface IdeasStatus {
   enabled: boolean;
   max_pending: number;
   sections: string[];
+  profile: Partial<WriterProfile>;
+  /** Commits available for ideas from the owner's own work (0 when the work log was not exported) */
+  work_log_commits: number;
   schedule_time: string;
   timezone: string;
   next_run_at: string;
@@ -162,6 +175,9 @@ export interface Idea {
   title: string;
   hook: string;
   brief: {
+    /** experience: from the owner's own commits; trend: a timely topic; external: sent to /ideas/ingest */
+    kind?: 'experience' | 'trend' | 'external';
+    commits?: string[];
     angles?: string[];
     outline?: { heading: string; guidance: string; prompts: string[] }[];
     questions?: string[];
@@ -173,6 +189,7 @@ export interface Idea {
   cover_image_url?: string | null;
   cover_credit?: { id: string; name: string; profile_url: string; photo_url: string } | null;
   status: 'new' | 'started' | 'dismissed';
+  feedback?: IdeaFeedback | null;
   post_id?: string | null;
   created_at: string;
 }

@@ -1,4 +1,4 @@
-import { Post, PostDetail, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions, ReviewItem, Series, SeriesDetail, HomeData, IdeasStatus, Idea } from '../types';
+import { Post, PostDetail, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions, ReviewItem, Series, SeriesDetail, HomeData, IdeasStatus, Idea, IdeaFeedback, WriterProfile } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -599,9 +599,9 @@ export function fetchIdeasStatus(token: string): Promise<IdeasStatus> {
 }
 
 export function updateIdeasSettings(
-  body: { enabled?: boolean; max_pending?: number; sections?: string[] },
+  body: { enabled?: boolean; max_pending?: number; sections?: string[]; profile?: WriterProfile },
   token: string
-): Promise<{ enabled: boolean; max_pending: number; sections: string[] }> {
+): Promise<{ enabled: boolean; max_pending: number; sections: string[]; profile: Partial<WriterProfile> }> {
   return authJson('/admin/ideas/settings', token, 'Failed to update the ideas settings', {
     method: 'PUT',
     body: JSON.stringify(body),
@@ -700,4 +700,12 @@ export async function fetchHome(): Promise<HomeData> {
   const res = await fetch(`${API_BASE}/posts/home`);
   if (!res.ok) throw new Error('Failed to load the home page');
   return res.json();
+}
+
+/** like keeps the idea; unknown and dislike also hide it. Every reaction steers the next ideas. */
+export function sendIdeaFeedback(ideaId: string, value: IdeaFeedback, token: string): Promise<{ feedback: IdeaFeedback; status: string }> {
+  return authJson(`/admin/ideas/${ideaId}/feedback`, token, 'Failed to save your feedback', {
+    method: 'POST',
+    body: JSON.stringify({ value }),
+  });
 }

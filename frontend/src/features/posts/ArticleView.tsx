@@ -35,7 +35,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
   t,
   currentLang = 'es',
 }) => {
-  // Section personality: calm (softer, for Mental Health) or vivid (section color accents)
+  // Section personality: calm (softer, larger type) or vivid (section color accents)
   const theme = post.section?.theme ?? 'default';
   const isCalm = theme === 'calm';
   const [isNoticeDismissed, setIsNoticeDismissed] = useState(false);
@@ -287,7 +287,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
             <MarkdownRenderer content={post.content_markdown} />
           </div>
 
-          {/* Section footer (admin-editable, e.g. the Mental Health disclaimer) */}
+          {/* Section footer (admin-editable, e.g. a disclaimer or a call to action) */}
           {post.section?.footer_markdown && (
             <aside className="section-footer mt-10 rounded-xl border border-[#1e293b] bg-[#07090e] p-5 text-slate-400">
               <MarkdownRenderer content={post.section.footer_markdown} />
