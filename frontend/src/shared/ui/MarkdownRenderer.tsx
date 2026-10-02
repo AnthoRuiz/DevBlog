@@ -35,6 +35,43 @@ interface MarkdownRendererProps {
   emptyMessage?: string;
 }
 
+/**
+ * Split markdown into blocks at blank lines, but keep fenced code blocks (``` ... ```) whole:
+ * code and Mermaid diagrams often contain blank lines.
+ */
+export function splitBlocks(content: string): string[] {
+  const blocks: string[] = [];
+  let current: string[] = [];
+  let inFence = false;
+  const flush = () => {
+    if (current.some((line) => line.trim())) blocks.push(current.join('\n'));
+    current = [];
+  };
+  for (const line of content.replace(/\r\n/g, '\n').split('\n')) {
+    const isFence = line.trim().startsWith('```');
+    if (isFence && !inFence) {
+      // A fence always starts its own block, even right after a paragraph line
+      flush();
+      inFence = true;
+      current.push(line);
+      continue;
+    }
+    if (isFence && inFence) {
+      current.push(line);
+      inFence = false;
+      flush();
+      continue;
+    }
+    if (!inFence && !line.trim()) {
+      flush();
+      continue;
+    }
+    current.push(line);
+  }
+  flush();
+  return blocks;
+}
+
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   emptyMessage = 'No content to display.',
@@ -97,7 +134,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     return <span dangerouslySetInnerHTML={{ __html: html }} />;
   };
 
-  const paragraphs = content.split(/\n\n+/);
+  const paragraphs = splitBlocks(content);
 
   return (
     <div className="md-body space-y-4 text-slate-300 text-sm font-sans leading-relaxed">

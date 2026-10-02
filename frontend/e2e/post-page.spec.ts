@@ -23,3 +23,17 @@ test('tech posts keep the default theme and have no section footer', async ({ pa
   await expect(page.locator('article.theme-default')).toBeVisible();
   await expect(page.locator('aside.section-footer')).toHaveCount(0);
 });
+
+test('code blocks with blank lines stay in one block', async ({ page, api }) => {
+  const post = await api.createPost({
+    title: `E2E code ${stamp()}`,
+    section: 'tech',
+    content_markdown: 'Intro.\n\n```python\ndef a():\n    return 1\n\n\ndef b():\n    return 2\n```\n\nOutro.',
+  });
+  await page.goto(`/posts/${post.slug}`);
+  const code = page.locator('article pre');
+  await expect(code).toHaveCount(1);
+  await expect(code).toContainText('def a()');
+  await expect(code).toContainText('def b()');
+  await expect(page.getByText('Outro.')).toBeVisible();
+});
