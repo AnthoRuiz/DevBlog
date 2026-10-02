@@ -13,7 +13,7 @@
 ### 0.1 What this is
 The personal blog of **Anthony Ruiz** (software engineer in security, homelab builder), live at `https://blog.anthoruiz.dev`. It runs on his own homelab (Windows 11 + WSL2 + Docker) behind a Cloudflare Tunnel. The owner is the only `ADMIN`; anyone who signs up becomes a `CREATOR` whose posts go through the admin's review queue. Anonymous visitors are the readers.
 
-Content is organized in five fixed **sections** (Tech & Coding, AI, Interviews & Career, Mental Health, Gaming). Posts can be featured, grouped into **series**, searched with PostgreSQL full-text search, followed by RSS and shared with rich link previews. Mental Health posts are the owner's personal experience, not professional advice; that section has a calm theme and a disclaimer footer.
+Content is organized in four fixed **sections** (Tech & Coding, AI, Interviews & Career, Gaming). Posts can be featured, grouped into **series**, searched with PostgreSQL full-text search, followed by RSS and shared with rich link previews.
 
 ### 0.2 Current state (2026-10-01)
 - **Implementation Plan v2 is complete** (phases A–I, see §10 and `docs/plans/IMPLEMENTATION_PLAN_V2.md`). Everything is deployed to production.
@@ -340,29 +340,27 @@ erDiagram
 ```
 
 ### 4.4 Sections
-Every post and every tag belongs to exactly one section (`section_id`, required, `ON DELETE RESTRICT`). The five sections are created by migration `0003_add_sections`:
+Every post and every tag belongs to exactly one section (`section_id`, required, `ON DELETE RESTRICT`). The sections are created by migration `0003_add_sections` (a fifth one, Mental Health, was removed with its content by `0011`):
 
 | Section | Slug | Color | Icon key |
 |---|---|---|---|
 | Tech & Coding | `tech` | `#22d3ee` | `code` |
 | AI | `ai` | `#a78bfa` | `cpu` |
 | Interviews & Career | `career` | `#fb923c` | `target` |
-| Mental Health | `mental-health` | `#f472b6` | `heart` |
 | Gaming | `gaming` | `#4ade80` | `gamepad` |
 
-Admins can edit name, description, color, `theme` and `footer_markdown` (`PUT /admin/sections/{id}`, admin panel → Sections). Slugs are fixed because they are URLs (`/tech`), and there is no endpoint to create or delete sections: a new section needs a migration (and must not use a reserved slug, §5.3). Mental Health is seeded with `theme=calm` and a disclaimer footer by migration `0008`.
+Admins can edit name, description, color, `theme` and `footer_markdown` (`PUT /admin/sections/{id}`, admin panel → Sections). Slugs are fixed because they are URLs (`/tech`), and there is no endpoint to create or delete sections: a new section needs a migration (and must not use a reserved slug, §5.3).
 
 **Tag-section validation (`backend/app/services/tag_classifier.py`).** A new tag must fit its section ("WoW" belongs to Gaming, never Tech & Coding):
-- With an AI provider configured, the LLM layer (4.11) classifies the name against the section names and descriptions and returns `{section_slug, confidence, reason}` (the slug is an enum of the sections plus `none`). Without a provider, or when all fail, a keyword classifier is used (games, consoles, engines, mental-health, interview and AI terms; short keywords match whole words only).
+- With an AI provider configured, the LLM layer (4.11) classifies the name against the section names and descriptions and returns `{section_slug, confidence, reason}` (the slug is an enum of the sections plus `none`). Without a provider, or when all fail, a keyword classifier is used (games such as Tarkov, CS2 and Valheim, consoles, engines, interview and AI terms; short keywords match whole words only).
 - A tag is rejected only when another section is suggested with confidence ≥ 0.7. Ambiguous or unknown names return no suggestion and never block. Results are cached in memory.
 - The editor calls `POST /posts/tags/validate` while the author types (debounced) and offers "Create in <section>"; `POST /posts/tags` enforces the same rule (HTTP 422) unless an admin sends `force: true`.
 
 ### 4.5 Seed Data (`seed_initial_data()` in `backend/app/main.py`)
 Runs on every startup (after migrations) and only fills what is missing:
-1. **Starter tags** (only when the `tags` table is empty) — 19 tags from `DEFAULT_TAGS`, each with its section:
+1. **Starter tags** (only when the `tags` table is empty) — 17 tags from `DEFAULT_TAGS`, each with its section:
    - *Technology:* Software Engineering, Python, JavaScript & TypeScript, React, Backend & APIs, Databases, Distributed Systems, Cloud & DevOps, Docker & Homelab, Security, AI & Machine Learning
    - *Career & interviews:* Interview Prep, System Design, Algorithms & Data Structures, Career Growth
-   - *Wellbeing:* Mental Health, Productivity & Habits
    - *Gaming:* Video Games, Game Development
 2. **Admin user** (only when no `ADMIN` exists) — created from `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Without a password, a random one is generated and printed once to stdout (never to `server.log`). Existing admins still using the legacy default password are rotated to `ADMIN_PASSWORD` or reported with a warning.
 3. **Demo posts** (only when `SEED_DEMO_POSTS=True` and there are no posts) — three English posts with Unsplash covers in Tech & Coding. Enabled in development, disabled in production.
@@ -429,7 +427,8 @@ Every sign-up (email or Google) is a `CREATOR`; the admin account comes from `AD
 - `0007_series` — `series` table, `posts.series_id`/`series_position` and the **deferrable** unique constraint `uq_posts_series_position` (lets a reorder swap positions inside one transaction).
 - `0010_post_ideas` — `post_ideas` table; pending AI drafts were converted into ideas and their AI-written text deleted.
 - `0009_ai_drafts` — `posts.origin`, `posts.ai_meta`, `posts.cover_credit`, the `ai_writer_settings` row and the `ai_draft_runs` log (partial unique index: one scheduled run per day).
-- `0008_section_personality` — `sections.theme`, `sections.footer_markdown` (Mental Health seeded calm + disclaimer) and `posts.content_notice`.
+- `0008_section_personality` — `sections.theme`, `sections.footer_markdown` and `posts.content_notice`.
+- `0011_writer_profile` — `ai_writer_settings.profile` (JSONB, seeded with the owner's profile) and `post_ideas.feedback`; deletes the Mental Health section with its ideas, posts, series and tags (the downgrade recreates an empty section).
 - **Startup:** `run_migrations()` runs in a worker thread before seeding. A database that has the app tables but no `alembic_version` (created before Alembic) is stamped at `0001_baseline` first, so its data is kept and only later migrations run.
 - **New migration:** change the models, then `docker exec -w /app devblog_dev_backend alembic revision --autogenerate -m "<message>"` (or write it by hand following the `000N_<name>.py` naming and `revision`/`down_revision` chain), review the file (add data backfills by hand, write a real `downgrade()`), and let the dev backend apply it (it reloads on save and migrates on startup; `alembic upgrade head` also works). `alembic check` must report "No new upgrade operations detected". Then test it on a copy of production (§11.2).
 - **Model gotchas learned the hard way:** a `Mapped[datetime]` (non-optional) column is `NOT NULL`, so the migration must say `nullable=False` or `alembic check` fails; and a SQLAlchemy relationship must not share its name with a field of the Pydantic response schema built from that model (`Post.parent_series` exists because `PostDetailRead.series` is computed data; with both named `series`, Pydantic triggers a lazy load and async SQLAlchemy raises `MissingGreenlet`).
@@ -460,14 +459,19 @@ Every sign-up (email or Google) is a `CREATOR`; the admin account comes from `AD
 
 ### 4.12 Daily writing ideas (`services/ai_writer.py`, `topic_feeds.py`, `unsplash.py`, `api/v1/ideas.py`)
 **Principle:** the blog is personal and written by its owner. The AI researches and suggests; it never writes a post.
-- **What:** every day at `AI_DRAFTS_TIME` (default `16:00`) in `AI_DRAFTS_TIMEZONE` (default `America/Los_Angeles`) the backend researches **two different topics**, one meant to be written in English and one in Spanish (random), from the eligible sections (**never Mental Health**), and saves them as **idea cards** (`post_ideas`, status `new`).
+- **What:** every day at `AI_DRAFTS_TIME` (default `16:00`) in `AI_DRAFTS_TIMEZONE` (default `America/Los_Angeles`) the backend suggests **two different topics**, one meant to be written in English and one in Spanish (random), in different eligible sections, and saves them as **idea cards** (`post_ideas`, status `new`, `brief.kind`):
+  - **experience** — a story from the owner's own work. `scripts/export_work_log.sh` (run by `deploy.sh`, since the image has no git) writes the last 400 commits to `backend/app/data/work_log.json` (git-ignored). Only `feat`/`fix`/`refactor`/`perf`/`test` commits not used by an earlier idea (`brief.commits`) are offered; the LLM picks 1–6 related commits and the section, and the commit notes become the research (no sources).
+  - **trend** — a timely topic that fits the writer profile (below). In the feed fallback the LLM returns a `fit_score` (1–5) and anything below 4 is rejected (`NoFittingTopic`); the next least-used section is tried, then an experience idea.
+  - Without a work log both ideas are trends; if no story is left, a trend takes its place.
+- **Writer profile:** `ai_writer_settings.profile` = `{knows, learning, avoid, notes}`, editable in the admin Ideas tab (`PUT /admin/ideas/settings` with `profile`). It goes into every prompt; *learning* topics are framed as learning in public.
+- **Feedback:** `POST /admin/ideas/{id}/feedback` with `like`, `unknown` or `dislike` (the last two also dismiss the idea). The latest 20 reactions are added to the prompts as examples of what to suggest more or less of.
 - **Idea card:** working title, *hook* (why it matters now), 3–5 angles, a 4–6 section outline (heading, guidance, 2–3 prompts each) for a 5–10 minute post, 3–5 personal questions, a homelab experiment to run and measure, tags from the section, verified sources and an Unsplash cover. The card is written in the post's language; the research notes are stored but not sent to the UI.
 - **Sections:** the two ideas of a run always come from **different sections**: the section that went longest without an idea comes first (ties at random), so every eligible section gets its turn. With a single eligible section only one idea is created that day.
 - **Scheduler:** an asyncio task started in the app lifespan. It sleeps until the next run; on startup it catches up on today's run if it was missed. `ai_draft_runs` records each run (`schedule`, `retry`, `manual`) with a partial unique index (one scheduled run per day). A failed run is retried once after 30 minutes. Generation stops while `max_pending` (default 6) ideas are new. An in-process lock serializes runs.
-- **Research:** live web search when available (Claude web search; Gemini grounding needs a paid tier), otherwise free public feeds (Hacker News via Algolia and DEV.to, last 30 days) where the LLM picks a topic and the chosen articles' text becomes the notes. Sources are fetched to verify they open. Titles of recent posts and of every past idea (including dismissed ones) are excluded.
+- **Research:** live web search when available (Claude web search; Gemini grounding needs a paid tier), otherwise free public feeds (Hacker News via Algolia and DEV.to, last 30 days; per-section queries in `topic_feeds.SECTION_SOURCES`, e.g. Tarkov/CS2/Valheim for Gaming, coding and behavioral interviews for Career, AWS and the blog's stack for Tech) where the LLM picks and scores a topic and the chosen articles' text becomes the notes. Sources are fetched to verify they open. Titles of recent posts and of every past idea (including dismissed ones) are excluded.
 - **Start writing:** `POST /admin/ideas/{id}/start` creates the **admin's own draft** (`origin=human`, status `draft`) with the working title, the hook as summary, cover and credit, tags and a **guided template**: an outline whose prompts are `> ✍️` lines (how to use the template, angles, intro, one section per outline item with its guidance and prompts, the homelab experiment, closing questions, sources). The idea becomes `started` and links to the post; starting it twice returns 409.
 - **Dismiss:** `POST /admin/ideas/{id}/dismiss` hides the idea and keeps it so the topic is not suggested again.
-- **Other endpoints:** `GET /admin/ideas?status=new|started|dismissed|all`, `GET /admin/ideas/status`, `PUT /admin/ideas/settings` (`enabled`, `max_pending`, `sections`), `POST /admin/ideas/run` (background, 202). `GET /admin/review/count` returns `{pending, ideas_pending}`.
+- **Other endpoints:** `GET /admin/ideas?status=new|started|dismissed|all`, `GET /admin/ideas/status`, `PUT /admin/ideas/settings` (`enabled`, `max_pending`, `sections`, `profile`); the status includes `profile` and `work_log_commits`, `POST /admin/ideas/run` (background, 202). `GET /admin/review/count` returns `{pending, ideas_pending}`.
 - **External generators:** `POST /ideas/ingest` with `X-API-Key: AI_DRAFTS_API_KEY` accepts a finished idea card; disabled (404) when the key is unset. Development sets one for the e2e tests.
 - **History:** from 0009 to 0010 the job wrote full drafts that the admin could adopt; that was replaced because AI-written posts contradict the blog's promise. `posts.origin` and `posts.ai_meta` remain for history.
 - **Logs:** `devblog.ai_ideas` in `server.log`; the admin tab shows the last runs.
@@ -534,7 +538,7 @@ The URL is the source of truth for the page and the feed filters (`app/router.ts
 | Path | Page |
 |---|---|
 | `/` | Magazine home: lead story (most recently featured, else latest) with a *Latest* column, one block per section (lead + two more + *View all*), *Browse by tag*, then *All posts* with sort and Load more |
-| `/:section` | Section feed (`tech`, `ai`, `career`, `mental-health`, `gaming`) with a *Featured* band (up to two posts) and its series above the rest; `?tag=` filters by a tag of that section |
+| `/:section` | Section feed (`tech`, `ai`, `career`, `gaming`) with a *Featured* band (up to two posts) and its series above the rest; `?tag=` filters by a tag of that section |
 | `/tags/:tag` | Tag feed across sections |
 | `/posts/:slug` | Post page (canonical post URL, used by feeds and previews) |
 | `/series/:slug` | Series page: ordered posts, reading progress (stored in the browser), reorder/edit/delete for its owner |
@@ -549,8 +553,8 @@ Unknown paths and unknown section slugs render the client-side 404 page. Section
 ### 5.4 Key UI Behaviour
 
 #### Section personality (`ArticleView.tsx`, `index.css`)
-- The post page takes its section's `theme`: **calm** (Mental Health) uses a softer palette, larger line height, sans-serif metadata and no neon markers; **vivid** tints headings and quotes with the section color.
-- `posts.content_notice` shows a dismissible notice before the body; `sections.footer_markdown` is rendered below every post of the section. Mental Health starts with a personal-experience disclaimer pointing to findahelpline.com (editable in the admin Sections tab).
+- The post page takes its section's `theme`: **calm** uses a softer palette, larger line height, sans-serif metadata and no neon markers; **vivid** tints headings and quotes with the section color.
+- `posts.content_notice` shows a dismissible notice before the body; `sections.footer_markdown` is rendered below every post of the section.
 
 #### Header (`app/Navbar.tsx`)
 - Follows the brand book nav: `>ar_` mark + name on the left, search in the middle (its own row below `md`), and on the right only a compact mono language switch, the primary **New post** button (icon only on phones) and an **account button** (initials). Visitors see **Sign in** instead of the last two.
@@ -842,14 +846,15 @@ When reading, analyzing or extending this repository:
 
 ### 10.3 Decisions and their reasons
 - **Writing ideas instead of AI posts (2026-10-02):** a blog should be personal and written by a human, and AI-written posts contradict the brand promise (real setups, real numbers). The daily job now only suggests researched topics with an outline; the owner writes every post from a guided template.
-- **AI drafts (2026-10-02, replaced the same day):** built in-house instead of Meta Muse (muse.ai has no public API). Two drafts a day at 16:00 Seattle time, different topics, one EN and one ES at random, Mental Health excluded, Unsplash covers (free), approval publishes as the owner. Web research falls back to free public feeds because Gemini grounding needs a paid tier.
+- **AI drafts (2026-10-02, replaced the same day):** built in-house instead of Meta Muse (muse.ai has no public API). Two drafts a day at 16:00 Seattle time, different topics, one EN and one ES at random, Unsplash covers (free), approval publishes as the owner. Web research falls back to free public feeds because Gemini grounding needs a paid tier.
 - **Two roles only.** Visitors read anonymously; signing up makes you a `CREATOR`; one admin for now, and the admin can promote others. The last admin can never be demoted.
 - **Review queue for untrusted creators (D1).** Nothing a creator writes is public before review; the admin can mark trusted creators. Admin posts publish directly. Existing posts became `published` in the migration.
 - **Rejected posts** carry a reason, stay editable and can be resubmitted. Untrusted creators editing a live post send it back to review.
 - **No email notifications.** Pending reviews are a badge + tab title, polled every minute (the owner chose this over SMTP).
 - **Anonymous comments stay (D2)**, protected by honeypot, sanitizing and rate limits.
 - **Personal blog brand (D3)** from the brand book; the fake writing streak (`max(14, posts × 2)`) was removed.
-- **Mental Health (D4)** is personal experience, not professional advice: calm theme, disclaimer footer with findahelpline.com, optional content notices.
+- **Mental Health removed (2026-10-01, was D4):** the owner has no expertise to share there, so migration `0011` deleted the section and its content. Calm themes, section footers and content notices remain available to any section.
+- **Ideas that fit the writer (2026-10-01):** generic trend ideas were about topics the owner did not know. Ideas now follow an editable writer profile, one a day comes from his own commits, trend topics need a fit score of at least 4/5, and his 👍/🤷/👎 reactions steer the next runs.
 - **URLs:** `/<section>` and `/posts/<slug>` (not `/blog/...`); the canonical post URL is used by feeds and previews.
 - **Featured:** max two per section; the home lead and section leads fall back to the latest post.
 - **Series:** owned by creators (admin manages all), one section per series; readers only count published posts.
