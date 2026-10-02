@@ -22,7 +22,8 @@ logger = logging.getLogger("devblog.ai_drafts")
 SECTION_SOURCES: dict[str, tuple[list[str], list[str]]] = {
     "tech": (["AWS", "AWS lambda", "python", "fastapi", "postgres", "docker compose", "typescript react", "cloudflare tunnel", "self-hosted"],
              ["aws", "python", "docker", "postgres", "typescript", "react", "selfhosted"]),
-    "ai": (["LLM API", "AI coding assistant", "Claude", "Gemini API", "RAG"], ["ai", "llm", "rag"]),
+    "ai": (["AI coding assistant", "Claude Code", "AI developer productivity", "AI code review", "prompt engineering developers",
+            "LLM API", "Gemini API"], ["ai", "llm", "productivity", "promptengineering"]),
     "career": (["coding interview", "system design interview", "behavioral interview", "leetcode", "data structures", "tech hiring"],
                ["career", "interview", "algorithms", "datastructures", "leetcode"]),
     "gaming": (["Escape from Tarkov", "Tarkov", "Counter-Strike 2", "CS2", "Valheim"], ["gamedev", "gaming"]),
@@ -115,7 +116,7 @@ The writer's profile (only pick what he can write about from experience, or what
 His reactions to past ideas (pick more like the liked ones, nothing like the others):
 {feedback}
 
-Never pick: internal details of any employer (including Amazon), politics, medical or mental-health advice, rumors,
+Never pick: anything about the internals of any employer (including Amazon), politics, medical or mental-health advice, rumors,
 or pure product announcements without technical substance.
 Return the index of the best article, the topic in one line, a practical angle for a hands-on engineer, the indexes
 of up to two related articles from the list that add context (may be empty), and fit_score from 1 to 5: how well

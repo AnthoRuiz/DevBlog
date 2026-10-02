@@ -29,6 +29,7 @@ DEFAULT_PROFILE = {
         "Technical interview exercises (coding interview problems)",
         "The STAR method for behavioral interviews",
         "Helping people prepare for interviews in tech",
+        "Using AI to improve a developer's daily work (AI coding assistants such as Claude Code, prompting, reviews, workflows): he uses it every day",
         "The stack he built this blog with in his homelab: Python, FastAPI, PostgreSQL, Docker and Docker Compose, React + TypeScript, Cloudflare Tunnel",
     ],
     "learning": [
@@ -37,7 +38,7 @@ DEFAULT_PROFILE = {
     "avoid": [
         "Mental health",
         "Topics he has no hands-on experience with and no interest in learning",
-        "Internal details of any employer",
+        "Anything about the internals of his employer (systems, projects, data, incidents, processes, colleagues), with no exceptions",
     ],
     "notes": "Prefer topics where he can add his own experience, opinion or a homelab test.",
 }

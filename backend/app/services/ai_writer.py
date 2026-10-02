@@ -165,11 +165,15 @@ The topic must fit the writer's profile (what he knows or wants to learn):
 His reactions to past ideas (more like the liked ones, nothing like the others):
 {feedback}
 
-Never pick: internal details of any employer (including Amazon), politics, medical or mental-health advice, rumors.
+Never pick: anything about the internals of his employer or any employer (including Amazon: internal systems,
+projects, data, incidents or processes), politics, medical or mental-health advice, rumors. AWS topics must be
+about public services he can try on his own account or homelab.
 
 Then write research notes in English: the topic, why it matters now, the key facts (numbers only when a source states
 them), and practical angles for a hands-on engineer. Finish with exactly this format:
 
+FIT: <1 to 5: how well he can add his own experience or opinion; 5 = squarely in what he knows, 4 = what he knows
+or wants to learn, 3 or less = he would have little to add>
 TOPIC: <one line>
 SOURCES:
 - <page title> | <url>
@@ -226,6 +230,10 @@ His blog's promise: real setups with real numbers, run on his own hardware, incl
 
 His profile (stay within what he knows; topics he is learning are framed as learning in public):
 {profile}
+
+Never ask him about, or point the outline toward, the internals of his employer (systems, projects, data, incidents,
+processes, colleagues). Work experience appears only as general lessons; AWS appears only as public services he
+tries on his own account or homelab.
 
 Return:
 - title: a working title he could use or change, at most 90 characters, plain (no clickbait).
@@ -336,6 +344,11 @@ async def create_trend_idea(db: AsyncSession, section: Section, language: str, p
         # Web search needs a paid tier (Gemini) or a Claude key: research from free public feeds instead
         logger.info(f"[AI ideas] web search unavailable ({e.reason}); researching {section.slug} from public feeds")
         research = await topic_feeds.research_from_feeds(section, avoid, profile, feedback)
+    else:
+        # Same bar as the feeds: skip topics he would have little to add to
+        fit = re.search(r"^\s*FIT:\s*([1-5])", research.text, re.MULTILINE)
+        if fit and int(fit.group(1)) < topic_feeds.MIN_FIT:
+            raise topic_feeds.NoFittingTopic(f"web research scored {fit.group(1)}")
     sources = await _verify_sources(research.sources)
     return await _save_idea(db, section, language, research.text, research.provider, sources, "trend", profile)
 
