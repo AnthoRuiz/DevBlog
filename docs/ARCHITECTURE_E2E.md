@@ -17,8 +17,8 @@ Content is organized in five fixed **sections** (Tech & Coding, AI, Interviews &
 
 ### 0.2 Current state (2026-10-01)
 - **Implementation Plan v2 is complete** (phases A–I, see §10 and `docs/plans/IMPLEMENTATION_PLAN_V2.md`). Everything is deployed to production.
-- **Database:** Alembic head `0009_ai_drafts` in production and development.
-- **AI drafts:** a daily job writes two drafts at 16:00 Seattle time for the admin to review (§4.12).
+- **Database:** Alembic head `0010_post_ideas` in production and development.
+- **Writing ideas:** a daily job researches two topics at 16:00 Seattle time and leaves idea cards for the owner, who writes every post himself, starting from a guided template (§4.12). The AI never writes posts.
 - **Production data:** only the admin account and the 19 starter tags; **no posts yet**, so the home shows empty-section states until the owner publishes.
 - **Development data:** demo and pagination-test posts (all in Tech & Coding) for local testing.
 - **AI:** only a Gemini key is configured in production (no Anthropic key); Claude is wired and takes over automatically if a key is added.
@@ -427,6 +427,7 @@ Every sign-up (email or Google) is a `CREATOR`; the admin account comes from `AD
 - `0005_post_search` — `posts.search_vector`, a **stored generated** `tsvector` (title A, summary B, content C, `simple` config) with a GIN index. The model declares it with `Computed(...)`; `alembic check` prints a harmless "Computed default cannot be modified" warning.
 - `0006_featured_posts` — `posts.featured_at` (indexed).
 - `0007_series` — `series` table, `posts.series_id`/`series_position` and the **deferrable** unique constraint `uq_posts_series_position` (lets a reorder swap positions inside one transaction).
+- `0010_post_ideas` — `post_ideas` table; pending AI drafts were converted into ideas and their AI-written text deleted.
 - `0009_ai_drafts` — `posts.origin`, `posts.ai_meta`, `posts.cover_credit`, the `ai_writer_settings` row and the `ai_draft_runs` log (partial unique index: one scheduled run per day).
 - `0008_section_personality` — `sections.theme`, `sections.footer_markdown` (Mental Health seeded calm + disclaimer) and `posts.content_notice`.
 - **Startup:** `run_migrations()` runs in a worker thread before seeding. A database that has the app tables but no `alembic_version` (created before Alembic) is stamped at `0001_baseline` first, so its data is kept and only later migrations run.
@@ -457,17 +458,18 @@ Every sign-up (email or Google) is a `CREATOR`; the admin account comes from `AD
 
 - `GET /posts/ai-status` tells the editor whether AI is available; the editor then disables translation and labels keyword suggestions.
 
-### 4.12 Daily AI drafts (`services/ai_writer.py`, `topic_feeds.py`, `unsplash.py`, `api/v1/ai_drafts.py`)
-- **What:** every day at `AI_DRAFTS_TIME` (default `16:00`) in `AI_DRAFTS_TIMEZONE` (default `America/Los_Angeles`) the backend writes **two drafts on different topics**, one in English and one in Spanish (assigned at random), from the eligible sections. **Mental Health is always excluded** (personal experience only). Drafts are `pending_review` posts with `origin="ai"` by the **AI Writer** account (`AI_WRITER_EMAIL`, inactive, no password: it can never sign in).
-- **Scheduler:** an asyncio task started in the app lifespan (like the backup job). It sleeps until the next run; on startup it runs today's job if the time has passed and no scheduled run exists (missed while the app was down). `ai_draft_runs` records every run (`schedule`, `retry`, `manual`) and a partial unique index allows one scheduled run per day, so restarts or several workers never duplicate it. A failed run is retried once after 30 minutes. Generation stops while `max_pending` (default 6) AI drafts wait for review. An in-process lock serializes runs and regenerations.
-- **Sections:** least recently drafted first, ties at random; the eligible list lives in `ai_writer_settings.sections` (default tech, ai, career, gaming).
-- **Research:** first `llm.research_with_search()` (Claude `web_search_20260209` tool, or Gemini Google Search grounding). **Gemini grounding is not available on the free tier**, so with only a free Gemini key it fails fast and the writer falls back to `topic_feeds.research_from_feeds()`: recent stories from Hacker News (Algolia API) and DEV.to filtered by section keywords and the last 30 days; the LLM picks one with a normal call and the chosen articles' text (fetched and stripped to paragraphs) becomes the research notes. Sources are fetched to verify they open (redirects resolved), up to six, and appended as a *Sources/Fuentes* section.
-- **Writing:** `generate_json` with a schema (title, summary, markdown, tags from the section, Unsplash query, editor notes in Spanish). The prompt asks for a **casual, conversational tone** (personal blog, not documentation; contractions in English, "tú" and natural expressions in Spanish) that stays useful and follows the brand book's no-hype rules, and a **5–10 minute read** (1,000–1,500 words); if the computed reading time falls outside 5–10 minutes the writer asks once for a longer or shorter version and keeps the closer one. It presents other people's work in third person (never "I built/used" about the research), and marks places for the owner's experience with `> TODO:` blockquotes.
-- **Covers:** Unsplash search (`UNSPLASH_ACCESS_KEY`, only the Access Key), landscape, a photo not used before; the image is hotlinked, the photographer is credited under the cover (`posts.cover_credit`) and the photo's `download_location` is pinged, as the Unsplash API guidelines require. Changing the cover in the editor drops the credit.
-- **Adoption:** approving an AI draft (`POST /admin/posts/{id}/approve`) or publishing it from the editor sets the admin as author ("publish as mine"); saving it keeps it in the AI queue; rejecting it ("Discard") keeps it for topic deduplication. `origin` stays `ai` internally.
-- **Admin endpoints:** `GET /admin/ai-drafts/status`, `PUT /admin/ai-drafts/settings` (`enabled`, `max_pending`, `sections`), `POST /admin/ai-drafts/run` (background, 202), `POST /admin/ai-drafts/{id}/regenerate` (`{note}`, rewrites from the stored research in the background). `GET /admin/review/count` returns `{pending, ai_pending}`.
-- **External generators:** `POST /ai-drafts/ingest` with `X-API-Key: AI_DRAFTS_API_KEY` accepts a finished draft (n8n, scheduled agents…); disabled (404) when the key is unset. Development sets a key for the e2e tests.
-- **Logs:** `devblog.ai_drafts` in `server.log`; the admin tab shows the last runs.
+### 4.12 Daily writing ideas (`services/ai_writer.py`, `topic_feeds.py`, `unsplash.py`, `api/v1/ideas.py`)
+**Principle:** the blog is personal and written by its owner. The AI researches and suggests; it never writes a post.
+- **What:** every day at `AI_DRAFTS_TIME` (default `16:00`) in `AI_DRAFTS_TIMEZONE` (default `America/Los_Angeles`) the backend researches **two different topics**, one meant to be written in English and one in Spanish (random), from the eligible sections (**never Mental Health**), and saves them as **idea cards** (`post_ideas`, status `new`).
+- **Idea card:** working title, *hook* (why it matters now), 3–5 angles, a 4–6 section outline (heading, guidance, 2–3 prompts each) for a 5–10 minute post, 3–5 personal questions, a homelab experiment to run and measure, tags from the section, verified sources and an Unsplash cover. The card is written in the post's language; the research notes are stored but not sent to the UI.
+- **Scheduler:** an asyncio task started in the app lifespan. It sleeps until the next run; on startup it catches up on today's run if it was missed. `ai_draft_runs` records each run (`schedule`, `retry`, `manual`) with a partial unique index (one scheduled run per day). A failed run is retried once after 30 minutes. Generation stops while `max_pending` (default 6) ideas are new. An in-process lock serializes runs.
+- **Research:** live web search when available (Claude web search; Gemini grounding needs a paid tier), otherwise free public feeds (Hacker News via Algolia and DEV.to, last 30 days) where the LLM picks a topic and the chosen articles' text becomes the notes. Sources are fetched to verify they open. Titles of recent posts and of every past idea (including dismissed ones) are excluded.
+- **Start writing:** `POST /admin/ideas/{id}/start` creates the **admin's own draft** (`origin=human`, status `draft`) with the working title, the hook as summary, cover and credit, tags and a **guided template**: an outline whose prompts are `> ✍️` lines (how to use the template, angles, intro, one section per outline item with its guidance and prompts, the homelab experiment, closing questions, sources). The idea becomes `started` and links to the post; starting it twice returns 409.
+- **Dismiss:** `POST /admin/ideas/{id}/dismiss` hides the idea and keeps it so the topic is not suggested again.
+- **Other endpoints:** `GET /admin/ideas?status=new|started|dismissed|all`, `GET /admin/ideas/status`, `PUT /admin/ideas/settings` (`enabled`, `max_pending`, `sections`), `POST /admin/ideas/run` (background, 202). `GET /admin/review/count` returns `{pending, ideas_pending}`.
+- **External generators:** `POST /ideas/ingest` with `X-API-Key: AI_DRAFTS_API_KEY` accepts a finished idea card; disabled (404) when the key is unset. Development sets one for the e2e tests.
+- **History:** from 0009 to 0010 the job wrote full drafts that the admin could adopt; that was replaced because AI-written posts contradict the blog's promise. `posts.origin` and `posts.ai_meta` remain for history.
+- **Logs:** `devblog.ai_ideas` in `server.log`; the admin tab shows the last runs.
 
 ## 5. Frontend Architecture (React 18, TypeScript & Vite)
 
@@ -553,9 +555,10 @@ Unknown paths and unknown section slugs render the client-side 404 page. Section
 - Follows the brand book nav: `>ar_` mark + name on the left, search in the middle (its own row below `md`), and on the right only a compact mono language switch, the primary **New post** button (icon only on phones) and an **account button** (initials). Visitors see **Sign in** instead of the last two.
 - The account button opens a menu (closes on outside click and Escape) with the user's name, email and role, **My posts**, and for admins **Admin panel** (with the pending-review count) and **System status**; the testing role switch (when enabled) and **Sign out** close it. The pending count also shows as a badge on the account button.
 
-#### AI drafts (`features/admin/AIDraftsTab.tsx`)
-- Admins see AI drafts as a violet badge on **AI drafts** in the account menu (the account button badge counts everything pending) and a dismissible banner under the header ("You have N AI drafts waiting…" → **Review**). Both open `/admin/backups?tab=ai`.
-- The tab shows the schedule, next run, pause/resume, **Generate now**, the recent runs, and each draft with cover, language, section, topic, **notes for you**, the sources it used, and **Preview**, **Edit**, **Approve & publish as mine**, **New version** (feedback note) and **Discard**. It polls while a generation or rewrite is running. The human review tab no longer lists AI drafts.
+#### Writing ideas (`features/admin/IdeasTab.tsx`) and templates
+- Admins see new ideas as a violet count on **Writing ideas** in the account menu and a dismissible banner under the header ("You have N new writing ideas" → **See ideas**); both open `/admin/backups?tab=ideas`. The `(N)` tab title counts reviews plus ideas.
+- The tab shows the schedule, pause/resume, **Find ideas now** and recent runs, and each card with cover, language to write in, section, hook, angles, homelab experiment, outline and questions (collapsible) and sources, with **Start writing** (closes the panel and opens the editor on the new draft) and **Dismiss** (click twice).
+- **Templates:** template prompts are `> ✍️` lines. The editor's preview renders them one per line in a dashed violet box; publishing with prompts left shows "There are still N ✍️ prompts…" and needs a second click. A blank post offers **Use template** (generic structure in the post's language: intro, context, what I did, what happened with numbers and what failed first, what I took away), from `shared/utils/postTemplate.ts`.
 - Post pages show the Unsplash credit ("Photo by … on Unsplash") under the cover when a post has one.
 
 #### My posts (`features/posts/MyPostsModal.tsx`)
@@ -731,10 +734,9 @@ Production reads `.env`, development reads `.env.dev` (templates: `.env.example`
 | `LLM_PROVIDER_ORDER` | | `claude,gemini` | Failover order of the configured providers |
 | `SITE_NAME` / `SITE_TAGLINE` | | `Anthony Ruiz` / brand tagline | Site identity served by `GET /site` |
 | `SITE_DESCRIPTION` | | one-line bio | Meta description for feeds and previews |
-| `AI_DRAFTS_TIME` / `AI_DRAFTS_TIMEZONE` | | `16:00` / `America/Los_Angeles` | When the daily AI drafts are written |
-| `UNSPLASH_ACCESS_KEY` | | empty | Unsplash Access Key for AI draft covers (without it drafts have no cover) |
-| `AI_DRAFTS_API_KEY` | | empty | Enables `POST /ai-drafts/ingest` for external generators (dev sets one for the e2e tests) |
-| `AI_WRITER_EMAIL` | | `ai-writer@blog.internal` | Account that authors AI drafts |
+| `AI_DRAFTS_TIME` / `AI_DRAFTS_TIMEZONE` | | `16:00` / `America/Los_Angeles` | When the daily writing ideas are researched |
+| `UNSPLASH_ACCESS_KEY` | | empty | Unsplash Access Key for idea covers (without it ideas have no cover) |
+| `AI_DRAFTS_API_KEY` | | empty | Enables `POST /ideas/ingest` for external generators (dev sets one for the e2e tests) |
 | `SITE_URL` | | `https://blog.anthoruiz.dev` | Canonical base URL for post links, feeds and previews |
 | `BACKEND_PORT` | | `8001` | Dev backend host port (`.env.dev` only) |
 | `VITE_API_PROXY_TARGET` | | `http://localhost:8001` | Vite dev proxy target (shell env when running `npm run dev`) |
@@ -838,7 +840,8 @@ When reading, analyzing or extending this repository:
 | I. Magazine home | Approved design: lead story + latest, section blocks, browse by tag, all posts | — |
 
 ### 10.3 Decisions and their reasons
-- **AI drafts (2026-10-02):** built in-house instead of Meta Muse (muse.ai has no public API). Two drafts a day at 16:00 Seattle time, different topics, one EN and one ES at random, Mental Health excluded, Unsplash covers (free), approval publishes as the owner. Web research falls back to free public feeds because Gemini grounding needs a paid tier.
+- **Writing ideas instead of AI posts (2026-10-02):** a blog should be personal and written by a human, and AI-written posts contradict the brand promise (real setups, real numbers). The daily job now only suggests researched topics with an outline; the owner writes every post from a guided template.
+- **AI drafts (2026-10-02, replaced the same day):** built in-house instead of Meta Muse (muse.ai has no public API). Two drafts a day at 16:00 Seattle time, different topics, one EN and one ES at random, Mental Health excluded, Unsplash covers (free), approval publishes as the owner. Web research falls back to free public feeds because Gemini grounding needs a paid tier.
 - **Two roles only.** Visitors read anonymously; signing up makes you a `CREATOR`; one admin for now, and the admin can promote others. The last admin can never be demoted.
 - **Review queue for untrusted creators (D1).** Nothing a creator writes is public before review; the admin can mark trusted creators. Admin posts publish directly. Existing posts became `published` in the migration.
 - **Rejected posts** carry a reason, stay editable and can be resubmitted. Untrusted creators editing a live post send it back to review.
@@ -949,7 +952,7 @@ Then check the changed pages in a browser against production.
 - The repository lives inside OneDrive (§9.9).
 
 ### 12.3 Candidate next steps (not started; confirm with the owner first)
-- AI drafts: enable Gemini billing (5,000 grounded searches/month included) or add a Claude key for live web research instead of feeds; per-section topic preferences in the admin tab; approval/discard metrics.
+- Writing ideas: enable Gemini billing (5,000 grounded searches/month included) or add a Claude key for live web research instead of feeds; per-section topic preferences in the admin tab; started/dismissed metrics.
 - LinkedIn automation from the RSS feed (n8n/Zapier), per `docs/plans/FEAT_RSS_LINKEDIN_SPEC.md`.
 - Comment moderation (pending state + admin tab), and notifications to authors when a post is approved or rejected.
 - Persist the language choice and use the author's name in the byline.
