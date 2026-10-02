@@ -552,6 +552,9 @@ async def update_post(
     if post_update.content_markdown is not None:
         post.content_markdown = post_update.content_markdown
     if post_update.cover_image_url is not None:
+        if post_update.cover_image_url != post.cover_image_url:
+            # A new cover drops the previous photo's attribution
+            post.cover_credit = None
         post.cover_image_url = post_update.cover_image_url
     if post_update.content_notice is not None:
         post.content_notice = post_update.content_notice.strip() or None
@@ -573,6 +576,12 @@ async def update_post(
     elif content_changed and post.status == PostStatus.PUBLISHED and not _can_publish_directly(current_user):
         # An untrusted creator editing a live post sends it back to review
         post.status = PostStatus.PENDING_REVIEW
+    if post.origin == "ai" and post.author_id != current_user.id:
+        # An AI draft not yet adopted: saving keeps it in the AI review queue, publishing adopts it
+        if post.status == PostStatus.DRAFT:
+            post.status = PostStatus.PENDING_REVIEW
+        elif post.status == PostStatus.PUBLISHED and current_user.role == UserRole.ADMIN:
+            post.author_id = current_user.id
     if post.status == PostStatus.PUBLISHED:
         post.review_note = None
         if not post.published_at:

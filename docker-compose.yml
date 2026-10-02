@@ -45,6 +45,11 @@ services:
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@devblog.local}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ALLOW_ROLE_SELF_SWITCH=${ALLOW_ROLE_SELF_SWITCH:-False}
+      # Daily AI drafts (see services/ai_writer.py)
+      - AI_DRAFTS_TIME=${AI_DRAFTS_TIME:-16:00}
+      - AI_DRAFTS_TIMEZONE=${AI_DRAFTS_TIMEZONE:-America/Los_Angeles}
+      - AI_DRAFTS_API_KEY=${AI_DRAFTS_API_KEY:-}
+      - UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY:-}
     ports:
       # Host-only access; public traffic comes in through Nginx (frontend) and the tunnel
       - "127.0.0.1:8000:8000"

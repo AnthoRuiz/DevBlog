@@ -15,4 +15,6 @@ anthropic==1.9.0
 python-slugify==8.0.4
 psutil>=5.9.0
 slowapi>=0.1.9
+# IANA time zones for zoneinfo (slim images ship without system tzdata)
+tzdata>=2024.1
 

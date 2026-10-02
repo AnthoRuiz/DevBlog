@@ -9,6 +9,7 @@ from app.api.v1.sections import router as sections_router
 from app.api.v1.review import router as review_router
 from app.api.v1.series import router as series_router
 from app.api.v1.feeds import router as feeds_router
+from app.api.v1.ai_drafts import router as ai_drafts_router
 
 api_router = APIRouter()
 
@@ -23,3 +24,4 @@ api_router.include_router(sections_router)
 api_router.include_router(review_router)
 api_router.include_router(series_router)
 api_router.include_router(feeds_router)
+api_router.include_router(ai_drafts_router)

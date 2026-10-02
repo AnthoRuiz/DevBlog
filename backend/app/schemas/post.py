@@ -90,6 +90,10 @@ class PostRead(BaseModel):
     upvotes_count: int
     views_count: int
     status: PostStatus
+    # "human" or "ai" (AI drafts until the admin adopts them; kept internally afterwards)
+    origin: str = "human"
+    # Unsplash attribution for the cover: {id, name, profile_url, photo_url}
+    cover_credit: Optional[dict] = None
     review_note: Optional[str] = None
     featured_at: Optional[datetime] = None
     series_id: Optional[uuid.UUID] = None
@@ -102,6 +106,36 @@ class PostRead(BaseModel):
 class ReviewItem(PostRead):
     """A post waiting for admin review, with who wrote it."""
     author_name: Optional[str] = None
+    # AI drafts: topic, sources, editor notes, providers (admin only)
+    ai_meta: Optional[dict] = None
+
+
+class AIDraftSource(BaseModel):
+    title: str = Field(..., max_length=300)
+    url: str = Field(..., pattern=r"^https?://", max_length=1000)
+
+
+class AIDraftIngest(BaseModel):
+    """A draft sent by an external generator (n8n, scheduled agents...) to POST /ai-drafts/ingest."""
+    title: str = Field(..., min_length=5, max_length=255)
+    summary: str = Field(..., min_length=10, max_length=500)
+    content_markdown: str = Field(..., min_length=100, max_length=60000)
+    language: str = Field(..., pattern="^(en|es)$")
+    section_slug: str
+    tags: list[str] = Field(default_factory=list, max_length=5)
+    sources: list[AIDraftSource] = Field(default_factory=list, max_length=10)
+    cover_query: Optional[str] = Field(None, max_length=80)
+    editor_notes: list[str] = Field(default_factory=list, max_length=6)
+
+
+class AIDraftSettingsUpdate(BaseModel):
+    enabled: Optional[bool] = None
+    max_pending: Optional[int] = Field(None, ge=1, le=30)
+    sections: Optional[list[str]] = None
+
+
+class AIRegenerateRequest(BaseModel):
+    note: str = Field(..., min_length=3, max_length=1000)
 
 
 class PostReject(BaseModel):

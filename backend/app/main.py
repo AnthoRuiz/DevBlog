@@ -244,9 +244,15 @@ async def lifespan(app: FastAPI):
     await seed_initial_data()
     # Start the automatic backup scheduler
     backup_task = asyncio.create_task(automated_backup_scheduler())
+    # Daily AI drafts (AI_DRAFTS_TIME in AI_DRAFTS_TIMEZONE); creates the AI Writer account if missing
+    from app.services import ai_writer
+    async with AsyncSessionLocal() as session:
+        await ai_writer.ensure_writer(session)
+    ai_drafts_task = asyncio.create_task(ai_writer.scheduler())
     yield
     # Cleanup on shutdown
     backup_task.cancel()
+    ai_drafts_task.cancel()
     await engine.dispose()
 
 # Do not publish the OpenAPI schema in production (/api/v1/openapi.json is reachable through Nginx)

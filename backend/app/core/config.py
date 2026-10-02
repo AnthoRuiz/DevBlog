@@ -70,6 +70,16 @@ class Settings(BaseSettings):
     )
     SITE_URL: str = "https://blog.anthoruiz.dev"
 
+    # AI drafts (services/ai_writer.py): two drafts a day, researched on the web, waiting for admin review
+    AI_DRAFTS_TIME: str = "16:00"
+    AI_DRAFTS_TIMEZONE: str = "America/Los_Angeles"
+    # Account that authors AI drafts until the admin adopts them (no password: it cannot sign in)
+    AI_WRITER_EMAIL: str = "ai-writer@blog.internal"
+    # Optional key for external generators posting to POST /ai-drafts/ingest (disabled when unset)
+    AI_DRAFTS_API_KEY: Optional[str] = None
+    # Unsplash cover images for AI drafts (only the Access Key is needed)
+    UNSPLASH_ACCESS_KEY: Optional[str] = None
+
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:5173",

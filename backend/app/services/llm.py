@@ -244,3 +244,109 @@ async def generate_json(
             min(known) if known else None,
         )
     raise LLMUnavailable(f"every configured AI provider failed ({', '.join(providers)})", "failed")
+
+
+# ── Web research (AI drafts) ──────────────────────────────────────────────────
+@dataclass
+class ResearchResult:
+    text: str
+    # [{"title", "url"}]; URLs are checked by the caller before they are published
+    sources: list[dict[str, str]]
+    provider: str
+
+
+_SOURCE_LINE = re.compile(r"^\s*[-*]\s*(?P<title>.+?)\s*\|\s*(?P<url>https?://\S+)\s*$", re.MULTILINE)
+
+
+def _sources_from_text(text: str) -> list[dict[str, str]]:
+    """Read the "- Title | https://..." lines the research prompt asks for."""
+    return [{"title": m.group("title").strip(), "url": m.group("url").rstrip(").,]")} for m in _SOURCE_LINE.finditer(text)]
+
+
+async def _research_claude(prompt: str, timeout: float) -> ResearchResult:
+    client = _claude().with_options(timeout=timeout)
+    tools = [{"type": "web_search_20260209", "name": "web_search", "max_uses": 6}]
+    messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
+    try:
+        response = await client.messages.create(model=settings.CLAUDE_MODEL, max_tokens=6000, tools=tools, messages=messages)
+        # The server-side search loop can pause; re-send the turn to let it continue (capped)
+        for _ in range(3):
+            if response.stop_reason != "pause_turn":
+                break
+            messages = [{"role": "user", "content": prompt}, {"role": "assistant", "content": response.content}]
+            response = await client.messages.create(model=settings.CLAUDE_MODEL, max_tokens=6000, tools=tools, messages=messages)
+    except anthropic.RateLimitError as e:
+        raise ProviderQuotaExceeded(str(e), _parse_seconds(e.response.headers.get("retry-after")))
+    except anthropic.BadRequestError as e:
+        if "credit balance" in str(e).lower():
+            raise ProviderQuotaExceeded(str(e))
+        raise
+    if response.stop_reason == "refusal":
+        raise ValueError("research declined")
+    text = "\n".join(b.text for b in response.content if b.type == "text").strip()
+    if not text:
+        raise ValueError("empty research answer")
+    return ResearchResult(text, _sources_from_text(text), f"claude:{response.model}")
+
+
+async def _research_gemini_model(model: str, prompt: str, timeout: float) -> ResearchResult:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        # Grounding with Google Search: answers cite current web pages
+        "tools": [{"google_search": {}}],
+        "generationConfig": {"temperature": 0.4, "thinkingConfig": {"thinkingLevel": "low"}, "maxOutputTokens": 8192},
+    }
+    headers = {"x-goog-api-key": settings.GEMINI_API_KEY.strip()}
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.post(url, json=payload, headers=headers)
+    if resp.status_code == 429:
+        raise ProviderQuotaExceeded(f"{model}: HTTP 429", _parse_seconds(resp.headers.get("retry-after")))
+    if resp.status_code != 200:
+        raise ValueError(f"{model}: HTTP {resp.status_code}")
+    candidate = resp.json()["candidates"][0]
+    text = "".join(p.get("text", "") for p in candidate.get("content", {}).get("parts", [])).strip()
+    if not text:
+        raise ValueError(f"{model}: empty research answer (finishReason={candidate.get('finishReason')})")
+    sources = _sources_from_text(text)
+    # Grounding chunks are the pages Google Search actually returned
+    for chunk in candidate.get("groundingMetadata", {}).get("groundingChunks", []):
+        web = chunk.get("web") or {}
+        if web.get("uri"):
+            sources.append({"title": web.get("title") or web["uri"], "url": web["uri"]})
+    return ResearchResult(text, sources, f"gemini:{model}")
+
+
+async def research_with_search(prompt: str, *, task: str, timeout: float = 120.0) -> ResearchResult:
+    """Free-text research with live web search, with the same provider failover as generate_json."""
+    providers = configured_providers()
+    if not providers:
+        raise LLMUnavailable("no AI provider configured", "not_configured")
+    quota_hits: list[Optional[int]] = []
+    for provider in providers:
+        try:
+            if provider == "claude":
+                return await _research_claude(prompt, timeout)
+            last_error: Optional[Exception] = None
+            gemini_quota = 0
+            for model in gemini_models():
+                try:
+                    return await _research_gemini_model(model, prompt, timeout)
+                except ProviderQuotaExceeded as e:
+                    gemini_quota += 1
+                    last_error = e
+                except Exception as e:
+                    last_error = e
+                    logger.info(f"[LLM] gemini research with {model} failed ({e}); trying the next model")
+            if gemini_quota and gemini_quota == len(gemini_models()):
+                raise ProviderQuotaExceeded("every Gemini model is out of quota")
+            raise last_error or ValueError("no Gemini model configured")
+        except ProviderQuotaExceeded as e:
+            logger.warning(f"[LLM] {provider} is out of quota for {task}")
+            quota_hits.append(e.retry_after)
+        except Exception as e:
+            logger.warning(f"[LLM] {provider} research failed for {task}: {type(e).__name__}: {e}")
+    if len(quota_hits) == len(providers):
+        known = [s for s in quota_hits if s]
+        raise LLMUnavailable("AI quota exhausted on every configured provider", "quota_exhausted", min(known) if known else None)
+    raise LLMUnavailable(f"web research failed on every configured provider ({', '.join(providers)})", "failed")

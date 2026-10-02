@@ -35,7 +35,7 @@ async def review_queue(current_admin: User = Depends(get_current_admin), db: Asy
         .order_by(Post.updated_at, Post.created_at)
     )
     return [
-        ReviewItem(**PostRead.model_validate(post).model_dump(), author_name=author_name)
+        ReviewItem(**PostRead.model_validate(post).model_dump(), author_name=author_name, ai_meta=post.ai_meta)
         for post, author_name in rows.all()
     ]
 
@@ -43,10 +43,13 @@ async def review_queue(current_admin: User = Depends(get_current_admin), db: Asy
 @router.get("/review/count")
 async def review_count(current_admin: User = Depends(get_current_admin), db: AsyncSession = Depends(get_db)):
     """Number of posts waiting for review, for the admin panel badge."""
-    count = (
-        await db.execute(select(func.count(Post.id)).where(Post.status == PostStatus.PENDING_REVIEW))
-    ).scalar_one()
-    return {"pending": count}
+    rows = dict(
+        (await db.execute(
+            select(Post.origin, func.count(Post.id)).where(Post.status == PostStatus.PENDING_REVIEW).group_by(Post.origin)
+        )).all()
+    )
+    # pending: everything waiting (badge total); ai_pending: the AI drafts among them
+    return {"pending": sum(rows.values()), "ai_pending": rows.get("ai", 0)}
 
 
 MAX_FEATURED_PER_SECTION = 2
@@ -103,6 +106,9 @@ async def approve_post(
     post.review_note = None
     if not post.published_at:
         post.published_at = datetime.now(timezone.utc)
+    # Approving an AI draft publishes it as the admin's own post
+    if post.origin == "ai":
+        post.author_id = current_admin.id
     await db.commit()
     return PostRead.model_validate(await _get_post_or_404(db, post_id))
 
