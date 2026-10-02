@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
 import { Outlet, useLocation, useMatch, useNavigate, useSearchParams } from 'react-router-dom';
+import { Sparkles, X } from 'lucide-react';
 import { Navbar } from './Navbar';
 import { LoginModal } from '../features/auth/LoginModal';
 import { NewPostModal } from '../features/posts/NewPostModal';
@@ -27,7 +28,9 @@ export const Layout: FC = () => (
 const LayoutFrame: FC = () => {
   const { lang, t } = useLanguage();
   const { token, user, isAdmin, canPublishDirectly, login, setUser } = useAuth();
-  const { pending: reviewPending } = useReviewBadge();
+  const { pending: reviewPending, aiPending } = useReviewBadge();
+  // The AI drafts banner can be hidden until the next page load
+  const [isAIBannerHidden, setIsAIBannerHidden] = useState(false);
   const { notifyPostsChanged, editor, openEditor, closeEditor, isLoginOpen, setLoginOpen } = useShell();
   const sections = useSections();
   const tags = useTags();
@@ -55,8 +58,10 @@ const LayoutFrame: FC = () => {
 
   // Admin modals are routes over the feed; closing one returns to the page it was opened from
   const adminMatch = useMatch('/admin/:panel');
-  const openAdminPanel = (panel: 'status' | 'backups') =>
-    navigate(`/admin/${panel}`, { state: { from: adminMatch ? '/' : location.pathname + location.search } });
+  const openAdminPanel = (panel: 'status' | 'backups', tab?: 'ai') =>
+    navigate(`/admin/${panel}${tab ? `?tab=${tab}` : ''}`, {
+      state: { from: adminMatch ? '/' : location.pathname + location.search },
+    });
   const closeAdminPanel = () => navigate((location.state as { from?: string } | null)?.from || '/');
 
   // Navbar search: typing opens /search, scoped to the section being browsed; further typing
@@ -104,9 +109,40 @@ const LayoutFrame: FC = () => {
         onOpenMyPosts={() => setIsMyPostsOpen(true)}
         onOpenAdmin={() => openAdminPanel('backups')}
         onOpenStatus={() => openAdminPanel('status')}
+        onOpenAIDrafts={() => openAdminPanel('backups', 'ai')}
+        aiPending={aiPending}
         showRoleSwitch={ROLE_TESTING_ENABLED}
         reviewPending={reviewPending}
       />
+
+      {/* Admins: AI drafts waiting for review */}
+      {isAdmin && aiPending > 0 && !adminMatch && !isAIBannerHidden && (
+        <div className="border-b border-violet-500/20 bg-violet-500/[0.06]">
+          <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-sm">
+            <p className="flex items-center gap-2 text-violet-100">
+              <Sparkles className="w-4 h-4 text-violet-300" aria-hidden="true" />
+              {t.aiDraftsBanner.replace('{count}', String(aiPending))}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => openAdminPanel('backups', 'ai')}
+                className="px-3 py-1 rounded-md bg-violet-500/20 hover:bg-violet-500/30 border border-violet-400/40 text-violet-100 text-xs font-semibold"
+              >
+                {t.aiDraftsReview}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAIBannerHidden(true)}
+                className="p-1 rounded text-violet-200/70 hover:text-violet-100"
+                aria-label={t.aiDraftsHide}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
         {/* A crashing page shows the diagnostics screen (and reports the error) without taking down the app */}
@@ -150,6 +186,12 @@ const LayoutFrame: FC = () => {
         reviewPending={reviewPending}
         onReviewed={notifyPostsChanged}
         onPreviewPost={(item) => navigate(`/posts/${item.slug}`)}
+        aiPending={aiPending}
+        initialTab={searchParams.get('tab')}
+        onEditPost={(post) => {
+          closeAdminPanel();
+          openEditor(post);
+        }}
       />
 
       <MyPostsModal

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FC, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, ChevronDown, FileText, LogOut, PenLine, Search, Shield, User as UserIcon, X } from 'lucide-react';
+import { Activity, ChevronDown, FileText, LogOut, PenLine, Search, Shield, Sparkles, User as UserIcon, X } from 'lucide-react';
 import { Language } from '../shared/i18n/translations';
 import { useLanguage } from '../shared/i18n/LanguageContext';
 import { useAuth } from '../features/auth/AuthContext';
@@ -15,6 +15,9 @@ interface NavbarProps {
   onOpenMyPosts: () => void;
   onOpenAdmin: () => void;
   onOpenStatus: () => void;
+  onOpenAIDrafts: () => void;
+  /** AI drafts waiting (included in reviewPending) */
+  aiPending: number;
   /** Only shown when the role testing mode is on */
   showRoleSwitch: boolean;
   /** Posts waiting for review (admins) */
@@ -33,6 +36,8 @@ export const Navbar: FC<NavbarProps> = ({
   onOpenMyPosts,
   onOpenAdmin,
   onOpenStatus,
+  onOpenAIDrafts,
+  aiPending,
   showRoleSwitch,
   reviewPending,
 }) => {
@@ -105,8 +110,11 @@ export const Navbar: FC<NavbarProps> = ({
                     </MenuItem>
                     {isAdmin && (
                       <>
-                        <MenuItem icon={<Shield className="w-4 h-4" />} onClick={() => (close(), onOpenAdmin())} badge={reviewPending}>
+                        <MenuItem icon={<Shield className="w-4 h-4" />} onClick={() => (close(), onOpenAdmin())} badge={reviewPending - aiPending}>
                           {t.menuAdminPanel}
+                        </MenuItem>
+                        <MenuItem icon={<Sparkles className="w-4 h-4" />} onClick={() => (close(), onOpenAIDrafts())} badge={aiPending} badgeTone="ai">
+                          {t.menuAIDrafts}
                         </MenuItem>
                         <MenuItem icon={<Activity className="w-4 h-4" />} onClick={() => (close(), onOpenStatus())}>
                           {t.menuSystemStatus}
@@ -251,13 +259,14 @@ const AccountMenu: FC<AccountMenuProps> = ({ name, email, role, reviewPending, t
   );
 };
 
-const MenuItem: FC<{ icon: ReactNode; onClick: () => void; badge?: number; tone?: 'danger'; children: ReactNode }> = ({
-  icon,
-  onClick,
-  badge = 0,
-  tone,
-  children,
-}) => (
+const MenuItem: FC<{
+  icon: ReactNode;
+  onClick: () => void;
+  badge?: number;
+  badgeTone?: 'ai';
+  tone?: 'danger';
+  children: ReactNode;
+}> = ({ icon, onClick, badge = 0, badgeTone, tone, children }) => (
   <button
     type="button"
     role="menuitem"
@@ -269,7 +278,11 @@ const MenuItem: FC<{ icon: ReactNode; onClick: () => void; badge?: number; tone?
     <span className="shrink-0">{icon}</span>
     <span className="flex-1">{children}</span>
     {badge > 0 && (
-      <span className="min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-amber-400 text-[#07090E] text-[10px] font-bold flex items-center justify-center">
+      <span
+        className={`min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
+          badgeTone === 'ai' ? 'bg-violet-400 text-[#07090E]' : 'bg-amber-400 text-[#07090E]'
+        }`}
+      >
         {badge}
       </span>
     )}

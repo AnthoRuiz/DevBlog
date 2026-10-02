@@ -1,4 +1,4 @@
-import { Post, PostDetail, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions, ReviewItem, Series, SeriesDetail, HomeData } from '../types';
+import { Post, PostDetail, Tag, Comment, HardwareTelemetry, SystemStatusResponse, User, UserRole, BackupItem, BackupsResponse, MediaStats, MediaCleanupResult, PostPage, SectionWithCount, Section, TagValidation, AIStatus, TagSuggestions, ReviewItem, Series, SeriesDetail, HomeData, AIDraftsStatus } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -589,9 +589,34 @@ export function fetchReviewQueue(token: string): Promise<ReviewItem[]> {
   return authJson('/admin/review', token, 'Failed to load the review queue');
 }
 
-export async function fetchReviewCount(token: string): Promise<number> {
-  const data = await authJson<{ pending: number }>('/admin/review/count', token, 'Failed to load the review count');
-  return data.pending;
+/** pending: everything waiting for review; ai_pending: the AI drafts among them */
+export function fetchReviewCount(token: string): Promise<{ pending: number; ai_pending: number }> {
+  return authJson('/admin/review/count', token, 'Failed to load the review count');
+}
+
+export function fetchAIDraftsStatus(token: string): Promise<AIDraftsStatus> {
+  return authJson('/admin/ai-drafts/status', token, 'Failed to load the AI drafts status');
+}
+
+export function updateAIDraftsSettings(
+  body: { enabled?: boolean; max_pending?: number; sections?: string[] },
+  token: string
+): Promise<{ enabled: boolean; max_pending: number; sections: string[] }> {
+  return authJson('/admin/ai-drafts/settings', token, 'Failed to update the AI drafts settings', {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+export function runAIDraftsNow(token: string): Promise<{ started: boolean }> {
+  return authJson('/admin/ai-drafts/run', token, 'Failed to start the generation', { method: 'POST' });
+}
+
+export function regenerateAIDraft(postId: string, note: string, token: string): Promise<{ started: boolean }> {
+  return authJson(`/admin/ai-drafts/${postId}/regenerate`, token, 'Failed to start the new version', {
+    method: 'POST',
+    body: JSON.stringify({ note }),
+  });
 }
 
 export function approvePost(postId: string, token: string): Promise<Post> {

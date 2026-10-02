@@ -98,6 +98,10 @@ export interface Post {
   review_note?: string | null;
   // Set while the admin features the post in its section (max two per section)
   featured_at?: string | null;
+  // "ai" for drafts written by the AI writer (kept internally after the admin adopts them)
+  origin?: 'human' | 'ai';
+  // Unsplash attribution shown under the cover
+  cover_credit?: { id: string; name: string; profile_url: string; photo_url: string } | null;
   series_id?: string | null;
   series_position?: number | null;
   published_at?: string;
@@ -109,6 +113,43 @@ export interface Post {
 // A post waiting for admin review, with who wrote it
 export interface ReviewItem extends Post {
   author_name?: string | null;
+  // AI drafts only: what the writer researched and wants the admin to check
+  ai_meta?: {
+    topic?: string;
+    sources?: { title: string; url: string }[];
+    editor_notes?: string[];
+    providers?: { research?: string; writing?: string };
+    generated_at?: string;
+    regenerating?: boolean;
+    regenerate_error?: string | null;
+    last_feedback?: string;
+  } | null;
+}
+
+export interface AIDraftRun {
+  id: string;
+  run_date: string;
+  trigger: 'schedule' | 'retry' | 'manual';
+  status: 'running' | 'succeeded' | 'partial' | 'failed' | 'skipped';
+  detail: string;
+  post_ids: string[];
+  started_at: string;
+  finished_at: string | null;
+}
+
+// GET /admin/ai-drafts/status
+export interface AIDraftsStatus {
+  enabled: boolean;
+  max_pending: number;
+  sections: string[];
+  schedule_time: string;
+  timezone: string;
+  next_run_at: string;
+  pending: number;
+  running: boolean;
+  providers: string[];
+  unsplash_configured: boolean;
+  recent_runs: AIDraftRun[];
 }
 
 export interface PostDetail extends Post {

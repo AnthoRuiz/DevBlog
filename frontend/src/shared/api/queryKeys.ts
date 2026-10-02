@@ -16,4 +16,7 @@ export const queryKeys = {
   seriesList: (section: string) => ['series', 'list', section] as const,
   series: (slug: string, signedIn: boolean) => ['series', 'detail', slug, signedIn] as const,
   reviewCount: ['review', 'count'] as const,
+  // Under ['posts'] so post changes refresh them
+  reviewQueue: ['posts', 'review-queue'] as const,
+  aiStatus: ['review', 'ai-status'] as const,
 };

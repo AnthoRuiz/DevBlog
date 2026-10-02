@@ -239,6 +239,19 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
               />
             </div>
           )}
+          {/* Unsplash requires crediting the photographer with links back */}
+          {post.cover_image_url && post.cover_credit && (
+            <p className="-mt-6 mb-8 text-[11px] font-mono text-[#7C8AA0]">
+              {t.photoCreditPrefix}{' '}
+              <a href={post.cover_credit.profile_url} target="_blank" rel="noopener noreferrer" className="underline hover:text-[#F8FAFC]">
+                {post.cover_credit.name}
+              </a>{' '}
+              {t.photoCreditOn}{' '}
+              <a href={post.cover_credit.photo_url} target="_blank" rel="noopener noreferrer" className="underline hover:text-[#F8FAFC]">
+                Unsplash
+              </a>
+            </p>
+          )}
 
           {/* Highlighted summary */}
           <div

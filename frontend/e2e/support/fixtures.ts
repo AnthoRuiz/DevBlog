@@ -6,18 +6,23 @@ export { expect };
 
 type Json = Record<string, any>;
 
-function adminCredentials(): { email: string; password: string } {
-  if (process.env.E2E_ADMIN_EMAIL && process.env.E2E_ADMIN_PASSWORD) {
-    return { email: process.env.E2E_ADMIN_EMAIL, password: process.env.E2E_ADMIN_PASSWORD };
-  }
+function devEnv(): Record<string, string> {
   const envFile = resolve(process.cwd(), '..', '.env.dev');
-  if (!existsSync(envFile)) throw new Error('Set E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD or create ../.env.dev');
-  const env = Object.fromEntries(
+  if (!existsSync(envFile)) return {};
+  return Object.fromEntries(
     readFileSync(envFile, 'utf8')
       .split(/\r?\n/)
       .filter((line) => line.includes('=') && !line.trim().startsWith('#'))
       .map((line) => [line.slice(0, line.indexOf('=')).trim(), line.slice(line.indexOf('=') + 1).trim()])
   );
+}
+
+function adminCredentials(): { email: string; password: string } {
+  if (process.env.E2E_ADMIN_EMAIL && process.env.E2E_ADMIN_PASSWORD) {
+    return { email: process.env.E2E_ADMIN_EMAIL, password: process.env.E2E_ADMIN_PASSWORD };
+  }
+  const env = devEnv();
+  if (!env.ADMIN_EMAIL) throw new Error('Set E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD or create ../.env.dev');
   return { email: env.ADMIN_EMAIL, password: env.ADMIN_PASSWORD };
 }
 
@@ -87,6 +92,29 @@ export class Api {
     const series = await this.call('POST', '/series', { title, section_id: (await this.section(section)).id }, this.adminToken);
     this.created.series.push(series.id);
     return series;
+  }
+
+  /** Post an AI draft through the ingest endpoint (needs AI_DRAFTS_API_KEY in ../.env.dev); no AI quota used. */
+  async ingestDraft(fields: Json & { section_slug: string }): Promise<Json> {
+    const key = process.env.E2E_AI_DRAFTS_API_KEY ?? devEnv().AI_DRAFTS_API_KEY;
+    if (!key) throw new Error('Set AI_DRAFTS_API_KEY in ../.env.dev');
+    const res = await this.request.fetch('/api/v1/ai-drafts/ingest', {
+      method: 'POST',
+      headers: { 'X-API-Key': key },
+      data: {
+        summary: 'E2E AI summary for review.',
+        content_markdown: 'Intro paragraph for the AI draft.\n\n## Section\n\nBody text long enough to pass the minimum length check for drafts.',
+        language: 'en',
+        tags: [],
+        sources: [{ title: 'Example source', url: 'https://example.com/article' }],
+        editor_notes: ['Check the main claim.'],
+        ...fields,
+      },
+    });
+    if (!res.ok()) throw new Error(`ingest -> ${res.status()} ${await res.text()}`);
+    const draft = await res.json();
+    this.created.posts.push(draft.id);
+    return draft;
   }
 
   async cleanup() {

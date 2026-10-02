@@ -17,10 +17,12 @@ import {
   Eraser,
   LayoutGrid,
   ClipboardCheck,
+  Sparkles,
 } from 'lucide-react';
 import { SectionsAdmin } from './SectionsAdmin';
 import { ReviewQueue } from './ReviewQueue';
-import { BackupItem, BackupsResponse, MediaStats, ReviewItem, User, UserRole } from '../../shared/types';
+import { AIDraftsTab } from './AIDraftsTab';
+import { BackupItem, BackupsResponse, MediaStats, Post, ReviewItem, User, UserRole } from '../../shared/types';
 import {
   fetchAdminBackups,
   createAdminBackup,
@@ -45,7 +47,14 @@ interface BackupsModalProps {
   reviewPending?: number;
   onReviewed?: () => void;
   onPreviewPost?: (item: ReviewItem) => void;
+  /** AI drafts waiting (also part of reviewPending) */
+  aiPending?: number;
+  /** Tab to show when the panel opens (?tab=ai from the account menu or the banner) */
+  initialTab?: string | null;
+  onEditPost?: (post: Post) => void;
 }
+
+type AdminTab = 'review' | 'ai' | 'roles' | 'backups' | 'sections';
 
 export const BackupsModal: React.FC<BackupsModalProps> = ({
   isOpen,
@@ -57,8 +66,16 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
   reviewPending = 0,
   onReviewed,
   onPreviewPost,
+  aiPending = 0,
+  initialTab,
+  onEditPost,
 }) => {
-  const [activeTab, setActiveTab] = useState<'review' | 'roles' | 'backups' | 'sections'>('review');
+  const [activeTab, setActiveTab] = useState<AdminTab>('review');
+
+  // Open on the requested tab each time the panel opens
+  useEffect(() => {
+    if (isOpen) setActiveTab(initialTab === 'ai' ? 'ai' : 'review');
+  }, [isOpen, initialTab]);
   
   // Backups state
   const [data, setData] = useState<BackupsResponse | null>(null);
@@ -276,9 +293,10 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
     },
   ];
 
+  // items-start + my-auto: centered when it fits, scrollable from the top when taller than the screen
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex justify-center items-center p-4 animate-fadeIn">
-      <div className="relative w-full max-w-3xl bg-[#0b0f19] border border-[#1e293b] rounded-2xl shadow-2xl overflow-hidden font-sans">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex justify-center items-start p-4 animate-fadeIn">
+      <div className="relative my-auto w-full max-w-3xl bg-[#0b0f19] border border-[#1e293b] rounded-2xl shadow-2xl overflow-hidden font-sans">
         
         {/* Panel header */}
         <div className="bg-[#121622] px-6 py-4 border-b border-[#1e293b] flex items-center justify-between">
@@ -321,7 +339,20 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
             }`}
           >
             <ClipboardCheck className="w-4 h-4" />
-            <span>Review ({reviewPending})</span>
+            <span>Review ({reviewPending - aiPending})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('ai')}
+            className={`flex items-center gap-2 py-3 px-4 text-xs font-mono font-bold border-b-2 transition-all ${
+              activeTab === 'ai'
+                ? 'border-violet-400 text-violet-200 bg-violet-500/5'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>AI drafts ({aiPending})</span>
           </button>
 
           <button
@@ -530,6 +561,15 @@ export const BackupsModal: React.FC<BackupsModalProps> = ({
 
         {activeTab === 'review' && (
           <ReviewQueue token={token} onMessage={setMessage} onReviewed={onReviewed} onPreview={onPreviewPost} />
+        )}
+
+        {activeTab === 'ai' && (
+          <AIDraftsTab
+            token={token}
+            onMessage={setMessage}
+            onPreview={(slug) => onPreviewPost?.({ slug } as ReviewItem)}
+            onEdit={(post) => onEditPost?.(post)}
+          />
         )}
 
         {activeTab === 'sections' && (

@@ -220,6 +220,12 @@ export interface Translations {
   pagePrev: string;
   pageNext: string;
   paginationLabel: string;
+  menuAIDrafts: string;
+  aiDraftsBanner: string;
+  aiDraftsReview: string;
+  aiDraftsHide: string;
+  photoCreditPrefix: string;
+  photoCreditOn: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -439,6 +445,12 @@ export const translations: Record<Language, Translations> = {
     pagePrev: 'Anterior',
     pageNext: 'Siguiente',
     paginationLabel: 'Paginación',
+    menuAIDrafts: 'Borradores de IA',
+    aiDraftsBanner: 'Tienes {count} borrador(es) de IA esperando tu revisión.',
+    aiDraftsReview: 'Revisar',
+    aiDraftsHide: 'Ocultar aviso',
+    photoCreditPrefix: 'Foto de',
+    photoCreditOn: 'en',
   },
   en: {
     siteTitle: 'Anthony Ruiz',
@@ -656,6 +668,12 @@ export const translations: Record<Language, Translations> = {
     pagePrev: 'Previous',
     pageNext: 'Next',
     paginationLabel: 'Pagination',
+    menuAIDrafts: 'AI drafts',
+    aiDraftsBanner: 'You have {count} AI draft(s) waiting for your review.',
+    aiDraftsReview: 'Review',
+    aiDraftsHide: 'Hide notice',
+    photoCreditPrefix: 'Photo by',
+    photoCreditOn: 'on',
   },
   pt: {
     siteTitle: 'Anthony Ruiz',
@@ -873,6 +891,12 @@ export const translations: Record<Language, Translations> = {
     pagePrev: 'Anterior',
     pageNext: 'Próximo',
     paginationLabel: 'Paginação',
+    menuAIDrafts: 'Rascunhos de IA',
+    aiDraftsBanner: 'Você tem {count} rascunho(s) de IA aguardando sua revisão.',
+    aiDraftsReview: 'Revisar',
+    aiDraftsHide: 'Ocultar aviso',
+    photoCreditPrefix: 'Foto de',
+    photoCreditOn: 'no',
   },
   fr: {
     siteTitle: 'Anthony Ruiz',
@@ -1090,6 +1114,12 @@ export const translations: Record<Language, Translations> = {
     pagePrev: 'Précédent',
     pageNext: 'Suivant',
     paginationLabel: 'Pagination',
+    menuAIDrafts: 'Brouillons IA',
+    aiDraftsBanner: 'Vous avez {count} brouillon(s) IA en attente de votre relecture.',
+    aiDraftsReview: 'Relire',
+    aiDraftsHide: 'Masquer l\'avis',
+    photoCreditPrefix: 'Photo de',
+    photoCreditOn: 'sur',
   },
 };
 

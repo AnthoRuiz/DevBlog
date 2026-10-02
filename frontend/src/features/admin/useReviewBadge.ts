@@ -21,7 +21,9 @@ export function useReviewBadge() {
     refetchInterval: 60_000,
     refetchIntervalInBackground: true,
   });
-  const pending = enabled ? query.data ?? 0 : 0;
+  const pending = enabled ? query.data?.pending ?? 0 : 0;
+  // AI drafts among the pending posts
+  const aiPending = enabled ? query.data?.ai_pending ?? 0 : 0;
   const { refetch } = query;
 
   // TanStack Query only watches visibilitychange; window focus counts too
@@ -42,5 +44,5 @@ export function useReviewBadge() {
     setTitleBadge(pending);
   }, [pending]);
 
-  return { pending };
+  return { pending, aiPending };
 }
