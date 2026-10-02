@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_current_admin
 from app.db.session import get_db
 from app.models.post import Post, PostStatus
+from app.models.idea import PostIdea
 from app.models.user import User
 from app.schemas.post import PostRead, PostReject, ReviewItem
 
@@ -43,13 +44,12 @@ async def review_queue(current_admin: User = Depends(get_current_admin), db: Asy
 @router.get("/review/count")
 async def review_count(current_admin: User = Depends(get_current_admin), db: AsyncSession = Depends(get_db)):
     """Number of posts waiting for review, for the admin panel badge."""
-    rows = dict(
-        (await db.execute(
-            select(Post.origin, func.count(Post.id)).where(Post.status == PostStatus.PENDING_REVIEW).group_by(Post.origin)
-        )).all()
-    )
-    # pending: everything waiting (badge total); ai_pending: the AI drafts among them
-    return {"pending": sum(rows.values()), "ai_pending": rows.get("ai", 0)}
+    pending = (
+        await db.execute(select(func.count(Post.id)).where(Post.status == PostStatus.PENDING_REVIEW))
+    ).scalar_one()
+    # New writing ideas from the daily job (separate badge)
+    ideas = (await db.execute(select(func.count(PostIdea.id)).where(PostIdea.status == "new"))).scalar_one()
+    return {"pending": pending, "ideas_pending": ideas}
 
 
 MAX_FEATURED_PER_SECTION = 2

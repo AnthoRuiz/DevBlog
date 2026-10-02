@@ -110,32 +110,54 @@ class ReviewItem(PostRead):
     ai_meta: Optional[dict] = None
 
 
-class AIDraftSource(BaseModel):
+class IdeaSource(BaseModel):
     title: str = Field(..., max_length=300)
     url: str = Field(..., pattern=r"^https?://", max_length=1000)
 
 
-class AIDraftIngest(BaseModel):
-    """A draft sent by an external generator (n8n, scheduled agents...) to POST /ai-drafts/ingest."""
+class IdeaOutlineItem(BaseModel):
+    heading: str = Field(..., max_length=200)
+    guidance: str = Field(..., max_length=1000)
+    prompts: list[str] = Field(default_factory=list, max_length=5)
+
+
+class IdeaIngest(BaseModel):
+    """An idea sent by an external generator (n8n, scheduled agents...) to POST /ideas/ingest."""
     title: str = Field(..., min_length=5, max_length=255)
-    summary: str = Field(..., min_length=10, max_length=500)
-    content_markdown: str = Field(..., min_length=100, max_length=60000)
+    hook: str = Field(..., min_length=10, max_length=1500)
     language: str = Field(..., pattern="^(en|es)$")
     section_slug: str
+    angles: list[str] = Field(default_factory=list, max_length=6)
+    outline: list[IdeaOutlineItem] = Field(default_factory=list, max_length=8)
+    questions: list[str] = Field(default_factory=list, max_length=6)
+    experiment: str = Field("", max_length=1000)
     tags: list[str] = Field(default_factory=list, max_length=5)
-    sources: list[AIDraftSource] = Field(default_factory=list, max_length=10)
+    sources: list[IdeaSource] = Field(default_factory=list, max_length=10)
     cover_query: Optional[str] = Field(None, max_length=80)
-    editor_notes: list[str] = Field(default_factory=list, max_length=6)
 
 
-class AIDraftSettingsUpdate(BaseModel):
+class IdeaRead(BaseModel):
+    id: uuid.UUID
+    section_slug: str
+    section_name: str
+    section_color: str
+    language: str
+    title: str
+    hook: str
+    # angles, outline, questions, experiment, tags, providers (research notes are not sent)
+    brief: dict
+    sources: list[dict]
+    cover_image_url: Optional[str] = None
+    cover_credit: Optional[dict] = None
+    status: str
+    post_id: Optional[uuid.UUID] = None
+    created_at: datetime
+
+
+class IdeaSettingsUpdate(BaseModel):
     enabled: Optional[bool] = None
     max_pending: Optional[int] = Field(None, ge=1, le=30)
     sections: Optional[list[str]] = None
-
-
-class AIRegenerateRequest(BaseModel):
-    note: str = Field(..., min_length=3, max_length=1000)
 
 
 class PostReject(BaseModel):
