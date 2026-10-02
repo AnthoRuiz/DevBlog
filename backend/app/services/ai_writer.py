@@ -89,7 +89,9 @@ async def pending_ideas(db: AsyncSession) -> int:
 
 
 async def _pick_sections(db: AsyncSession, cfg: AIWriterSettings, count: int) -> list[Section]:
-    """Distinct sections, least recently drafted first (ties broken at random)."""
+    """Up to `count` DIFFERENT sections, never the same one twice in a run: the section that went
+    longest without an idea comes first (ties at random). With fewer eligible sections than `count`,
+    fewer ideas are created that day rather than repeating a section."""
     allowed = [slug for slug in cfg.sections if slug != "mental-health"]
     sections = (await db.execute(select(Section).where(Section.slug.in_(allowed)))).scalars().all()
     if not sections:
@@ -97,10 +99,7 @@ async def _pick_sections(db: AsyncSession, cfg: AIWriterSettings, count: int) ->
     last = dict((await db.execute(select(PostIdea.section_id, func.max(PostIdea.created_at)).group_by(PostIdea.section_id))).all())
     oldest = datetime.min.replace(tzinfo=timezone.utc)
     ranked = sorted(sections, key=lambda s: (last.get(s.id) or oldest, random.random()))
-    picked = ranked[:count]
-    while len(picked) < count:  # fewer eligible sections than drafts
-        picked.append(random.choice(sections))
-    return picked
+    return ranked[:count]
 
 
 async def _recent_titles(db: AsyncSession, section_id) -> list[str]:
